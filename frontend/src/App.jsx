@@ -238,6 +238,7 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const movementsRequestRef = useRef(0);
+  const authFailHandledRef = useRef(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -257,6 +258,10 @@ export default function App() {
       navigate("/", { replace: true });
     }
   }, [token, location.pathname, navigate]);
+
+  useEffect(() => {
+    authFailHandledRef.current = false;
+  }, [token]);
 
   const authHeaders = useMemo(() => {
     if (!token) return {};
@@ -375,6 +380,42 @@ export default function App() {
     return { rows, max };
   }, [stats.dailyTotals]);
 
+  async function handleAuthFailure() {
+    if (authFailHandledRef.current) return;
+    authFailHandledRef.current = true;
+
+    localStorage.removeItem("token");
+    setToken("");
+    setSelectedClient(null);
+    setMovements([]);
+    navigate("/login", { replace: true });
+
+    await Swal.fire({
+      icon: "warning",
+      title: "Sesion expirada",
+      text: "Tu sesion ya no es valida. Vuelve a iniciar sesion.",
+    });
+  }
+
+  async function authFetch(url, options = {}) {
+    if (!token) return null;
+
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...authHeaders,
+        ...options.headers,
+      },
+    });
+
+    if (response.status === 401) {
+      await handleAuthFailure();
+      return null;
+    }
+
+    return response;
+  }
+
   async function loadPublicPrices() {
     try {
       const response = await fetch(`${apiBase}/api/prices`);
@@ -388,9 +429,8 @@ export default function App() {
   async function loadSweetStats() {
     if (!token) return;
     try {
-      const response = await fetch(`${apiBase}/api/sweets/stats`, {
-        headers: authHeaders,
-      });
+      const response = await authFetch(`${apiBase}/api/sweets/stats`);
+      if (!response) return;
       if (response.ok) {
         setStockStats(await response.json());
       }
@@ -402,9 +442,8 @@ export default function App() {
   async function loadSweets() {
     if (!token) return;
     try {
-      const response = await fetch(`${apiBase}/api/sweets`, {
-        headers: authHeaders,
-      });
+      const response = await authFetch(`${apiBase}/api/sweets`);
+      if (!response) return;
       if (response.ok) {
         setSweets(await response.json());
       }
@@ -416,9 +455,8 @@ export default function App() {
   async function loadClients() {
     if (!token) return;
     try {
-      const response = await fetch(`${apiBase}/api/clients`, {
-        headers: authHeaders,
-      });
+      const response = await authFetch(`${apiBase}/api/clients`);
+      if (!response) return [];
       if (response.ok) {
         const data = await response.json();
         setClients(data);
@@ -434,9 +472,8 @@ export default function App() {
     if (!token) return;
     setStatsLoading(true);
     try {
-      const response = await fetch(`${apiBase}/api/stats`, {
-        headers: authHeaders,
-      });
+      const response = await authFetch(`${apiBase}/api/stats`);
+      if (!response) return;
       if (response.ok) {
         setStats(await response.json());
       }
@@ -450,10 +487,10 @@ export default function App() {
   async function loadWeekStats() {
     if (!token) return;
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiBase}/api/stats/weekly?from=${activeRange.from}&to=${activeRange.to}`,
-        { headers: authHeaders },
       );
+      if (!response) return;
       if (response.ok) {
         setWeekStats(await response.json());
       }
@@ -466,9 +503,8 @@ export default function App() {
     if (!token || !day) return;
     setSelectedDayLoading(true);
     try {
-      const response = await fetch(`${apiBase}/api/stats/day/${day}`, {
-        headers: authHeaders,
-      });
+      const response = await authFetch(`${apiBase}/api/stats/day/${day}`);
+      if (!response) return;
       if (response.ok) {
         setSelectedDayMoves(await response.json());
       }
@@ -482,9 +518,8 @@ export default function App() {
   async function loadPurchasePlaces() {
     if (!token) return;
     try {
-      const response = await fetch(`${apiBase}/api/purchase-places`, {
-        headers: authHeaders,
-      });
+      const response = await authFetch(`${apiBase}/api/purchase-places`);
+      if (!response) return;
       if (response.ok) {
         setPurchasePlaces(await response.json());
       }
@@ -496,9 +531,8 @@ export default function App() {
   async function loadPackagePurchases() {
     if (!token) return;
     try {
-      const response = await fetch(`${apiBase}/api/package-purchases`, {
-        headers: authHeaders,
-      });
+      const response = await authFetch(`${apiBase}/api/package-purchases`);
+      if (!response) return;
       if (response.ok) {
         setPackagePurchases(await response.json());
       }
@@ -510,11 +544,12 @@ export default function App() {
   async function handleAddPlace(event) {
     event.preventDefault();
     if (!newPlace.trim()) return;
-    const response = await fetch(`${apiBase}/api/purchase-places`, {
+    const response = await authFetch(`${apiBase}/api/purchase-places`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newPlace.trim() }),
     });
+    if (!response) return;
     if (response.ok) {
       setNewPlace("");
       loadPurchasePlaces();
@@ -532,11 +567,12 @@ export default function App() {
       packageCost: Number(purchaseForm.packageCost),
     };
 
-    const response = await fetch(`${apiBase}/api/package-purchases`, {
+    const response = await authFetch(`${apiBase}/api/package-purchases`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    if (!response) return;
 
     if (!response.ok) {
       await Swal.fire({
@@ -632,11 +668,12 @@ export default function App() {
 
   async function handleAddSweet(event) {
     event.preventDefault();
-    const response = await fetch(`${apiBase}/api/sweets`, {
+    const response = await authFetch(`${apiBase}/api/sweets`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newSweet),
     });
+    if (!response) return;
 
     if (!response.ok) {
       await Swal.fire({
@@ -661,9 +698,9 @@ export default function App() {
 
   async function handleUpdateSweet(event) {
     event.preventDefault();
-    const response = await fetch(`${apiBase}/api/sweets/${editingSweet.id}`, {
+    const response = await authFetch(`${apiBase}/api/sweets/${editingSweet.id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", ...authHeaders },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: editingSweet.name,
         purchasePrice: editingSweet.purchase_price,
@@ -671,6 +708,7 @@ export default function App() {
         stock: editingSweet.stock,
       }),
     });
+    if (!response) return;
 
     if (!response.ok) {
       await Swal.fire({
@@ -705,10 +743,10 @@ export default function App() {
 
     if (!result.isConfirmed) return;
 
-    const response = await fetch(`${apiBase}/api/sweets/${id}`, {
+    const response = await authFetch(`${apiBase}/api/sweets/${id}`, {
       method: "DELETE",
-      headers: authHeaders,
     });
+    if (!response) return;
 
     if (!response.ok) {
       await Swal.fire({
@@ -732,11 +770,12 @@ export default function App() {
 
   async function handleAddClient(event) {
     event.preventDefault();
-    const response = await fetch(`${apiBase}/api/clients`, {
+    const response = await authFetch(`${apiBase}/api/clients`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newClient }),
     });
+    if (!response) return;
 
     if (!response.ok) {
       await Swal.fire({
@@ -760,14 +799,15 @@ export default function App() {
   async function handleUpdateClient(event) {
     event.preventDefault();
     const editedClientId = editingClient.id;
-    const response = await fetch(`${apiBase}/api/clients/${editingClient.id}`, {
+    const response = await authFetch(`${apiBase}/api/clients/${editingClient.id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", ...authHeaders },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: editingClient.name,
         totalDebt: editingClient.total_debt,
       }),
     });
+    if (!response) return;
 
     if (!response.ok) {
       await Swal.fire({
@@ -810,10 +850,10 @@ export default function App() {
 
     if (!result.isConfirmed) return;
 
-    const response = await fetch(`${apiBase}/api/clients/${id}`, {
+    const response = await authFetch(`${apiBase}/api/clients/${id}`, {
       method: "DELETE",
-      headers: authHeaders,
     });
+    if (!response) return;
 
     if (!response.ok) {
       await Swal.fire({
@@ -848,12 +888,10 @@ export default function App() {
     setSelectedClient(client);
     setMovements([]);
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiBase}/api/clients/${clientId}/movements`,
-        {
-          headers: authHeaders,
-        },
       );
+      if (!response) return;
       if (response.ok) {
         const data = await response.json();
         if (movementsRequestRef.current === requestId) {
@@ -914,14 +952,15 @@ export default function App() {
       payload.amount = computedTotal;
     }
 
-    const response = await fetch(
+    const response = await authFetch(
       `${apiBase}/api/clients/${targetClient.id}/${endpoint}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       },
     );
+    if (!response) return;
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
@@ -990,14 +1029,15 @@ export default function App() {
 
     if (!passwordResult.isConfirmed) return;
 
-    const response = await fetch(
+    const response = await authFetch(
       `${apiBase}/api/clients/${selectedClient.id}/movements/${move.id}`,
       {
         method: "DELETE",
-        headers: { "Content-Type": "application/json", ...authHeaders },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: passwordResult.value }),
       },
     );
+    if (!response) return;
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
@@ -1069,11 +1109,12 @@ export default function App() {
       return;
     }
 
-    const response = await fetch(`${apiBase}/api/sales`, {
+    const response = await authFetch(`${apiBase}/api/sales`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ items: payloadItems }),
     });
+    if (!response) return;
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
@@ -1104,10 +1145,10 @@ export default function App() {
     setMovementDetailModalOpen(true);
 
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${apiBase}/api/movements/${move.id}/items`,
-        { headers: authHeaders },
       );
+      if (!response) return;
       if (response.ok) {
         setMovementDetailItems(await response.json());
       }
