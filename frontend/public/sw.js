@@ -1,7 +1,8 @@
-const CACHE_NAME = "tiendita-cache-v1";
+const CACHE_NAME = "tiendita-cache-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
+  "/logo.jpg",
   "/manifest.webmanifest",
   "/icons/icon-192.svg",
   "/icons/icon-512.svg",

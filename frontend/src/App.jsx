@@ -33,6 +33,7 @@ import {
   mdiPackageVariantClosed,
   mdiClose,
 } from "@mdi/js";
+import brandLogo from "../assets/logo.jpg";
 
 const apiBase =
   import.meta.env.VITE_API_URL || `http://${window.location.hostname}:4000`;
@@ -1189,7 +1190,11 @@ export default function App() {
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
           {/* Logo */}
           <div className="flex shrink-0 items-center gap-2 text-lg font-semibold">
-            <Icon path={mdiCandycane} size={1} />
+            <img
+              src={brandLogo}
+              alt="Logo Tiendita"
+              className="h-8 w-8 rounded-lg border border-amber-200 object-cover shadow-sm dark:border-slate-700"
+            />
             Tiendita
           </div>
 
@@ -1326,6 +1331,13 @@ export default function App() {
                     onSubmit={handleLogin}
                     className="rounded-3xl border border-amber-100/70 bg-white/90 p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900/80"
                   >
+                    <div className="mb-4 flex justify-center">
+                      <img
+                        src={brandLogo}
+                        alt="Logo Tiendita"
+                        className="h-16 w-16 rounded-2xl border border-amber-200 object-cover shadow-sm dark:border-slate-700"
+                      />
+                    </div>
                     <div className="mb-6 text-center text-2xl font-semibold">
                       Iniciar Sesion
                     </div>
