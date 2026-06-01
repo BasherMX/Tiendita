@@ -38,3 +38,13 @@ __pycache__/
 # Local tooling state
 .venv/
 .cache/
+
+# Local maintenance scripts (not part of minimal published app)
+backup-diario.ps1
+configurar-red.ps1
+extensiones.txt
+gestionar-volumenes.ps1
+limpiar-portproxy.bat
+programar-respaldo-diario.ps1
+reparar-backend.ps1
+start-local.ps1
