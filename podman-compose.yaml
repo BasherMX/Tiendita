@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: tiendita-db
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+    ports:
+      - "14330:1433"
+    volumes:
+      - db-data:/var/opt/mssql
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+    container_name: tiendita-backend
+    env_file:
+      - .env
+    environment:
+      - PORT=4000
+      - DB_HOST=db
+      - DB_USER=${DB_USER:-sa}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=tiendita
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS}
+      - ENABLE_DEMO_SEED=false
+    ports:
+      - "0.0.0.0:4000:4000"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Containerfile
+    container_name: tiendita-frontend
+    ports:
+      - "0.0.0.0:1416:1416"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db-data:
