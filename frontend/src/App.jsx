@@ -787,7 +787,9 @@ export default function App() {
     });
 
     const refreshedClients = await loadClients();
-    const refreshedEdited = refreshedClients.find((c) => c.id === editedClientId);
+    const refreshedEdited = refreshedClients.find(
+      (c) => c.id === editedClientId,
+    );
     if (refreshedEdited && selectedClient?.id === editedClientId) {
       setSelectedClient(refreshedEdited);
       await loadMovements(refreshedEdited);
@@ -846,9 +848,12 @@ export default function App() {
     setSelectedClient(client);
     setMovements([]);
     try {
-      const response = await fetch(`${apiBase}/api/clients/${clientId}/movements`, {
-        headers: authHeaders,
-      });
+      const response = await fetch(
+        `${apiBase}/api/clients/${clientId}/movements`,
+        {
+          headers: authHeaders,
+        },
+      );
       if (response.ok) {
         const data = await response.json();
         if (movementsRequestRef.current === requestId) {
@@ -1399,7 +1404,9 @@ export default function App() {
                         <input
                           className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
                           placeholder="Nombre"
-                          value={editingSweet ? editingSweet.name : newSweet.name}
+                          value={
+                            editingSweet ? editingSweet.name : newSweet.name
+                          }
                           onChange={(event) =>
                             editingSweet
                               ? setEditingSweet({
@@ -1938,7 +1945,10 @@ export default function App() {
                             onClick={() => setShowProfit((v) => !v)}
                             className="flex items-center gap-1 rounded-full border border-amber-200 px-3 py-1 text-xs text-amber-700 hover:bg-amber-50 dark:border-slate-700 dark:text-amber-300 dark:hover:bg-slate-800"
                           >
-                            <Icon path={showProfit ? mdiEye : mdiEyeOff} size={0.6} />
+                            <Icon
+                              path={showProfit ? mdiEye : mdiEyeOff}
+                              size={0.6}
+                            />
                             {showProfit ? "Ocultar" : "Mostrar"} ganancias
                           </button>
                         </div>
@@ -1958,7 +1968,8 @@ export default function App() {
                                 <tbody className="divide-y divide-amber-100/70 dark:divide-slate-800">
                                   {stats.dailyTotals.map((row, idx) => {
                                     const normalizedDay = toIsoDay(row.day);
-                                    const isActive = normalizedDay === selectedDay;
+                                    const isActive =
+                                      normalizedDay === selectedDay;
                                     return (
                                       <tr
                                         key={`${row.day}-${idx}`}
@@ -1969,7 +1980,9 @@ export default function App() {
                                         className={`cursor-pointer hover:bg-amber-50 dark:hover:bg-slate-800 ${isActive ? "bg-amber-100/70 dark:bg-slate-800" : ""}`}
                                       >
                                         <td className="px-4 py-2">
-                                          {new Date(row.day).toLocaleDateString()}
+                                          {new Date(
+                                            row.day,
+                                          ).toLocaleDateString()}
                                         </td>
                                         <td className="px-4 py-2">
                                           ${Number(row.total || 0).toFixed(2)}
@@ -1977,10 +1990,15 @@ export default function App() {
                                         <td className="px-4 py-2">
                                           {showProfit ? (
                                             <span className="text-emerald-600 dark:text-emerald-400">
-                                              ${Number(row.profit || 0).toFixed(2)}
+                                              $
+                                              {Number(row.profit || 0).toFixed(
+                                                2,
+                                              )}
                                             </span>
                                           ) : (
-                                            <span className="tracking-widest text-slate-400">••••••</span>
+                                            <span className="tracking-widest text-slate-400">
+                                              ••••••
+                                            </span>
                                           )}
                                         </td>
                                       </tr>
@@ -1994,7 +2012,9 @@ export default function App() {
                                 Movimientos del dia {selectedDay || "-"}
                               </div>
                               {selectedDayLoading ? (
-                                <p className="text-sm text-slate-500">Cargando detalle...</p>
+                                <p className="text-sm text-slate-500">
+                                  Cargando detalle...
+                                </p>
                               ) : selectedDayMoves.length ? (
                                 <div className="space-y-3">
                                   {selectedDayMoves.map((move) => (
@@ -2002,11 +2022,17 @@ export default function App() {
                                       key={`${move.buyer}-${move.id}`}
                                       className="rounded-2xl border border-amber-100/70 p-3 text-sm dark:border-slate-700"
                                     >
-                                      <div className="font-semibold">{move.buyer}</div>
-                                      <div className="text-xs text-slate-500">
-                                        {new Date(move.created_at).toLocaleString()}
+                                      <div className="font-semibold">
+                                        {move.buyer}
                                       </div>
-                                      <div className="mt-1 text-sm">{move.items}</div>
+                                      <div className="text-xs text-slate-500">
+                                        {new Date(
+                                          move.created_at,
+                                        ).toLocaleString()}
+                                      </div>
+                                      <div className="mt-1 text-sm">
+                                        {move.items}
+                                      </div>
                                       <div className="mt-1 font-semibold text-rose-500">
                                         ${Number(move.total || 0).toFixed(2)}
                                       </div>
@@ -2014,34 +2040,51 @@ export default function App() {
                                   ))}
                                 </div>
                               ) : (
-                                <p className="text-sm text-slate-500">Sin movimientos para ese dia.</p>
+                                <p className="text-sm text-slate-500">
+                                  Sin movimientos para ese dia.
+                                </p>
                               )}
                             </div>
                           </div>
                         ) : (
-                          <p className="text-sm text-slate-500">Sin compras registradas.</p>
+                          <p className="text-sm text-slate-500">
+                            Sin compras registradas.
+                          </p>
                         )}
                       </div>
 
                       <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-                        <div className="mb-4 text-lg font-semibold">Grafica de ventas (ultimos 14 dias)</div>
+                        <div className="mb-4 text-lg font-semibold">
+                          Grafica de ventas (ultimos 14 dias)
+                        </div>
                         {chartData.rows.length ? (
                           <div className="space-y-2">
                             {chartData.rows.map((item) => (
-                              <div key={item.dayLabel} className="grid grid-cols-[70px_1fr_90px] items-center gap-2 text-xs">
-                                <span className="text-slate-500">{item.dayLabel}</span>
+                              <div
+                                key={item.dayLabel}
+                                className="grid grid-cols-[70px_1fr_90px] items-center gap-2 text-xs"
+                              >
+                                <span className="text-slate-500">
+                                  {item.dayLabel}
+                                </span>
                                 <div className="h-3 rounded-full bg-amber-100 dark:bg-slate-800">
                                   <div
                                     className="h-3 rounded-full bg-amber-500 dark:bg-amber-400"
-                                    style={{ width: `${Math.max(4, (item.total / chartData.max) * 100)}%` }}
+                                    style={{
+                                      width: `${Math.max(4, (item.total / chartData.max) * 100)}%`,
+                                    }}
                                   />
                                 </div>
-                                <span className="text-right font-semibold">${item.total.toFixed(2)}</span>
+                                <span className="text-right font-semibold">
+                                  ${item.total.toFixed(2)}
+                                </span>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-slate-500">Sin datos para graficar.</p>
+                          <p className="text-sm text-slate-500">
+                            Sin datos para graficar.
+                          </p>
                         )}
                       </div>
                     </div>
@@ -2100,7 +2143,9 @@ export default function App() {
                           type="button"
                           className="rounded-full border border-amber-200 p-1 hover:bg-amber-50 disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
                           disabled={periodShift === 0}
-                          onClick={() => setPeriodShift((s) => Math.max(0, s - 1))}
+                          onClick={() =>
+                            setPeriodShift((s) => Math.max(0, s - 1))
+                          }
                           title="Periodo siguiente"
                         >
                           <Icon path={mdiChevronRight} size={0.7} />
@@ -2132,7 +2177,9 @@ export default function App() {
                           {showProfit ? (
                             <>${Number(weekStats.profit || 0).toFixed(2)}</>
                           ) : (
-                            <span className="tracking-widest text-slate-400">••••••</span>
+                            <span className="tracking-widest text-slate-400">
+                              ••••••
+                            </span>
                           )}
                         </div>
                       </div>
@@ -2179,7 +2226,9 @@ export default function App() {
                                       ${Number(row.profit || 0).toFixed(2)}
                                     </span>
                                   ) : (
-                                    <span className="tracking-widest text-slate-400">••••••</span>
+                                    <span className="tracking-widest text-slate-400">
+                                      ••••••
+                                    </span>
                                   )}
                                 </td>
                               </tr>
@@ -2378,7 +2427,10 @@ export default function App() {
                           ))}
                           {packagePurchases.length === 0 && (
                             <tr>
-                              <td className="px-4 py-4 text-center text-slate-500" colSpan={4}>
+                              <td
+                                className="px-4 py-4 text-center text-slate-500"
+                                colSpan={4}
+                              >
                                 Sin compras registradas
                               </td>
                             </tr>
@@ -2421,7 +2473,10 @@ export default function App() {
                   : "Registrar pago"}{" "}
                 - {selectedClient.name}
               </div>
-              <form onSubmit={handleMovementSubmit} className="max-h-[78vh] space-y-4 overflow-y-auto pr-1">
+              <form
+                onSubmit={handleMovementSubmit}
+                className="max-h-[78vh] space-y-4 overflow-y-auto pr-1"
+              >
                 {movementKind === "purchase" && (
                   <div className="space-y-3">
                     {movementItems.map((item, index) => {
@@ -2573,7 +2628,10 @@ export default function App() {
               <div className="mb-4 text-lg font-semibold">
                 Venta sin cliente
               </div>
-              <form onSubmit={handleCashSaleSubmit} className="max-h-[78vh] space-y-4 overflow-y-auto pr-1">
+              <form
+                onSubmit={handleCashSaleSubmit}
+                className="max-h-[78vh] space-y-4 overflow-y-auto pr-1"
+              >
                 <div className="space-y-3">
                   {cashSaleItems.map((item, index) => {
                     const selectedSweet = sweetById.get(String(item.sweetId));

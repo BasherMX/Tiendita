@@ -380,9 +380,7 @@ app.get("/api/stats/day/:day", authGuard, async (req, res) => {
     return res.status(400).json({ message: "Invalid day format" });
   }
 
-  const movementPurchases = await pool
-    .request()
-    .input("day", sql.Date, day)
+  const movementPurchases = await pool.request().input("day", sql.Date, day)
     .query(`
       SELECT m.id,
              m.created_at,
@@ -399,10 +397,7 @@ app.get("/api/stats/day/:day", authGuard, async (req, res) => {
       GROUP BY m.id, m.created_at, c.name
     `);
 
-  const cashSales = await pool
-    .request()
-    .input("day", sql.Date, day)
-    .query(`
+  const cashSales = await pool.request().input("day", sql.Date, day).query(`
       SELECT sa.id,
              sa.created_at,
              'Mostrador' AS buyer,
@@ -416,7 +411,8 @@ app.get("/api/stats/day/:day", authGuard, async (req, res) => {
     `);
 
   const rows = [...movementPurchases.recordset, ...cashSales.recordset].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
 
   return res.json(rows);
@@ -574,8 +570,7 @@ app.delete(
     try {
       const movementResult = await new sql.Request(tx)
         .input("movementId", sql.Int, movementId)
-        .input("clientId", sql.Int, clientId)
-        .query(`
+        .input("clientId", sql.Int, clientId).query(`
           SELECT TOP 1 id, client_id, amount
           FROM dbo.movements
           WHERE id = @movementId AND client_id = @clientId
@@ -605,7 +600,9 @@ app.delete(
 
       await new sql.Request(tx)
         .input("movementId", sql.Int, movementId)
-        .query("DELETE FROM dbo.movement_items WHERE movement_id = @movementId");
+        .query(
+          "DELETE FROM dbo.movement_items WHERE movement_id = @movementId",
+        );
 
       await new sql.Request(tx)
         .input("movementId", sql.Int, movementId)
@@ -622,7 +619,9 @@ app.delete(
       return res.json({ message: "Movimiento eliminado" });
     } catch (error) {
       await tx.rollback();
-      return res.status(500).json({ message: "No se pudo eliminar el movimiento" });
+      return res
+        .status(500)
+        .json({ message: "No se pudo eliminar el movimiento" });
     }
   },
 );
@@ -908,8 +907,7 @@ app.post("/api/purchase-places", authGuard, async (req, res) => {
 
   const inserted = await pool
     .request()
-    .input("name", sql.NVarChar, String(name).trim())
-    .query(`
+    .input("name", sql.NVarChar, String(name).trim()).query(`
       IF NOT EXISTS (SELECT 1 FROM dbo.purchase_places WHERE name = @name)
         INSERT INTO dbo.purchase_places (name) VALUES (@name);
       SELECT TOP 1 id, name FROM dbo.purchase_places WHERE name = @name;
@@ -945,8 +943,7 @@ app.post("/api/package-purchases", authGuard, async (req, res) => {
     .input("sweetId", sql.Int, sweetId ? Number(sweetId) : null)
     .input("productName", sql.NVarChar, normalizedName)
     .input("placeId", sql.Int, Number(placeId))
-    .input("packageCost", sql.Decimal(10, 2), Number(packageCost))
-    .query(`
+    .input("packageCost", sql.Decimal(10, 2), Number(packageCost)).query(`
       INSERT INTO dbo.package_purchases (sweet_id, product_name, place_id, package_cost)
       VALUES (@sweetId, @productName, @placeId, @packageCost)
     `);
