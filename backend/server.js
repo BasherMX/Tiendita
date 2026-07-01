@@ -433,13 +433,13 @@ app.get("/api/clients", authGuard, async (req, res) => {
   const result = await pool
     .request()
     .query(
-      "SELECT id, name, total_debt FROM dbo.clients ORDER BY total_debt DESC",
+      "SELECT id, name, total_debt, points, phone FROM dbo.clients ORDER BY total_debt DESC",
     );
   return res.json(result.recordset);
 });
 
 app.post("/api/clients", authGuard, async (req, res) => {
-  const { name } = req.body || {};
+  const { name, phone } = req.body || {};
   if (!name) {
     return res.status(400).json({ message: "Missing name" });
   }
@@ -447,14 +447,15 @@ app.post("/api/clients", authGuard, async (req, res) => {
   await pool
     .request()
     .input("name", sql.NVarChar, name)
-    .query("INSERT INTO dbo.clients (name) VALUES (@name)");
+    .input("phone", sql.NVarChar, phone || null)
+    .query("INSERT INTO dbo.clients (name, phone) VALUES (@name, @phone)");
 
   return res.json({ message: "Client created" });
 });
 
 app.put("/api/clients/:id", authGuard, async (req, res) => {
   const id = Number(req.params.id);
-  const { name, totalDebt } = req.body || {};
+  const { name, totalDebt, points, phone } = req.body || {};
   if (!name) {
     return res.status(400).json({ message: "Missing name" });
   }
@@ -466,7 +467,7 @@ app.put("/api/clients/:id", authGuard, async (req, res) => {
     const currentClient = await new sql.Request(tx)
       .input("id", sql.Int, id)
       .query(
-        "SELECT TOP 1 id, name, total_debt FROM dbo.clients WHERE id = @id",
+        "SELECT TOP 1 id, name, total_debt, points, phone FROM dbo.clients WHERE id = @id",
       );
 
     if (!currentClient.recordset.length) {
@@ -478,13 +479,18 @@ app.put("/api/clients/:id", authGuard, async (req, res) => {
     const normalizedDebt = Number.isFinite(Number(totalDebt))
       ? Number(totalDebt)
       : 0;
+    const normalizedPoints = Number.isFinite(Number(points))
+      ? Math.max(0, Number(points))
+      : 0;
 
     await new sql.Request(tx)
       .input("id", sql.Int, id)
       .input("name", sql.NVarChar, name)
       .input("debt", sql.Decimal(10, 2), normalizedDebt)
+      .input("points", sql.Decimal(10, 2), normalizedPoints)
+      .input("phone", sql.NVarChar, phone || null)
       .query(
-        "UPDATE dbo.clients SET name = @name, total_debt = @debt WHERE id = @id",
+        "UPDATE dbo.clients SET name = @name, total_debt = @debt, points = @points, phone = @phone WHERE id = @id",
       );
 
     const delta = Number((normalizedDebt - previousDebt).toFixed(2));
@@ -520,13 +526,97 @@ app.delete("/api/clients/:id", authGuard, async (req, res) => {
   return res.json({ message: "Client deleted" });
 });
 
+app.get("/api/clients/:id/debt-breakdown", authGuard, async (req, res) => {
+  const clientId = Number(req.params.id);
+  if (!Number.isInteger(clientId) || clientId <= 0) {
+    return res.status(400).json({ message: "Invalid client id" });
+  }
+
+  try {
+    const clientResult = await pool
+      .request()
+      .input("clientId", sql.Int, clientId)
+      .query("SELECT id, name, total_debt, points, phone FROM dbo.clients WHERE id = @clientId");
+
+    if (clientResult.recordset.length === 0) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+    const client = clientResult.recordset[0];
+
+    const movementsResult = await pool
+      .request()
+      .input("clientId", sql.Int, clientId)
+      .query(`
+        SELECT m.id AS movement_id, m.concept, m.amount, m.created_at,
+               mi.quantity, mi.unit_price, s.name AS sweet_name
+        FROM dbo.movements m
+        LEFT JOIN dbo.movement_items mi ON mi.movement_id = m.id
+        LEFT JOIN dbo.sweets s ON s.id = mi.sweet_id
+        WHERE m.client_id = @clientId AND m.concept LIKE 'Compra%' AND m.amount > 0
+        ORDER BY m.created_at DESC
+      `);
+
+    const movementsMap = {};
+    for (const row of movementsResult.recordset) {
+      if (!movementsMap[row.movement_id]) {
+        movementsMap[row.movement_id] = {
+          id: row.movement_id,
+          concept: row.concept,
+          amount: Number(row.amount),
+          created_at: row.created_at,
+          items: []
+        };
+      }
+      if (row.sweet_name) {
+        movementsMap[row.movement_id].items.push({
+          name: row.sweet_name,
+          quantity: row.quantity,
+          unit_price: Number(row.unit_price)
+        });
+      }
+    }
+
+    const sortedMovements = Object.values(movementsMap).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    let remainingDebt = Number(client.total_debt || 0);
+    const movements = [];
+
+    for (const mov of sortedMovements) {
+      if (remainingDebt <= 0) {
+        break;
+      }
+      const movAmt = Number(mov.amount);
+      if (movAmt >= remainingDebt) {
+        movements.push({
+          ...mov,
+          owed_amount: Number(remainingDebt.toFixed(2))
+        });
+        remainingDebt = 0;
+      } else {
+        movements.push({
+          ...mov,
+          owed_amount: movAmt
+        });
+        remainingDebt = Number((remainingDebt - movAmt).toFixed(2));
+      }
+    }
+
+    return res.json({ client, movements });
+  } catch (error) {
+    console.error("Error fetching debt breakdown:", error);
+    return res.status(500).json({ message: "Error fetching debt breakdown" });
+  }
+});
+
 app.get("/api/clients/:id/movements", authGuard, async (req, res) => {
   const clientId = Number(req.params.id);
   const result = await pool
     .request()
     .input("clientId", sql.Int, clientId)
     .query(
-      "SELECT id, concept, amount, created_at FROM dbo.movements WHERE client_id = @clientId ORDER BY created_at DESC",
+      "SELECT id, concept, amount, points, created_at FROM dbo.movements WHERE client_id = @clientId ORDER BY created_at DESC",
     );
   return res.json(result.recordset);
 });
@@ -571,7 +661,7 @@ app.delete(
       const movementResult = await new sql.Request(tx)
         .input("movementId", sql.Int, movementId)
         .input("clientId", sql.Int, clientId).query(`
-          SELECT TOP 1 id, client_id, amount
+          SELECT TOP 1 id, client_id, amount, concept, points
           FROM dbo.movements
           WHERE id = @movementId AND client_id = @clientId
         `);
@@ -608,11 +698,14 @@ app.delete(
         .input("movementId", sql.Int, movementId)
         .query("DELETE FROM dbo.movements WHERE id = @movementId");
 
+      const pointsToDeduct = Number(movement.points || 0);
+
       await new sql.Request(tx)
         .input("clientId", sql.Int, clientId)
         .input("amount", sql.Decimal(10, 2), Number(movement.amount))
+        .input("points", sql.Decimal(10, 2), pointsToDeduct)
         .query(
-          "UPDATE dbo.clients SET total_debt = total_debt - @amount WHERE id = @clientId",
+          "UPDATE dbo.clients SET total_debt = total_debt - @amount, points = CASE WHEN points - @points < 0 THEN 0 ELSE points - @points END WHERE id = @clientId",
         );
 
       await tx.commit();
@@ -629,32 +722,44 @@ app.delete(
 app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
   const clientId = Number(req.params.id);
   const { amount, concept, items } = req.body || {};
+  const pointsUsed = Number(req.body.pointsUsed) || 0;
 
-  if (Array.isArray(items) && items.length > 0) {
-    const normalizedItems = items
-      .map((item) => ({
-        sweetId: Number(item.sweetId),
-        quantity: Number(item.quantity),
-      }))
-      .filter(
-        (item) =>
-          Number.isFinite(item.sweetId) &&
-          Number.isFinite(item.quantity) &&
-          item.quantity > 0,
+  if (pointsUsed < 0) {
+    return res.status(400).json({ message: "Puntos a usar no pueden ser negativos" });
+  }
+
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+
+  try {
+    let totalAmount = 0;
+    let normalizedItems = [];
+
+    const settings = await getSettings();
+
+    // 1. Process items if present
+    if (Array.isArray(items) && items.length > 0) {
+      normalizedItems = items
+        .map((item) => ({
+          sweetId: Number(item.sweetId),
+          quantity: Number(item.quantity),
+        }))
+        .filter(
+          (item) =>
+            Number.isFinite(item.sweetId) &&
+            Number.isFinite(item.quantity) &&
+            item.quantity > 0,
+        );
+
+      if (normalizedItems.length === 0) {
+        await tx.rollback();
+        return res.status(400).json({ message: "Missing items" });
+      }
+
+      const ids = Array.from(
+        new Set(normalizedItems.map((item) => item.sweetId)),
       );
 
-    if (normalizedItems.length === 0) {
-      return res.status(400).json({ message: "Missing items" });
-    }
-
-    const ids = Array.from(
-      new Set(normalizedItems.map((item) => item.sweetId)),
-    );
-
-    const tx = new sql.Transaction(pool);
-    await tx.begin();
-
-    try {
       const idsParams = ids.map((_, idx) => `@id${idx}`).join(", ");
       const sweetRequest = new sql.Request(tx);
       ids.forEach((id, idx) => sweetRequest.input(`id${idx}`, sql.Int, id));
@@ -667,7 +772,6 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
         sweetsResult.recordset.map((sweet) => [sweet.id, sweet]),
       );
 
-      let totalAmount = 0;
       for (const item of normalizedItems) {
         const sweet = sweetMap.get(item.sweetId);
         if (!sweet) {
@@ -679,17 +783,62 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
       if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
         throw new Error("Invalid amount");
       }
+    } else {
+      // Manual amount purchase
+      if (!amount) {
+        await tx.rollback();
+        return res.status(400).json({ message: "Missing amount" });
+      }
+      totalAmount = Number(amount);
+      if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+        throw new Error("Monto de compra no válido");
+      }
+    }
 
-      const movementRequest = new sql.Request(tx);
-      const movementResult = await movementRequest
+    if (pointsUsed > totalAmount) {
+      throw new Error("No se pueden usar más puntos que el total de la compra");
+    }
+
+    // 2. Validate client and points balance if pointsUsed > 0
+    if (pointsUsed > 0) {
+      const clientRes = await new sql.Request(tx)
         .input("clientId", sql.Int, clientId)
-        .input("concept", sql.NVarChar, concept || "Compra")
-        .input("amount", sql.Decimal(10, 2), totalAmount)
-        .query(
-          "INSERT INTO dbo.movements (client_id, concept, amount) VALUES (@clientId, @concept, @amount); SELECT SCOPE_IDENTITY() AS id;",
-        );
+        .query("SELECT points FROM dbo.clients WHERE id = @clientId");
+      if (!clientRes.recordset.length) {
+        throw new Error("Client not found");
+      }
+      const clientPoints = Number(clientRes.recordset[0].points || 0);
+      if (clientPoints < pointsUsed) {
+        throw new Error(`Puntos insuficientes. El cliente tiene ${clientPoints.toFixed(1)} pts y se intentó usar ${pointsUsed.toFixed(1)} pts.`);
+      }
+    }
 
-      const movementId = Number(movementResult.recordset[0].id);
+    // 3. Create primary Purchase movement
+    const movementRequest = new sql.Request(tx);
+    const movementResult = await movementRequest
+      .input("clientId", sql.Int, clientId)
+      .input("concept", sql.NVarChar, concept || "Compra")
+      .input("amount", sql.Decimal(10, 2), totalAmount)
+      .input("points", sql.Decimal(10, 2), 0)
+      .query(
+        "INSERT INTO dbo.movements (client_id, concept, amount, points) VALUES (@clientId, @concept, @amount, @points); SELECT SCOPE_IDENTITY() AS id;",
+      );
+
+    const movementId = Number(movementResult.recordset[0].id);
+
+    // 4. Save items & update sweets stock (only for items path)
+    if (normalizedItems.length > 0) {
+      // First construct map to reuse sweetsResult
+      const ids = Array.from(new Set(normalizedItems.map((item) => item.sweetId)));
+      const idsParams = ids.map((_, idx) => `@id${idx}`).join(", ");
+      const sweetRequest = new sql.Request(tx);
+      ids.forEach((id, idx) => sweetRequest.input(`id${idx}`, sql.Int, id));
+      const sweetsResult = await sweetRequest.query(
+        `SELECT id, name, sale_price, stock FROM dbo.sweets WHERE id IN (${idsParams})`,
+      );
+      const sweetMap = new Map(
+        sweetsResult.recordset.map((sweet) => [sweet.id, sweet]),
+      );
 
       for (const item of normalizedItems) {
         const sweet = sweetMap.get(item.sweetId);
@@ -711,45 +860,65 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
             "UPDATE dbo.sweets SET stock = stock - @quantity, sold_count = sold_count + @quantity WHERE id = @sweetId",
           );
       }
+    }
 
-      const debtRequest = new sql.Request(tx);
-      await debtRequest
+    // 5. Apply points used if any
+    if (pointsUsed > 0) {
+      await new sql.Request(tx)
         .input("clientId", sql.Int, clientId)
-        .input("amount", sql.Decimal(10, 2), totalAmount)
+        .input("pointsUsed", sql.Decimal(10, 2), pointsUsed)
         .query(
-          "UPDATE dbo.clients SET total_debt = total_debt + @amount WHERE id = @clientId",
+          "UPDATE dbo.clients SET points = CASE WHEN points - @pointsUsed < 0 THEN 0 ELSE points - @pointsUsed END WHERE id = @clientId"
         );
 
-      await tx.commit();
-      return res.json({ message: "Purchase added", amount: totalAmount });
-    } catch (error) {
-      await tx.rollback();
-      return res.status(400).json({ message: error.message });
+      await new sql.Request(tx)
+        .input("clientId", sql.Int, clientId)
+        .input("concept", sql.NVarChar, "Pago con puntos")
+        .input("amount", sql.Decimal(10, 2), -pointsUsed)
+        .input("points", sql.Decimal(10, 2), -pointsUsed)
+        .query(
+          "INSERT INTO dbo.movements (client_id, concept, amount, points) VALUES (@clientId, @concept, @amount, @points)"
+        );
     }
+
+    const remainingAmount = Number((totalAmount - pointsUsed).toFixed(2));
+    const shouldPay = !!req.body.payImmediately;
+    const pointsEarned = settings.rewards_enabled
+      ? Number((remainingAmount * settings.reward_factor).toFixed(2))
+      : 0;
+
+    // 6. Handle payment or debt adjustment
+    if (shouldPay) {
+      await new sql.Request(tx)
+        .input("clientId", sql.Int, clientId)
+        .input("concept", sql.NVarChar, "Pago de compra al instante")
+        .input("amount", sql.Decimal(10, 2), -remainingAmount)
+        .input("points", sql.Decimal(10, 2), pointsEarned)
+        .query(
+          "INSERT INTO dbo.movements (client_id, concept, amount, points) VALUES (@clientId, @concept, @amount, @points)"
+        );
+
+      await new sql.Request(tx)
+        .input("clientId", sql.Int, clientId)
+        .input("points", sql.Decimal(10, 2), pointsEarned)
+        .query(
+          "UPDATE dbo.clients SET points = points + @points WHERE id = @clientId"
+        );
+    } else {
+      await new sql.Request(tx)
+        .input("clientId", sql.Int, clientId)
+        .input("amount", sql.Decimal(10, 2), remainingAmount)
+        .query(
+          "UPDATE dbo.clients SET total_debt = total_debt + @amount WHERE id = @clientId"
+        );
+    }
+
+    await tx.commit();
+    return res.json({ message: "Purchase added", amount: totalAmount });
+  } catch (error) {
+    await tx.rollback();
+    return res.status(400).json({ message: error.message });
   }
-
-  if (!amount) {
-    return res.status(400).json({ message: "Missing amount" });
-  }
-
-  await pool
-    .request()
-    .input("clientId", sql.Int, clientId)
-    .input("concept", sql.NVarChar, concept || "Compra")
-    .input("amount", sql.Decimal(10, 2), Number(amount))
-    .query(
-      "INSERT INTO dbo.movements (client_id, concept, amount) VALUES (@clientId, @concept, @amount)",
-    );
-
-  await pool
-    .request()
-    .input("clientId", sql.Int, clientId)
-    .input("amount", sql.Decimal(10, 2), Number(amount))
-    .query(
-      "UPDATE dbo.clients SET total_debt = total_debt + @amount WHERE id = @clientId",
-    );
-
-  return res.json({ message: "Purchase added" });
 });
 
 app.post("/api/sales", authGuard, async (req, res) => {
@@ -867,23 +1036,29 @@ app.post("/api/clients/:id/pay", authGuard, async (req, res) => {
       return res.status(404).json({ message: "Client not found" });
     }
 
+    const settings = await getSettings();
     const normalized = Math.abs(parsedAmount) * -1;
+    const pointsEarned = settings.rewards_enabled
+      ? Number((Math.abs(parsedAmount) * settings.reward_factor).toFixed(2))
+      : 0;
 
     await pool
       .request()
       .input("clientId", sql.Int, clientId)
       .input("concept", sql.NVarChar, concept || "Pago")
       .input("amount", sql.Decimal(10, 2), normalized)
+      .input("points", sql.Decimal(10, 2), pointsEarned)
       .query(
-        "INSERT INTO dbo.movements (client_id, concept, amount) VALUES (@clientId, @concept, @amount)",
+        "INSERT INTO dbo.movements (client_id, concept, amount, points) VALUES (@clientId, @concept, @amount, @points)",
       );
 
     await pool
       .request()
       .input("clientId", sql.Int, clientId)
       .input("amount", sql.Decimal(10, 2), Math.abs(parsedAmount))
+      .input("points", sql.Decimal(10, 2), pointsEarned)
       .query(
-        "UPDATE dbo.clients SET total_debt = total_debt - @amount WHERE id = @clientId",
+        "UPDATE dbo.clients SET total_debt = total_debt - @amount, points = points + @points WHERE id = @clientId",
       );
 
     return res.json({ message: "Payment registered" });
@@ -949,6 +1124,283 @@ app.post("/api/package-purchases", authGuard, async (req, res) => {
     `);
 
   return res.json({ message: "Package purchase added" });
+});
+
+app.get("/api/rewards", authGuard, async (req, res) => {
+  try {
+    const result = await pool
+      .request()
+      .query(`
+        SELECT r.id, r.name, r.points_cost, COALESCE(s.stock, r.stock) AS stock, r.sweet_id
+        FROM dbo.rewards r
+        LEFT JOIN dbo.sweets s ON r.sweet_id = s.id
+        ORDER BY r.name ASC
+      `);
+    return res.json(result.recordset);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.post("/api/rewards", authGuard, async (req, res) => {
+  try {
+    const { name, pointsCost, stock, sweetId } = req.body || {};
+    if (!name || pointsCost == null) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+    const normalizedStock = Number.isFinite(Number(stock)) ? Number(stock) : 0;
+    const parsedSweetId = sweetId ? Number(sweetId) : null;
+    await pool
+      .request()
+      .input("name", sql.NVarChar, name)
+      .input("cost", sql.Decimal(10, 2), Number(pointsCost))
+      .input("stock", sql.Int, normalizedStock)
+      .input("sweetId", sql.Int, parsedSweetId)
+      .query(
+        "INSERT INTO dbo.rewards (name, points_cost, stock, sweet_id) VALUES (@name, @cost, @stock, @sweetId)"
+      );
+    return res.json({ message: "Reward added" });
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+app.put("/api/rewards/:id", authGuard, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { name, pointsCost, stock, sweetId } = req.body || {};
+    if (!name || pointsCost == null) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+    const normalizedStock = Number.isFinite(Number(stock)) ? Number(stock) : 0;
+    const parsedSweetId = sweetId ? Number(sweetId) : null;
+    await pool
+      .request()
+      .input("id", sql.Int, id)
+      .input("name", sql.NVarChar, name)
+      .input("cost", sql.Decimal(10, 2), Number(pointsCost))
+      .input("stock", sql.Int, normalizedStock)
+      .input("sweetId", sql.Int, parsedSweetId)
+      .query(
+        "UPDATE dbo.rewards SET name = @name, points_cost = @cost, stock = @stock, sweet_id = @sweetId WHERE id = @id"
+      );
+    return res.json({ message: "Reward updated" });
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+app.delete("/api/rewards/:id", authGuard, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query("DELETE FROM dbo.rewards WHERE id = @id");
+    return res.json({ message: "Reward deleted" });
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+app.post("/api/clients/:id/redeem", authGuard, async (req, res) => {
+  const clientId = Number(req.params.id);
+  const { sweetId } = req.body || {};
+
+  if (!clientId || !sweetId) {
+    return res.status(400).json({ message: "Missing client or sweet ID" });
+  }
+
+  const settings = await getSettings();
+  if (!settings.rewards_enabled) {
+    return res.status(400).json({ message: "El sistema de recompensas está desactivado por la administración." });
+  }
+
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+
+  try {
+    const clientResult = await new sql.Request(tx)
+      .input("clientId", sql.Int, clientId)
+      .query("SELECT id, name, points FROM dbo.clients WHERE id = @clientId");
+
+    if (clientResult.recordset.length === 0) {
+      await tx.rollback();
+      return res.status(404).json({ message: "Client not found" });
+    }
+    const client = clientResult.recordset[0];
+    const clientPoints = Number(client.points || 0);
+
+    const sweetResult = await new sql.Request(tx)
+      .input("sweetId", sql.Int, sweetId)
+      .query("SELECT id, name, sale_price, stock FROM dbo.sweets WHERE id = @sweetId");
+
+    if (sweetResult.recordset.length === 0) {
+      await tx.rollback();
+      return res.status(404).json({ message: "Sweet not found" });
+    }
+    const sweet = sweetResult.recordset[0];
+    const pointsCost = Number(sweet.sale_price); // 1 point = 1 peso
+    const sweetStock = Number(sweet.stock || 0);
+
+    if (clientPoints < pointsCost) {
+      await tx.rollback();
+      return res.status(400).json({
+        message: `Puntos insuficientes. El cliente tiene ${clientPoints.toFixed(1)} pts y el dulce cuesta ${pointsCost.toFixed(1)} pts.`,
+      });
+    }
+    if (sweetStock <= 0) {
+      await tx.rollback();
+      return res.status(400).json({ message: "Dulce agotado (sin stock)." });
+    }
+
+    await new sql.Request(tx)
+      .input("clientId", sql.Int, clientId)
+      .input("cost", sql.Decimal(10, 2), pointsCost)
+      .query("UPDATE dbo.clients SET points = CASE WHEN points - @cost < 0 THEN 0 ELSE points - @cost END WHERE id = @clientId");
+
+    await new sql.Request(tx)
+      .input("sweetId", sql.Int, sweetId)
+      .query("UPDATE dbo.sweets SET stock = stock - 1, sold_count = sold_count + 1 WHERE id = @sweetId");
+
+    await new sql.Request(tx)
+      .input("clientId", sql.Int, clientId)
+      .input("sweetId", sql.Int, sweetId)
+      .input("cost", sql.Decimal(10, 2), pointsCost)
+      .query("INSERT INTO dbo.redemptions (client_id, sweet_id, points_spent) VALUES (@clientId, @sweetId, @cost)");
+
+    const concept = `Canje de dulce: ${sweet.name}`;
+    await new sql.Request(tx)
+      .input("clientId", sql.Int, clientId)
+      .input("concept", concept)
+      .input("amount", sql.Decimal(10, 2), 0)
+      .input("points", sql.Decimal(10, 2), -pointsCost)
+      .query("INSERT INTO dbo.movements (client_id, concept, amount, points) VALUES (@clientId, @concept, @amount, @points)");
+
+    await tx.commit();
+    return res.json({ message: "Sweet redeemed successfully" });
+  } catch (error) {
+    await tx.rollback();
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.get("/api/clients/:id/redemptions", authGuard, async (req, res) => {
+  try {
+    const clientId = Number(req.params.id);
+    const result = await pool
+      .request()
+      .input("clientId", sql.Int, clientId)
+      .query(`
+        SELECT r.id, r.points_spent, r.created_at, s.name AS reward_name
+        FROM dbo.redemptions r
+        JOIN dbo.sweets s ON r.sweet_id = s.id
+        WHERE r.client_id = @clientId
+        ORDER BY r.created_at DESC
+      `);
+    return res.json(result.recordset);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+async function getSettings() {
+  try {
+    const result = await pool.request().query("SELECT [key], [value] FROM dbo.settings");
+    const settingsMap = {
+      reward_factor: 0.10,
+      rewards_enabled: true,
+    };
+    result.recordset.forEach((row) => {
+      if (row.key === "reward_factor") {
+        settingsMap.reward_factor = parseFloat(row.value) || 0;
+      } else if (row.key === "rewards_enabled") {
+        settingsMap.rewards_enabled = row.value === "true";
+      }
+    });
+    return settingsMap;
+  } catch (e) {
+    console.error("Failed to load settings from DB, using defaults", e.message);
+    return { reward_factor: 0.10, rewards_enabled: true };
+  }
+}
+
+app.get("/api/settings", authGuard, async (req, res) => {
+  try {
+    const result = await pool.request().query("SELECT [key], [value] FROM dbo.settings");
+    const settingsMap = {};
+    result.recordset.forEach((row) => {
+      settingsMap[row.key] = row.value;
+    });
+    if (settingsMap.reward_factor == null) settingsMap.reward_factor = "0.10";
+    if (settingsMap.rewards_enabled == null) settingsMap.rewards_enabled = "true";
+    return res.json(settingsMap);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.put("/api/settings", authGuard, async (req, res) => {
+  try {
+    const { reward_factor, rewards_enabled } = req.body || {};
+    if (reward_factor == null || rewards_enabled == null) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+    
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
+    try {
+      await new sql.Request(tx)
+        .input("key", sql.NVarChar, "reward_factor")
+        .input("val", sql.NVarChar, String(reward_factor))
+        .query("UPDATE dbo.settings SET [value] = @val WHERE [key] = @key");
+      await new sql.Request(tx)
+        .input("key", sql.NVarChar, "rewards_enabled")
+        .input("val", sql.NVarChar, String(rewards_enabled))
+        .query("UPDATE dbo.settings SET [value] = @val WHERE [key] = @key");
+      await tx.commit();
+      return res.json({ message: "Settings updated" });
+    } catch (e) {
+      await tx.rollback();
+      throw e;
+    }
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+app.get("/api/redemptions/stats", authGuard, async (req, res) => {
+  try {
+    const listResult = await pool.request().query(`
+      SELECT r.id, r.points_spent, r.created_at, 
+             c.name AS client_name, s.name AS sweet_name
+      FROM dbo.redemptions r
+      JOIN dbo.clients c ON r.client_id = c.id
+      JOIN dbo.sweets s ON r.sweet_id = s.id
+      ORDER BY r.created_at DESC
+    `);
+    
+    const summaryResult = await pool.request().query(`
+      SELECT COUNT(*) AS total_count, COALESCE(SUM(points_spent), 0) AS total_points
+      FROM dbo.redemptions
+    `);
+
+    const popularResult = await pool.request().query(`
+      SELECT s.name AS sweet_name, COUNT(*) AS count, COALESCE(SUM(r.points_spent), 0) AS total_points
+      FROM dbo.redemptions r
+      JOIN dbo.sweets s ON r.sweet_id = s.id
+      GROUP BY s.name
+      ORDER BY count DESC
+    `);
+
+    return res.json({
+      redemptions: listResult.recordset,
+      totals: summaryResult.recordset[0] || { total_count: 0, total_points: 0 },
+      bySweet: popularResult.recordset
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
 });
 
 app.get("/health", (req, res) => {

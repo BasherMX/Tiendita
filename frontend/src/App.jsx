@@ -32,6 +32,9 @@ import {
   mdiStore,
   mdiPackageVariantClosed,
   mdiClose,
+  mdiGift,
+  mdiStar,
+  mdiWhatsapp,
 } from "@mdi/js";
 import brandLogo from "../assets/logo.jpg";
 
@@ -184,6 +187,13 @@ export default function App() {
   const [stockStats, setStockStats] = useState(null);
   const [clients, setClients] = useState([]);
   const [clientsQuery, setClientsQuery] = useState("");
+  const [payImmediately, setPayImmediately] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [redeemQuery, setRedeemQuery] = useState("");
+  const [settings, setSettings] = useState({ reward_factor: 0.10, rewards_enabled: true });
+  const [redemptionStats, setRedemptionStats] = useState({ redemptions: [], totals: { total_count: 0, total_points: 0 }, bySweet: [] });
+  const [redemptionStatsLoading, setRedemptionStatsLoading] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [movements, setMovements] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
   const [editingSweet, setEditingSweet] = useState(null);
@@ -195,6 +205,9 @@ export default function App() {
     stock: "",
   });
   const [newClient, setNewClient] = useState("");
+  const [newClientPhone, setNewClientPhone] = useState("");
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsToUse, setPointsToUse] = useState("");
   const [movementAmount, setMovementAmount] = useState("");
   const [movementItems, setMovementItems] = useState([
     { id: Date.now(), sweetId: "", quantity: 1 },
@@ -234,6 +247,13 @@ export default function App() {
     placeId: "",
     packageCost: "",
   });
+
+  const [rewards, setRewards] = useState([]);
+  const [newReward, setNewReward] = useState({ name: "", pointsCost: "", stock: "", sweetId: "" });
+  const [editingReward, setEditingReward] = useState(null);
+  const [redemptions, setRedemptions] = useState([]);
+  const [redemptionsLoading, setRedemptionsLoading] = useState(false);
+  const [clientSubTab, setClientSubTab] = useState("movements");
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -341,8 +361,53 @@ export default function App() {
 
   const projectedClientBalance = useMemo(() => {
     const current = Number(selectedClient?.total_debt || 0);
+    const pointsUsedNum = usePoints ? (Number(pointsToUse) || 0) : 0;
+    if (movementKind === "purchase") {
+      if (payImmediately) {
+        return current;
+      }
+      return current + movementPreviewAmount - pointsUsedNum;
+    }
     return current + movementPreviewAmount;
-  }, [selectedClient, movementPreviewAmount]);
+  }, [selectedClient, movementPreviewAmount, movementKind, payImmediately, usePoints, pointsToUse]);
+
+  const projectedPoints = useMemo(() => {
+    const current = Number(selectedClient?.points || 0);
+    if (!settings.rewards_enabled) return current;
+    const pointsUsedNum = usePoints ? (Number(pointsToUse) || 0) : 0;
+    if (movementKind === "purchase") {
+      if (payImmediately) {
+        const cashPortion = Math.max(0, movementPreviewAmount - pointsUsedNum);
+        const pointsEarned = Number((cashPortion * settings.reward_factor).toFixed(2));
+        return Math.max(0, current - pointsUsedNum + pointsEarned);
+      }
+      return Math.max(0, current - pointsUsedNum);
+    } else if (movementKind === "pay") {
+      const paymentAmount = Math.abs(movementPreviewAmount);
+      const pointsEarned = Number((paymentAmount * settings.reward_factor).toFixed(2));
+      return current + pointsEarned;
+    }
+    return current;
+  }, [selectedClient, movementPreviewAmount, movementKind, payImmediately, settings, usePoints, pointsToUse]);
+
+  const filteredSweetsForRedeem = useMemo(() => {
+    const query = redeemQuery.trim().toLowerCase();
+    if (!query) return sortedSweets;
+    return sortedSweets.filter((sweet) =>
+      String(sweet.name || "")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [sortedSweets, redeemQuery]);
+
+  const hasActiveRewards = useMemo(() => {
+    if (!settings.rewards_enabled) return false;
+    return sortedSweets.some(
+      (sweet) =>
+        projectedPoints >= Number(sweet.sale_price) &&
+        Number(sweet.stock || 0) > 0
+    );
+  }, [sortedSweets, projectedPoints, settings]);
 
   const debtStats = useMemo(() => {
     const pending = clients
@@ -499,6 +564,73 @@ export default function App() {
     }
   }
 
+  async function loadSettings() {
+    if (!token) return;
+    try {
+      const response = await authFetch(`${apiBase}/api/settings`);
+      if (response && response.ok) {
+        const data = await response.json();
+        setSettings({
+          reward_factor: parseFloat(data.reward_factor) || 0.10,
+          rewards_enabled: data.rewards_enabled === "true",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading settings:", error);
+    }
+  }
+
+  async function loadRedemptionStats() {
+    if (!token) return;
+    setRedemptionStatsLoading(true);
+    try {
+      const response = await authFetch(`${apiBase}/api/redemptions/stats`);
+      if (response && response.ok) {
+        const data = await response.json();
+        setRedemptionStats(data);
+      }
+    } catch (error) {
+      console.error("Error loading redemption stats:", error);
+    } finally {
+      setRedemptionStatsLoading(false);
+    }
+  }
+
+  async function handleSaveSettings(event) {
+    if (event) event.preventDefault();
+    setSavingSettings(true);
+    try {
+      const response = await authFetch(`${apiBase}/api/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reward_factor: settings.reward_factor,
+          rewards_enabled: settings.rewards_enabled ? "true" : "false",
+        }),
+      });
+      if (response && response.ok) {
+        await Swal.fire({
+          icon: "success",
+          title: "Configuración guardada",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+        loadSettings();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        await Swal.fire({
+          icon: "error",
+          title: "Error al guardar",
+          text: data.message || "Ocurrió un error",
+        });
+      }
+    } catch (error) {
+      console.error("Error saving settings:", error);
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
   async function loadDayMovements(day) {
     if (!token || !day) return;
     setSelectedDayLoading(true);
@@ -539,6 +671,148 @@ export default function App() {
     } catch (error) {
       console.error("Error loading package purchases:", error);
     }
+  }
+
+  async function loadRewards() {
+    if (!token) return;
+    try {
+      const response = await authFetch(`${apiBase}/api/rewards`);
+      if (!response) return;
+      if (response.ok) {
+        setRewards(await response.json());
+      }
+    } catch (error) {
+      console.error("Error loading rewards:", error);
+    }
+  }
+
+  async function loadClientRedemptions(clientId) {
+    if (!token || !clientId) return;
+    setRedemptionsLoading(true);
+    try {
+      const response = await authFetch(`${apiBase}/api/clients/${clientId}/redemptions`);
+      if (!response) return;
+      if (response.ok) {
+        setRedemptions(await response.json());
+      }
+    } catch (error) {
+      console.error("Error loading redemptions:", error);
+    } finally {
+      setRedemptionsLoading(false);
+    }
+  }
+
+  async function handleAddReward(event) {
+    event.preventDefault();
+    if (!newReward.name || !newReward.pointsCost) return;
+    const response = await authFetch(`${apiBase}/api/rewards`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newReward),
+    });
+    if (!response) return;
+    if (response.ok) {
+      setNewReward({ name: "", pointsCost: "", stock: "", sweetId: "" });
+      await Swal.fire({
+        icon: "success",
+        title: "Recompensa creada",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      loadRewards();
+    }
+  }
+
+  async function handleUpdateReward(event) {
+    event.preventDefault();
+    if (!editingReward.name || !editingReward.points_cost) return;
+    const response = await authFetch(`${apiBase}/api/rewards/${editingReward.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: editingReward.name,
+        pointsCost: editingReward.points_cost,
+        stock: editingReward.stock,
+        sweetId: editingReward.sweet_id,
+      }),
+    });
+    if (!response) return;
+    if (response.ok) {
+      setEditingReward(null);
+      await Swal.fire({
+        icon: "success",
+        title: "Recompensa actualizada",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      loadRewards();
+    }
+  }
+
+  async function handleDeleteReward(id) {
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "¿Eliminar recompensa?",
+      text: "Esta acción no se puede deshacer",
+      showCancelButton: true,
+      confirmButtonText: "Eliminar",
+      cancelButtonText: "Cancelar",
+    });
+
+    if (!result.isConfirmed) return;
+
+    const response = await authFetch(`${apiBase}/api/rewards/${id}`, {
+      method: "DELETE",
+    });
+    if (!response) return;
+    if (response.ok) {
+      await Swal.fire({
+        icon: "success",
+        title: "Recompensa eliminada",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      loadRewards();
+    }
+  }
+
+  async function handleRedeemReward(sweetId) {
+    if (!selectedClient) return;
+    const client = selectedClient;
+
+    const response = await authFetch(`${apiBase}/api/clients/${client.id}/redeem`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sweetId }),
+    });
+    if (!response) return;
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      await Swal.fire({
+        icon: "error",
+        title: "Error al canjear",
+        text: data.message || "No se pudo realizar el canje",
+      });
+      return;
+    }
+
+    await Swal.fire({
+      icon: "success",
+      title: "Recompensa canjeada",
+      timer: 1500,
+      showConfirmButton: false,
+    });
+
+    const refreshedClients = await loadClients();
+    const refreshedSelected = refreshedClients.find((c) => c.id === client.id);
+    if (refreshedSelected) {
+      setSelectedClient(refreshedSelected);
+      loadClientRedemptions(client.id);
+    }
+    loadRewards();
+    loadSweets();
+    loadRedemptionStats();
   }
 
   async function handleAddPlace(event) {
@@ -618,6 +892,9 @@ export default function App() {
       loadStats();
       loadPurchasePlaces();
       loadPackagePurchases();
+      loadRewards();
+      loadSettings();
+      loadRedemptionStats();
     }
   }, [token]);
 
@@ -773,7 +1050,7 @@ export default function App() {
     const response = await authFetch(`${apiBase}/api/clients`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newClient }),
+      body: JSON.stringify({ name: newClient, phone: newClientPhone }),
     });
     if (!response) return;
 
@@ -787,6 +1064,7 @@ export default function App() {
     }
 
     setNewClient("");
+    setNewClientPhone("");
     await Swal.fire({
       icon: "success",
       title: "Cliente creado",
@@ -805,6 +1083,8 @@ export default function App() {
       body: JSON.stringify({
         name: editingClient.name,
         totalDebt: editingClient.total_debt,
+        points: editingClient.points,
+        phone: editingClient.phone,
       }),
     });
     if (!response) return;
@@ -887,6 +1167,8 @@ export default function App() {
 
     setSelectedClient(client);
     setMovements([]);
+    setClientSubTab("movements");
+    loadClientRedemptions(clientId);
     try {
       const response = await authFetch(
         `${apiBase}/api/clients/${clientId}/movements`,
@@ -903,15 +1185,88 @@ export default function App() {
     }
   }
 
+  async function handleSendWhatsApp(client) {
+    if (!client.phone) {
+      await Swal.fire({
+        icon: "info",
+        title: "Sin teléfono",
+        text: "Registra un número de teléfono en la edición del cliente para poder enviar su cuenta por WhatsApp.",
+      });
+      return;
+    }
+
+    try {
+      const response = await authFetch(`${apiBase}/api/clients/${client.id}/debt-breakdown`);
+      if (!response || !response.ok) {
+        throw new Error("No se pudo obtener el desglose");
+      }
+      
+      const { client: clientData, movements } = await response.json();
+      
+      let message = `*Resumen de cuenta - Tiendita*\n\n`;
+      message += `Hola *${clientData.name}*, te comparto el estado actual de tu cuenta:\n\n`;
+      message += `*Saldo Total:* $${Number(clientData.total_debt).toFixed(2)}\n`;
+      message += `*Puntos Disponibles:* ${Number(clientData.points || 0).toFixed(1)} pts\n\n`;
+      
+      const purchases = movements.filter(m => m.amount > 0);
+      if (purchases.length > 0) {
+        message += `*Detalle de compras pendientes:*\n`;
+        purchases.forEach(m => {
+          const dateStr = new Date(m.created_at).toLocaleDateString("es-MX", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+          });
+          
+          if (m.owed_amount && Number(m.owed_amount) < Number(m.amount)) {
+            message += `• *${dateStr}*: ${m.concept} - $${Number(m.amount).toFixed(2)} (pendiente: $${Number(m.owed_amount).toFixed(2)})\n`;
+          } else {
+            message += `• *${dateStr}*: ${m.concept} - $${Number(m.amount).toFixed(2)}\n`;
+          }
+
+          if (m.items && m.items.length > 0) {
+            m.items.forEach(item => {
+              message += `  - ${item.quantity}x ${item.name} ($${Number(item.unit_price).toFixed(2)} c/u)\n`;
+            });
+          }
+        });
+      } else {
+        message += `No tienes compras pendientes. ¡Tu saldo está al día!\n`;
+      }
+      
+      message += `\n---------------------------------\n`;
+      message += `¡Gracias por tu preferencia!`;
+
+      const cleanPhone = client.phone.replace(/\D/g, "");
+      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, "_blank");
+    } catch (error) {
+      console.error("Error sending WhatsApp:", error);
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "No se pudo generar el mensaje de WhatsApp. Inténtalo de nuevo.",
+      });
+    }
+  }
+
   function resetMovementModal() {
     setMovementAmount("");
     setMovementItems([{ id: Date.now(), sweetId: "", quantity: 1 }]);
+    setPayImmediately(false);
+    setDropdownOpen(false);
     setMovementModalOpen(false);
+    setUsePoints(false);
+    setPointsToUse("");
   }
 
   function openMovementModal(kind) {
     if (!selectedClient) return;
     setMovementKind(kind);
+    setPayImmediately(false);
+    setDropdownOpen(false);
     setMovementModalOpen(true);
   }
 
@@ -942,14 +1297,20 @@ export default function App() {
       concept: movementKind === "pay" ? "Pago" : "Compra",
     };
 
-    if (movementKind === "purchase" && usesItems) {
-      payload.items = movementItems
-        .filter((item) => item.sweetId && item.quantity)
-        .map((item) => ({
-          sweetId: Number(item.sweetId),
-          quantity: Number(item.quantity),
-        }));
-      payload.amount = computedTotal;
+    if (movementKind === "purchase") {
+      payload.payImmediately = payImmediately;
+      if (usePoints) {
+        payload.pointsUsed = Number(pointsToUse) || 0;
+      }
+      if (usesItems) {
+        payload.items = movementItems
+          .filter((item) => item.sweetId && item.quantity)
+          .map((item) => ({
+            sweetId: Number(item.sweetId),
+            quantity: Number(item.quantity),
+          }));
+        payload.amount = computedTotal;
+      }
     }
 
     const response = await authFetch(
@@ -978,6 +1339,7 @@ export default function App() {
       timer: 1500,
       showConfirmButton: false,
     });
+    const hasRewardsBefore = hasActiveRewards;
     resetMovementModal();
     const refreshedClients = await loadClients();
     const refreshedSelected = refreshedClients.find(
@@ -986,6 +1348,9 @@ export default function App() {
     if (refreshedSelected && selectedClient?.id === targetClient.id) {
       setSelectedClient(refreshedSelected);
       await loadMovements(refreshedSelected);
+      if (hasRewardsBefore && movementKind === "purchase") {
+        setClientSubTab("redeem");
+      }
     } else if (selectedClient?.id === targetClient.id) {
       await loadMovements(targetClient);
     }
@@ -1230,6 +1595,156 @@ export default function App() {
     </div>
   );
 
+  const rewardsPanel = (
+    <div className="space-y-6">
+      {/* Configuración de Recompensas */}
+      <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+        <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
+          <Icon path={mdiGift} size={1} />
+          Configuración del Sistema de Recompensas
+        </div>
+        <form onSubmit={handleSaveSettings} className="grid gap-4 md:grid-cols-3 items-end">
+          <label className="flex items-center gap-3 rounded-2xl border border-amber-100/70 bg-white/50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-800/50 cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-amber-300 text-amber-500 focus:ring-amber-400 dark:border-slate-600 dark:bg-slate-700"
+              checked={settings.rewards_enabled}
+              onChange={(e) => setSettings({ ...settings, rewards_enabled: e.target.checked })}
+            />
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Activar acumulación y canje</span>
+          </label>
+          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+            Factor de Recompensa (% de la compra en puntos)
+            <input
+              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+              placeholder="ej. 10"
+              type="number"
+              min="0"
+              max="100"
+              step="0.5"
+              value={Number((settings.reward_factor * 100).toFixed(1))}
+              onChange={(e) =>
+                setSettings({ ...settings, reward_factor: (parseFloat(e.target.value) || 0) / 100 })
+              }
+              required
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={savingSettings}
+            className="w-full rounded-2xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-600 transition disabled:opacity-50"
+          >
+            {savingSettings ? "Guardando..." : "Guardar Configuración"}
+          </button>
+        </form>
+      </div>
+
+      {/* Estadísticas */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 flex items-center justify-between">
+          <div>
+            <div className="text-xs uppercase text-slate-500 font-semibold">Total de Dulces Canjeados</div>
+            <div className="text-3xl font-bold mt-1 text-amber-700 dark:text-amber-400">
+              {redemptionStats.totals?.total_count || 0} uds
+            </div>
+          </div>
+          <Icon path={mdiGift} size={1.8} className="opacity-20 text-amber-500" />
+        </div>
+        <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 flex items-center justify-between">
+          <div>
+            <div className="text-xs uppercase text-slate-500 font-semibold">Total de Puntos Canjeados</div>
+            <div className="text-3xl font-bold mt-1 text-amber-700 dark:text-amber-400">
+              {Number(redemptionStats.totals?.total_points || 0).toFixed(1)} pts
+            </div>
+          </div>
+          <Icon path={mdiStar} size={1.8} className="opacity-20 text-amber-500" />
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Historial Detallado de Canjes */}
+        <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="mb-4 text-lg font-semibold">Historial de Canjes</div>
+          {redemptionStatsLoading ? (
+            <p className="text-sm text-slate-500">Cargando historial...</p>
+          ) : (
+            <div className="max-h-[50vh] overflow-y-auto rounded-2xl border border-amber-100/70 dark:border-slate-800">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-amber-50 text-amber-900 dark:bg-slate-800 dark:text-amber-200 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2">Fecha</th>
+                    <th className="px-4 py-2">Cliente</th>
+                    <th className="px-4 py-2">Producto</th>
+                    <th className="px-4 py-2 text-right">Puntos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-100/70 dark:divide-slate-800">
+                  {redemptionStats.redemptions?.map((red) => (
+                    <tr key={red.id} className="hover:bg-amber-50/60 dark:hover:bg-slate-800/70">
+                      <td className="px-4 py-2 font-mono text-xs">
+                        {new Date(red.created_at).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2 font-medium">{red.client_name}</td>
+                      <td className="px-4 py-2">{red.sweet_name}</td>
+                      <td className="px-4 py-2 text-right text-amber-700 dark:text-amber-400 font-semibold">
+                        -{Number(red.points_spent).toFixed(1)} pts
+                      </td>
+                    </tr>
+                  ))}
+                  {(redemptionStats.redemptions == null || redemptionStats.redemptions.length === 0) && (
+                    <tr>
+                      <td className="px-4 py-4 text-center text-slate-500" colSpan={4}>
+                        No hay canjes registrados en el sistema.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Productos más Canjeados */}
+        <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="mb-4 text-lg font-semibold">Dulces más Canjeados</div>
+          {redemptionStatsLoading ? (
+            <p className="text-sm text-slate-500">Cargando estadísticas...</p>
+          ) : (
+            <div className="max-h-[50vh] overflow-y-auto rounded-2xl border border-amber-100/70 dark:border-slate-800">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-amber-50 text-amber-900 dark:bg-slate-800 dark:text-amber-200 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2">Dulce</th>
+                    <th className="px-4 py-2 text-center">Unidades</th>
+                    <th className="px-4 py-2 text-right">Puntos Totales</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-100/70 dark:divide-slate-800">
+                  {redemptionStats.bySweet?.map((row, idx) => (
+                    <tr key={`${row.sweet_name}-${idx}`} className="hover:bg-amber-50/60 dark:hover:bg-slate-800/70">
+                      <td className="px-4 py-2 font-medium">{row.sweet_name}</td>
+                      <td className="px-4 py-2 text-center">{row.count} uds</td>
+                      <td className="px-4 py-2 text-right text-amber-700 dark:text-amber-400 font-semibold">
+                        {Number(row.total_points).toFixed(1)} pts
+                      </td>
+                    </tr>
+                  ))}
+                  {(redemptionStats.bySweet == null || redemptionStats.bySweet.length === 0) && (
+                    <tr>
+                      <td className="px-4 py-4 text-center text-slate-500" colSpan={3}>
+                        Sin datos disponibles.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-rose-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <nav className="sticky top-0 z-20 border-b border-amber-100/60 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
@@ -1255,6 +1770,7 @@ export default function App() {
                   label: "Inventario",
                 },
                 { path: "/clientes", icon: mdiAccountGroup, label: "Clientes" },
+                { path: "/recompensas", icon: mdiGift, label: "Recompensas" },
                 { path: "/compras", icon: mdiStore, label: "Compras" },
                 {
                   path: "/estadisticas",
@@ -1344,6 +1860,7 @@ export default function App() {
                     icon: mdiAccountGroup,
                     label: "Clientes",
                   },
+                  { path: "/recompensas", icon: mdiGift, label: "Recompensas" },
                   { path: "/compras", icon: mdiStore, label: "Compras" },
                   {
                     path: "/estadisticas",
@@ -1724,31 +2241,68 @@ export default function App() {
                           onSubmit={handleUpdateClient}
                           className="grid gap-3"
                         >
-                          <input
-                            className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700"
-                            placeholder="Nombre"
-                            value={editingClient.name}
-                            onChange={(event) =>
-                              setEditingClient({
-                                ...editingClient,
-                                name: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700"
-                            placeholder="Saldo (+ o -)"
-                            type="number"
-                            step="0.01"
-                            value={editingClient.total_debt}
-                            onChange={(event) =>
-                              setEditingClient({
-                                ...editingClient,
-                                total_debt: event.target.value,
-                              })
-                            }
-                          />
-                          <div className="flex gap-2">
+                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                            Nombre
+                            <input
+                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                              placeholder="Nombre"
+                              value={editingClient.name}
+                              onChange={(event) =>
+                                setEditingClient({
+                                  ...editingClient,
+                                  name: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                            Teléfono (WhatsApp)
+                            <input
+                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                              placeholder="Ej. 4492777186"
+                              value={editingClient.phone || ""}
+                              onChange={(event) =>
+                                setEditingClient({
+                                  ...editingClient,
+                                  phone: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                            Saldo (+ o -)
+                            <input
+                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                              placeholder="Saldo (+ o -)"
+                              type="number"
+                              step="0.01"
+                              value={editingClient.total_debt}
+                              onChange={(event) =>
+                                setEditingClient({
+                                  ...editingClient,
+                                  total_debt: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                            Puntos
+                            <input
+                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                              placeholder="Puntos"
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={editingClient.points}
+                              onChange={(event) =>
+                                setEditingClient({
+                                  ...editingClient,
+                                  points: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                          <div className="flex gap-2 mt-1">
                             <button className="flex-1 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
                               Actualizar
                             </button>
@@ -1762,16 +2316,31 @@ export default function App() {
                           </div>
                         </form>
                       ) : (
-                        <form onSubmit={handleAddClient} className="flex gap-2">
-                          <input
-                            className="flex-1 rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700"
-                            placeholder="Nombre del cliente"
-                            value={newClient}
-                            onChange={(event) =>
-                              setNewClient(event.target.value)
-                            }
-                          />
-                          <button className="flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                        <form onSubmit={handleAddClient} className="grid gap-3">
+                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                            Nombre
+                            <input
+                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                              placeholder="Nombre del cliente"
+                              value={newClient}
+                              onChange={(event) =>
+                                setNewClient(event.target.value)
+                              }
+                              required
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                            Teléfono (WhatsApp)
+                            <input
+                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                              placeholder="Ej. 4492777186"
+                              value={newClientPhone}
+                              onChange={(event) =>
+                                setNewClientPhone(event.target.value)
+                              }
+                            />
+                          </label>
+                          <button className="w-full flex items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
                             <Icon path={mdiPlusCircle} size={0.8} />
                             Crear
                           </button>
@@ -1805,7 +2374,13 @@ export default function App() {
                               onClick={() => loadMovements(client)}
                               className="flex-1 text-left"
                             >
-                              <div className="font-medium">{client.name}</div>
+                              <div className="font-medium flex items-center gap-1.5">
+                                {client.name}
+                                <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
+                                  <Icon path={mdiStar} size={0.4} />
+                                  {Number(client.points || 0).toFixed(1)} pts
+                                </span>
+                              </div>
                               <div
                                 className={`text-xs ${
                                   Number(client.total_debt) > 0
@@ -1844,84 +2419,240 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-
-                  {selectedClient && (
+                       {selectedClient && (
                     <div className="flex flex-col rounded-3xl border border-amber-100/70 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 sm:p-6 lg:min-h-0">
-                      <div className="mb-4 text-lg font-semibold">
-                        Movimientos de {selectedClient.name}
+                      <div className="mb-4 text-lg font-semibold flex items-center justify-between">
+                        <div>Detalle de {selectedClient.name}</div>
+                        <div className="flex items-center gap-1 rounded-2xl bg-amber-50 px-3 py-1 text-sm font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
+                          <Icon path={mdiStar} size={0.6} />
+                          {Number(selectedClient.points || 0).toFixed(1)} pts
+                        </div>
                       </div>
-                      <div className="mb-4 grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openMovementModal("purchase")}
-                          className="flex items-center justify-center gap-2 rounded-2xl bg-rose-500 px-2 py-2 text-sm font-semibold text-white hover:bg-rose-600"
-                        >
-                          <Icon path={mdiCashPlus} size={0.8} />
-                          Registrar compra
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openMovementModal("pay")}
-                          className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-2 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
-                        >
-                          <Icon path={mdiCashMinus} size={0.8} />
-                          Registrar pago
-                        </button>
-                      </div>
-                      <div className="flex-1 space-y-2 overflow-y-auto pr-1 lg:min-h-0">
-                        {movements.map((move) => {
-                          const isPurchase =
-                            String(move.concept || "")
-                              .toLowerCase()
-                              .includes("compra") && Number(move.amount) > 0;
 
-                          return (
+                      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between bg-amber-50/40 dark:bg-slate-800/40 rounded-2xl p-3 border border-amber-100/50 dark:border-slate-800">
+                        <div className="text-sm text-slate-500">
+                          {selectedClient.phone ? (
+                            <span>Teléfono: <span className="font-semibold text-slate-700 dark:text-slate-300">{selectedClient.phone}</span></span>
+                          ) : (
+                            <span className="italic text-slate-400">Sin teléfono registrado</span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleSendWhatsApp(selectedClient)}
+                          className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white transition ${
+                            selectedClient.phone
+                              ? "bg-emerald-600 hover:bg-emerald-700"
+                              : "bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed opacity-60"
+                          }`}
+                        >
+                          <Icon path={mdiWhatsapp} size={0.6} />
+                          {selectedClient.phone ? "Enviar Cuenta" : "Sin WhatsApp"}
+                        </button>
+                      </div>
+
+                      {/* Sub-tabs */}
+                      <div className="mb-4 flex border-b border-amber-100 dark:border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setClientSubTab("movements")}
+                          className={`flex-1 pb-2 text-center text-sm font-semibold transition ${
+                            clientSubTab === "movements"
+                              ? "border-b-2 border-amber-500 text-amber-800 dark:text-amber-300"
+                              : "text-slate-500 hover:text-slate-700"
+                          }`}
+                        >
+                          Movimientos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setClientSubTab("redeem")}
+                          className={`flex-1 pb-2 text-center text-sm font-semibold transition ${
+                            clientSubTab === "redeem"
+                              ? "border-b-2 border-amber-500 text-amber-800 dark:text-amber-300"
+                              : "text-slate-500 hover:text-slate-700"
+                          }`}
+                        >
+                          Canjear
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setClientSubTab("redemptions")}
+                          className={`flex-1 pb-2 text-center text-sm font-semibold transition ${
+                            clientSubTab === "redemptions"
+                              ? "border-b-2 border-amber-500 text-amber-800 dark:text-amber-300"
+                              : "text-slate-500 hover:text-slate-700"
+                          }`}
+                        >
+                          Historial Canjes
+                        </button>
+                      </div>
+
+                      {clientSubTab === "movements" && (
+                        <>
+                          <div className="mb-4 grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openMovementModal("purchase")}
+                              className="flex items-center justify-center gap-2 rounded-2xl bg-rose-500 px-2 py-2 text-sm font-semibold text-white hover:bg-rose-600"
+                            >
+                              <Icon path={mdiCashPlus} size={0.8} />
+                              Registrar compra
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openMovementModal("pay")}
+                              className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-2 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+                            >
+                              <Icon path={mdiCashMinus} size={0.8} />
+                              Registrar pago
+                            </button>
+                          </div>
+                          <div className="flex-1 space-y-2 overflow-y-auto pr-1 lg:min-h-0">
+                            {movements.map((move) => {
+                              const isPurchase =
+                                String(move.concept || "")
+                                  .toLowerCase()
+                                  .includes("compra") && Number(move.amount) > 0;
+
+                              return (
+                                <div
+                                  key={move.id}
+                                  className="flex flex-col gap-2 rounded-2xl border border-amber-100/70 px-3 py-2 text-sm dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:px-4"
+                                >
+                                  <div>
+                                    <div className="font-semibold flex flex-wrap items-center gap-1.5">
+                                      <span>{move.concept}</span>
+                                      {Number(move.points) !== 0 && (
+                                        <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                          Number(move.points) > 0
+                                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                            : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
+                                        }`}>
+                                          <Icon path={mdiStar} size={0.4} />
+                                          {Number(move.points) > 0 ? `+${Number(move.points).toFixed(1)}` : `${Number(move.points).toFixed(1)}`} pts
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-slate-500">
+                                      {new Date(move.created_at).toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+                                    <div
+                                      className={`font-semibold ${Number(move.amount) >= 0 ? "text-rose-500" : "text-emerald-500"}`}
+                                    >
+                                      ${Number(move.amount).toFixed(2)}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteMovement(move)}
+                                      className="rounded-lg border border-rose-200 p-1 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-900/20"
+                                      title="Eliminar movimiento"
+                                    >
+                                      <Icon path={mdiDelete} size={0.7} />
+                                    </button>
+                                    {isPurchase && (
+                                      <button
+                                        type="button"
+                                        onClick={() => openMovementDetail(move)}
+                                        className="rounded-lg border border-amber-200 p-1 text-amber-700 hover:bg-amber-50"
+                                        title="Ver detalle"
+                                      >
+                                        <Icon path={mdiEye} size={0.7} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {movements.length === 0 && (
+                              <p className="text-sm text-slate-500">
+                                Aun no hay movimientos.
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {clientSubTab === "redeem" && (
+                        <div className="flex-1 space-y-3 overflow-y-auto pr-1 lg:min-h-0">
+                          {!settings.rewards_enabled ? (
+                            <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4 text-center text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
+                              El sistema de recompensas ha sido desactivado temporalmente por la administración.
+                            </div>
+                          ) : (
+                            <>
+                              <div className="mb-2">
+                                <input
+                                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700"
+                                  placeholder="Buscar dulce para canje..."
+                                  value={redeemQuery}
+                                  onChange={(event) => setRedeemQuery(event.target.value)}
+                                />
+                              </div>
+                              {filteredSweetsForRedeem.map((sweet) => {
+                                const cost = Number(sweet.sale_price);
+                                const canRedeem = Number(selectedClient.points || 0) >= cost && Number(sweet.stock || 0) > 0;
+                                return (
+                                  <div
+                                    key={sweet.id}
+                                    className="flex items-center justify-between rounded-2xl border border-amber-100/70 p-3 text-sm dark:border-slate-800 bg-white/60 dark:bg-slate-900/40"
+                                  >
+                                    <div>
+                                      <div className="font-semibold">{sweet.name}</div>
+                                      <div className="text-xs text-slate-500">
+                                        Costo: {cost.toFixed(1)} pts | Stock: {sweet.stock} uds
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRedeemReward(sweet.id)}
+                                      disabled={!canRedeem}
+                                      className={`rounded-xl px-4 py-1.5 text-xs font-semibold text-white transition ${
+                                        canRedeem
+                                          ? "bg-amber-500 hover:bg-amber-600"
+                                          : "bg-slate-300 dark:bg-slate-800 cursor-not-allowed opacity-50"
+                                      }`}
+                                    >
+                                      Canjear
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                              {filteredSweetsForRedeem.length === 0 && (
+                                <p className="text-sm text-slate-500">No hay dulces disponibles para canje.</p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {clientSubTab === "redemptions" && (
+                        <div className="flex-1 space-y-3 overflow-y-auto pr-1 lg:min-h-0">
+                          {redemptionsLoading ? (
+                            <p className="text-sm text-slate-500">Cargando historial...</p>
+                          ) : redemptions.map((red) => (
                             <div
-                              key={move.id}
-                              className="flex flex-col gap-2 rounded-2xl border border-amber-100/70 px-3 py-2 text-sm dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:px-4"
+                              key={red.id}
+                              className="flex items-center justify-between rounded-2xl border border-amber-100/70 p-3 text-sm dark:border-slate-800 bg-white/60 dark:bg-slate-900/40"
                             >
                               <div>
-                                <div className="font-semibold">
-                                  {move.concept}
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                  {new Date(move.created_at).toLocaleString()}
+                                <div className="font-semibold">{red.reward_name}</div>
+                                <div className="text-xs text-slate-500 font-mono">
+                                  {new Date(red.created_at).toLocaleString()}
                                 </div>
                               </div>
-                              <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-                                <div
-                                  className={`font-semibold ${Number(move.amount) >= 0 ? "text-rose-500" : "text-emerald-500"}`}
-                                >
-                                  ${Number(move.amount).toFixed(2)}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteMovement(move)}
-                                  className="rounded-lg border border-rose-200 p-1 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-900/20"
-                                  title="Eliminar movimiento"
-                                >
-                                  <Icon path={mdiDelete} size={0.7} />
-                                </button>
-                                {isPurchase && (
-                                  <button
-                                    type="button"
-                                    onClick={() => openMovementDetail(move)}
-                                    className="rounded-lg border border-amber-200 p-1 text-amber-700 hover:bg-amber-50"
-                                    title="Ver detalle"
-                                  >
-                                    <Icon path={mdiEye} size={0.7} />
-                                  </button>
-                                )}
+                              <div className="font-semibold text-amber-700 dark:text-amber-400">
+                                -{Number(red.points_spent).toFixed(1)} pts
                               </div>
                             </div>
-                          );
-                        })}
-                        {movements.length === 0 && (
-                          <p className="text-sm text-slate-500">
-                            Aun no hay movimientos.
-                          </p>
-                        )}
-                      </div>
+                          ))}
+                          {redemptions.length === 0 && !redemptionsLoading && (
+                            <p className="text-sm text-slate-500">El cliente no ha canjeado recompensas aún.</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2488,6 +3219,17 @@ export default function App() {
           />
 
           <Route
+            path="/recompensas"
+            element={
+              token ? (
+                rewardsPanel
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
             path="*"
             element={<Navigate to={token ? "/" : "/login"} replace />}
           />
@@ -2611,30 +3353,135 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-amber-100/70 bg-amber-50/70 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/70">
-                  <div className="text-xs uppercase text-slate-500">
-                    Saldo actual
+                {movementKind === "purchase" && settings.rewards_enabled && (
+                  <div className="rounded-2xl border border-amber-100/70 bg-amber-50/20 p-4 dark:border-slate-800 dark:bg-slate-900/50 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon path={mdiStar} size={0.8} className="text-amber-500" />
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Usar puntos disponibles</span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={usePoints}
+                          onChange={(e) => {
+                            const active = e.target.checked;
+                            setUsePoints(active);
+                            if (active) {
+                              const total = usesItems ? computedTotal : (Number(movementAmount) || 0);
+                              const available = Number(selectedClient?.points || 0);
+                              const defaultPoints = Math.min(available, total);
+                              setPointsToUse(defaultPoints.toFixed(2));
+                            } else {
+                              setPointsToUse("");
+                            }
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-500"></div>
+                      </label>
+                    </div>
+                    
+                    {usePoints && (
+                      <div className="grid gap-2 sm:grid-cols-2 items-center">
+                        <div className="text-xs text-slate-500">
+                          Disponibles: <span className="font-semibold text-slate-700 dark:text-slate-300">{Number(selectedClient?.points || 0).toFixed(1)} pts</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={Number(selectedClient?.points || 0)}
+                            className="flex-1 w-full rounded-2xl border border-amber-100/70 bg-transparent px-3 py-1.5 text-sm outline-none dark:border-slate-700 text-slate-800 dark:text-slate-200"
+                            placeholder="Cantidad de puntos"
+                            value={pointsToUse}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPointsToUse(val);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const total = usesItems ? computedTotal : (Number(movementAmount) || 0);
+                              const available = Number(selectedClient?.points || 0);
+                              setPointsToUse(Math.min(available, total).toFixed(2));
+                            }}
+                            className="rounded-xl bg-amber-500 px-3 py-1 text-xs text-white hover:bg-amber-600 font-semibold"
+                          >
+                            Máx
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="font-semibold">
-                    ${Number(selectedClient?.total_debt || 0).toFixed(2)}
+                )}
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-amber-100/70 bg-amber-50/70 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/70">
+                    <div className="text-xs uppercase text-slate-500 font-semibold">
+                      Saldo actual
+                    </div>
+                    <div className="font-semibold text-base mb-1">
+                      ${Number(selectedClient?.total_debt || 0).toFixed(2)}
+                    </div>
+                    <div className="text-xs uppercase text-slate-500 font-semibold">
+                      Saldo estimado tras guardar (preview)
+                    </div>
+                    <div
+                      className={`font-semibold text-base ${
+                        projectedClientBalance > 0
+                          ? "text-rose-500"
+                          : projectedClientBalance < 0
+                            ? "text-emerald-500"
+                            : "text-slate-900 dark:text-slate-100"
+                      }`}
+                    >
+                      ${projectedClientBalance.toFixed(2)}
+                    </div>
                   </div>
-                  <div className="mt-1 text-xs uppercase text-slate-500">
-                    Saldo estimado tras guardar (preview)
-                  </div>
-                  <div
-                    className={`font-semibold ${
-                      projectedClientBalance > 0
-                        ? "text-rose-500"
-                        : projectedClientBalance < 0
-                          ? "text-emerald-500"
-                          : "text-slate-900 dark:text-slate-100"
-                    }`}
-                  >
-                    ${projectedClientBalance.toFixed(2)}
-                  </div>
+
+                  {movementKind === "purchase" ? (
+                    <div className="rounded-2xl border border-amber-100/70 bg-amber-50/70 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/70">
+                      <div className="text-xs uppercase text-slate-500 font-semibold">Puntos actuales</div>
+                      <div className="font-semibold flex items-center gap-1.5 text-base mb-1">
+                        <Icon path={mdiStar} size={0.6} className="text-amber-500" />
+                        {Number(selectedClient?.points || 0).toFixed(1)} pts
+                      </div>
+                      <div className="text-xs uppercase text-slate-500 font-semibold">Puntos tras esta compra (preview)</div>
+                      <div className="font-semibold flex items-center gap-1.5 text-base">
+                        <Icon path={mdiStar} size={0.6} className="text-amber-500" />
+                        {projectedPoints.toFixed(1)} pts
+                        {hasActiveRewards && (
+                          <span className="text-amber-600 dark:text-amber-400 font-bold text-xs animate-pulse">
+                            (tienes recompensas activas)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-amber-100/70 bg-amber-50/70 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/70">
+                      <div className="text-xs uppercase text-slate-500 font-semibold">Puntos actuales</div>
+                      <div className="font-semibold flex items-center gap-1.5 text-base mb-1">
+                        <Icon path={mdiStar} size={0.6} className="text-amber-500" />
+                        {Number(selectedClient?.points || 0).toFixed(1)} pts
+                      </div>
+                      <div className="text-xs uppercase text-slate-500 font-semibold">Puntos tras este pago (preview)</div>
+                      <div className="font-semibold flex items-center gap-1.5 text-base">
+                        <Icon path={mdiStar} size={0.6} className="text-amber-500" />
+                        {projectedPoints.toFixed(1)} pts
+                        {hasActiveRewards && (
+                          <span className="text-amber-600 dark:text-amber-400 font-bold text-xs animate-pulse">
+                            (tienes recompensas activas)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex justify-end gap-2">
+                <div className="flex justify-end gap-2 overflow-visible">
                   <button
                     type="button"
                     onClick={resetMovementModal}
@@ -2642,12 +3489,59 @@ export default function App() {
                   >
                     Cancelar
                   </button>
-                  <button
-                    className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
-                    type="submit"
-                  >
-                    Guardar
-                  </button>
+
+                  {movementKind === "purchase" ? (
+                    <div className="relative flex rounded-2xl overflow-visible">
+                      <button
+                        type="submit"
+                        className="rounded-l-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 transition"
+                      >
+                        {payImmediately ? "Guardar y pagar" : "Guardar (Fiar)"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDropdownOpen(!dropdownOpen)}
+                        className="rounded-r-2xl border-l border-amber-600 bg-amber-500 px-3 py-2 text-white hover:bg-amber-600 transition flex items-center justify-center"
+                        title="Seleccionar modo de guardado"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+
+                      {dropdownOpen && (
+                        <div className="absolute right-0 bottom-full mb-2 z-50 min-w-[160px] rounded-xl border border-amber-100 bg-white p-1 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPayImmediately(false);
+                              setDropdownOpen(false);
+                            }}
+                            className={`w-full rounded-lg px-3 py-2 text-left text-xs font-medium hover:bg-amber-50 dark:hover:bg-slate-800 ${!payImmediately ? "bg-amber-50 text-amber-800 dark:bg-slate-800 dark:text-amber-300" : "text-slate-700 dark:text-slate-300"}`}
+                          >
+                            Guardar (Fiar)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPayImmediately(true);
+                              setDropdownOpen(false);
+                            }}
+                            className={`w-full rounded-lg px-3 py-2 text-left text-xs font-medium hover:bg-amber-50 dark:hover:bg-slate-800 ${payImmediately ? "bg-amber-50 text-amber-800 dark:bg-slate-800 dark:text-amber-300" : "text-slate-700 dark:text-slate-300"}`}
+                          >
+                            Guardar y pagar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+                      type="submit"
+                    >
+                      Guardar
+                    </button>
+                  )}
                 </div>
               </form>
             </motion.div>

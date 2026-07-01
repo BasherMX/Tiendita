@@ -39,10 +39,25 @@ BEGIN
     id INT IDENTITY(1,1) PRIMARY KEY,
     name NVARCHAR(120) NOT NULL,
     total_debt DECIMAL(10,2) NOT NULL DEFAULT 0,
+    points DECIMAL(10,2) NOT NULL DEFAULT 0,
+    phone NVARCHAR(20) NULL,
     created_at DATETIME2 NOT NULL DEFAULT GETDATE()
   );
 END;
 GO
+
+IF COL_LENGTH('dbo.clients', 'points') IS NULL
+BEGIN
+  ALTER TABLE dbo.clients ADD points DECIMAL(10,2) NOT NULL DEFAULT 0;
+END;
+GO
+
+IF COL_LENGTH('dbo.clients', 'phone') IS NULL
+BEGIN
+  ALTER TABLE dbo.clients ADD phone NVARCHAR(20) NULL;
+END;
+GO
+
 
 IF OBJECT_ID('dbo.movements', 'U') IS NULL
 BEGIN
@@ -121,3 +136,73 @@ BEGIN
   );
 END;
 GO
+
+IF OBJECT_ID('dbo.rewards', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.rewards (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    name NVARCHAR(120) NOT NULL,
+    points_cost DECIMAL(10,2) NOT NULL,
+    stock INT NOT NULL DEFAULT 0,
+    sweet_id INT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_rewards_sweet FOREIGN KEY (sweet_id) REFERENCES dbo.sweets(id)
+  );
+END;
+GO
+
+IF OBJECT_ID('dbo.rewards', 'U') IS NOT NULL AND COL_LENGTH('dbo.rewards', 'sweet_id') IS NULL
+BEGIN
+  ALTER TABLE dbo.rewards ADD sweet_id INT NULL;
+  ALTER TABLE dbo.rewards ADD CONSTRAINT fk_rewards_sweet FOREIGN KEY (sweet_id) REFERENCES dbo.sweets(id);
+END;
+GO
+
+IF OBJECT_ID('dbo.redemptions', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.redemptions (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    client_id INT NOT NULL,
+    reward_id INT NULL,
+    sweet_id INT NULL,
+    points_spent DECIMAL(10,2) NOT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_redemptions_client FOREIGN KEY (client_id) REFERENCES dbo.clients(id),
+    CONSTRAINT fk_redemptions_sweet FOREIGN KEY (sweet_id) REFERENCES dbo.sweets(id)
+  );
+END;
+GO
+
+IF EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'fk_redemptions_reward')
+BEGIN
+  ALTER TABLE dbo.redemptions DROP CONSTRAINT fk_redemptions_reward;
+END;
+GO
+
+IF COL_LENGTH('dbo.redemptions', 'sweet_id') IS NULL AND OBJECT_ID('dbo.redemptions', 'U') IS NOT NULL
+BEGIN
+  ALTER TABLE dbo.redemptions ADD sweet_id INT NULL;
+  ALTER TABLE dbo.redemptions ADD CONSTRAINT fk_redemptions_sweet FOREIGN KEY (sweet_id) REFERENCES dbo.sweets(id);
+  ALTER TABLE dbo.redemptions ALTER COLUMN reward_id INT NULL;
+END;
+GO
+
+IF COL_LENGTH('dbo.movements', 'points') IS NULL AND OBJECT_ID('dbo.movements', 'U') IS NOT NULL
+BEGIN
+  ALTER TABLE dbo.movements ADD points DECIMAL(10,2) NOT NULL DEFAULT 0;
+END;
+GO
+
+IF OBJECT_ID('dbo.settings', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.settings (
+    [key] NVARCHAR(50) PRIMARY KEY,
+    [value] NVARCHAR(200) NOT NULL
+  );
+  INSERT INTO dbo.settings ([key], [value]) VALUES ('reward_factor', '0.10');
+  INSERT INTO dbo.settings ([key], [value]) VALUES ('rewards_enabled', 'true');
+END;
+GO
+
+
+
