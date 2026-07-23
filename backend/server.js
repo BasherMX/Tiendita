@@ -1135,10 +1135,31 @@ app.get("/api/whatsapp/status", authGuard, async (req, res) => {
   try {
     const settings = await getSettings();
     const provider = settings.whatsapp_provider || "meta";
-    if (provider === "meta" || process.env.META_WHATSAPP_TOKEN) {
-      return res.json({ status: "CONNECTED", provider: "meta" });
+    if (provider === "meta") {
+      const token = settings.meta_whatsapp_token || process.env.META_WHATSAPP_TOKEN;
+      const phoneId = settings.meta_phone_number_id || process.env.META_PHONE_NUMBER_ID;
+      if (token && phoneId) {
+        return res.json({ status: "CONNECTED", provider: "meta" });
+      } else {
+        return res.json({ status: "DISCONNECTED", provider: "meta" });
+      }
+    } else {
+      const gatewayUrl = settings.whatsapp_gateway_url || "";
+      if (!gatewayUrl || gatewayUrl.includes("openwa:2785") || gatewayUrl.includes("localhost")) {
+        return res.json({ status: "DISCONNECTED", provider: "openwa" });
+      }
+      const sessionName = settings.whatsapp_session_id || "tiendita";
+      try {
+        const resp = await fetch(`${gatewayUrl}/api/sessions/${sessionName}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          return res.json({ status: data.status || "CONNECTED", provider: "openwa" });
+        }
+      } catch (e) {
+        return res.json({ status: "DISCONNECTED", provider: "openwa" });
+      }
+      return res.json({ status: "DISCONNECTED", provider: "openwa" });
     }
-    return res.json({ status: "DISCONNECTED", provider: "openwa" });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

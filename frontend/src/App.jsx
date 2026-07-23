@@ -199,10 +199,13 @@ export default function App() {
     reward_factor: 0.10,
     rewards_enabled: true,
     whatsapp_enabled: false,
+    whatsapp_provider: "meta",
     whatsapp_gateway_url: "http://openwa:2785",
     whatsapp_api_key: "",
     whatsapp_session_id: "tiendita",
     whatsapp_default_country: "52",
+    meta_whatsapp_token: "",
+    meta_phone_number_id: "",
   });
   const [redemptionStats, setRedemptionStats] = useState({ redemptions: [], totals: { total_count: 0, total_points: 0 }, bySweet: [] });
   const [redemptionStatsLoading, setRedemptionStatsLoading] = useState(false);
@@ -590,12 +593,15 @@ export default function App() {
         const data = await response.json();
         setSettings({
           reward_factor: parseFloat(data.reward_factor) || 0.10,
-          rewards_enabled: data.rewards_enabled === "true",
-          whatsapp_enabled: data.whatsapp_enabled === "true",
+          rewards_enabled: data.rewards_enabled === "true" || data.rewards_enabled === true,
+          whatsapp_enabled: data.whatsapp_enabled === "true" || data.whatsapp_enabled === true,
+          whatsapp_provider: data.whatsapp_provider || "meta",
           whatsapp_gateway_url: data.whatsapp_gateway_url || "http://openwa:2785",
           whatsapp_api_key: data.whatsapp_api_key || "",
           whatsapp_session_id: data.whatsapp_session_id || "tiendita",
           whatsapp_default_country: data.whatsapp_default_country || "52",
+          meta_whatsapp_token: data.meta_whatsapp_token || "",
+          meta_phone_number_id: data.meta_phone_number_id || "",
         });
       }
     } catch (error) {
@@ -1886,49 +1892,99 @@ export default function App() {
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Habilitar envíos automáticos de tickets</span>
               </label>
 
-              <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
-                Dirección del Gateway (OpenWA URL)
-                <input
-                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                  placeholder="ej. http://openwa:2785"
-                  value={settings.whatsapp_gateway_url}
-                  onChange={(e) => setSettings({ ...settings, whatsapp_gateway_url: e.target.value })}
-                  required
-                />
+              <label className="sm:col-span-2 grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                Proveedor de WhatsApp
+                <select
+                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-sm normal-case outline-none dark:border-slate-700 dark:bg-slate-800"
+                  value={settings.whatsapp_provider || "meta"}
+                  onChange={(e) => setSettings({ ...settings, whatsapp_provider: e.target.value })}
+                >
+                  <option value="meta">Meta WhatsApp Cloud API (Oficial Serverless - Vercel)</option>
+                  <option value="openwa">OpenWA Gateway (URL Externa con Contenedor)</option>
+                </select>
               </label>
 
-              <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
-                API Key (OpenWA)
-                <input
-                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                  placeholder="API Key"
-                  type="password"
-                  value={settings.whatsapp_api_key}
-                  onChange={(e) => setSettings({ ...settings, whatsapp_api_key: e.target.value })}
-                />
-              </label>
+              {(settings.whatsapp_provider || "meta") === "meta" ? (
+                <>
+                  <label className="sm:col-span-2 grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Meta Access Token (Bearer Token)
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      placeholder="ej. EAAG..."
+                      type="password"
+                      value={settings.meta_whatsapp_token || ""}
+                      onChange={(e) => setSettings({ ...settings, meta_whatsapp_token: e.target.value })}
+                    />
+                  </label>
 
-              <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
-                ID de Sesión
-                <input
-                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                  placeholder="ej. tiendita"
-                  value={settings.whatsapp_session_id}
-                  onChange={(e) => setSettings({ ...settings, whatsapp_session_id: e.target.value })}
-                  required
-                />
-              </label>
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Phone Number ID
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      placeholder="ej. 105938472910..."
+                      value={settings.meta_phone_number_id || ""}
+                      onChange={(e) => setSettings({ ...settings, meta_phone_number_id: e.target.value })}
+                    />
+                  </label>
 
-              <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
-                Prefijo Telefónico (País)
-                <input
-                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                  placeholder="ej. 52"
-                  value={settings.whatsapp_default_country}
-                  onChange={(e) => setSettings({ ...settings, whatsapp_default_country: e.target.value })}
-                  required
-                />
-              </label>
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Prefijo Telefónico (País)
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      placeholder="ej. 52"
+                      value={settings.whatsapp_default_country || "52"}
+                      onChange={(e) => setSettings({ ...settings, whatsapp_default_country: e.target.value })}
+                      required
+                    />
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Dirección del Gateway (OpenWA URL)
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      placeholder="ej. https://tu-openwa.onrender.com"
+                      value={settings.whatsapp_gateway_url || ""}
+                      onChange={(e) => setSettings({ ...settings, whatsapp_gateway_url: e.target.value })}
+                      required
+                    />
+                  </label>
+
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    API Key (OpenWA)
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      placeholder="API Key"
+                      type="password"
+                      value={settings.whatsapp_api_key || ""}
+                      onChange={(e) => setSettings({ ...settings, whatsapp_api_key: e.target.value })}
+                    />
+                  </label>
+
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    ID de Sesión
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      placeholder="ej. tiendita"
+                      value={settings.whatsapp_session_id || "tiendita"}
+                      onChange={(e) => setSettings({ ...settings, whatsapp_session_id: e.target.value })}
+                      required
+                    />
+                  </label>
+
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Prefijo Telefónico (País)
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      placeholder="ej. 52"
+                      value={settings.whatsapp_default_country || "52"}
+                      onChange={(e) => setSettings({ ...settings, whatsapp_default_country: e.target.value })}
+                      required
+                    />
+                  </label>
+                </>
+              )}
 
               <div className="sm:col-span-2 flex justify-end mt-2">
                 <button
