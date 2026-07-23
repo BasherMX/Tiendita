@@ -85,14 +85,26 @@ function authGuard(req, res, next) {
 async function getSettings() {
   try {
     const result = await query("SELECT key, value FROM settings");
-    const settings = {};
+    const settings = {
+      reward_factor: 0.10,
+      rewards_enabled: true,
+      whatsapp_enabled: false,
+      whatsapp_provider: "meta",
+      whatsapp_gateway_url: "http://openwa:2785",
+      whatsapp_api_key: "",
+      whatsapp_session_id: "tiendita",
+      whatsapp_default_country: "52",
+    };
     result.rows.forEach((row) => {
-      settings[row.key] = row.value;
+      if (row.key === "reward_factor") settings.reward_factor = parseFloat(row.value) || 0;
+      else if (row.key === "rewards_enabled") settings.rewards_enabled = row.value === "true";
+      else if (row.key === "whatsapp_enabled") settings.whatsapp_enabled = row.value === "true";
+      else settings[row.key] = row.value;
     });
     return settings;
   } catch (err) {
     console.error("Error reading settings:", err.message);
-    return {};
+    return { reward_factor: 0.10, rewards_enabled: true, whatsapp_enabled: false };
   }
 }
 
@@ -122,7 +134,7 @@ app.get("/api/prices", async (req, res) => {
   }
 });
 
-// CRUD Sweets (Dulces)
+// CRUD Sweets
 app.get("/api/sweets", authGuard, async (req, res) => {
   try {
     const result = await query("SELECT id, name, purchase_price, sale_price, stock, sold_count FROM sweets ORDER BY created_at DESC");
@@ -140,7 +152,7 @@ app.post("/api/sweets", authGuard, async (req, res) => {
   try {
     const result = await query(
       "INSERT INTO sweets (name, purchase_price, sale_price, stock) VALUES ($1, $2, $3, $4) RETURNING *",
-      [name, purchasePrice, salePrice, stock || 0]
+      [name, purchasePrice, salePrice, Number(stock) || 0]
     );
     return res.json(result.rows[0]);
   } catch (error) {
@@ -154,7 +166,7 @@ app.put("/api/sweets/:id", authGuard, async (req, res) => {
   try {
     const result = await query(
       "UPDATE sweets SET name = $1, purchase_price = $2, sale_price = $3, stock = $4 WHERE id = $5 RETURNING *",
-      [name, purchasePrice, salePrice, stock, id]
+      [name, purchasePrice, salePrice, Number(stock) || 0, id]
     );
     if (!result.rows.length) return res.status(404).json({ message: "Sweet not found" });
     return res.json(result.rows[0]);
@@ -173,10 +185,178 @@ app.delete("/api/sweets/:id", authGuard, async (req, res) => {
   }
 });
 
+app.get("/api/sweets/stats", authGuard, async (req, res) => {
+  try {
+    const totals = await query(
+      "SELECT COUNT(*) AS total_products, COALESCE(SUM(stock), 0) AS total_stock, COALESCE(SUM(sold_count), 0) AS total_sold FROM sweets"
+    );
+    const topSeller = await query(
+      "SELECT name, sold_count FROM sweets ORDER BY sold_count DESC, name ASC LIMIT 1"
+    );
+    const lowSeller = await query(
+      "SELECT name, sold_count FROM sweets ORDER BY sold_count ASC, name ASC LIMIT 1"
+    );
+    const lowStock = await query(
+      "SELECT name, stock FROM sweets ORDER BY stock ASC, name ASC LIMIT 1"
+    );
+    return res.json({
+      totals: totals.rows[0] || { total_products: 0, total_stock: 0, total_sold: 0 },
+      topSeller: topSeller.rows[0] || null,
+      lowSeller: lowSeller.rows[0] || null,
+      lowStock: lowStock.rows[0] || null,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+// Estadísticas Generales
+app.get("/api/stats", authGuard, async (req, res) => {
+  try {
+    const lowStockThreshold = 10;
+    const criticalStockThreshold = 3;
+
+    const dailyTotals = await query(`
+      SELECT day, SUM(total) AS total, SUM(profit) AS profit
+      FROM (
+        SELECT m.created_at::date AS day,
+               SUM(mi.quantity * mi.unit_price) AS total,
+               SUM(mi.quantity * (mi.unit_price - s.purchase_price)) AS profit
+        FROM movements m
+        JOIN movement_items mi ON mi.movement_id = m.id
+        JOIN sweets s ON s.id = mi.sweet_id
+        WHERE m.amount > 0 AND m.concept LIKE 'Compra%'
+        GROUP BY m.created_at::date
+        UNION ALL
+        SELECT si.created_at::date AS day,
+               SUM(si.quantity * si.unit_price) AS total,
+               SUM(si.quantity * (si.unit_price - s.purchase_price)) AS profit
+        FROM sale_items si
+        JOIN sweets s ON s.id = si.sweet_id
+        GROUP BY si.created_at::date
+      ) AS combined
+      GROUP BY day
+      ORDER BY day DESC
+    `);
+
+    const topSeller = await query(
+      "SELECT name, sold_count FROM sweets ORDER BY sold_count DESC, name ASC LIMIT 1"
+    );
+    const lowSeller = await query(
+      "SELECT name, sold_count FROM sweets ORDER BY sold_count ASC, name ASC LIMIT 1"
+    );
+    const lowStock = await query(
+      "SELECT id, name, stock FROM sweets WHERE stock <= $1 ORDER BY stock ASC, name ASC",
+      [lowStockThreshold]
+    );
+
+    return res.json({
+      dailyTotals: dailyTotals.rows || [],
+      topSeller: topSeller.rows[0] || null,
+      lowSeller: lowSeller.rows[0] || null,
+      lowStock: lowStock.rows || [],
+      thresholds: {
+        low: lowStockThreshold,
+        critical: criticalStockThreshold,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.get("/api/stats/weekly", authGuard, async (req, res) => {
+  const { from, to } = req.query;
+  if (!from || !to) {
+    return res.status(400).json({ message: "from and to dates required" });
+  }
+  try {
+    const result = await query(
+      `SELECT day, SUM(total) AS total, SUM(profit) AS profit
+       FROM (
+         SELECT m.created_at::date AS day,
+                SUM(mi.quantity * mi.unit_price) AS total,
+                SUM(mi.quantity * (mi.unit_price - s.purchase_price)) AS profit
+         FROM movements m
+         JOIN movement_items mi ON mi.movement_id = m.id
+         JOIN sweets s ON s.id = mi.sweet_id
+         WHERE m.amount > 0 AND m.concept LIKE 'Compra%'
+           AND m.created_at::date BETWEEN $1::date AND $2::date
+         GROUP BY m.created_at::date
+         UNION ALL
+         SELECT si.created_at::date AS day,
+                SUM(si.quantity * si.unit_price) AS total,
+                SUM(si.quantity * (si.unit_price - s.purchase_price)) AS profit
+         FROM sale_items si
+         JOIN sweets s ON s.id = si.sweet_id
+         WHERE si.created_at::date BETWEEN $1::date AND $2::date
+         GROUP BY si.created_at::date
+       ) AS combined
+       GROUP BY day
+       ORDER BY day ASC`,
+      [from, to]
+    );
+
+    const days = result.rows || [];
+    const total = days.reduce((sum, row) => sum + Number(row.total || 0), 0);
+    const profit = days.reduce((sum, row) => sum + Number(row.profit || 0), 0);
+    return res.json({ total, profit, days });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.get("/api/stats/day/:day", authGuard, async (req, res) => {
+  const day = req.params.day;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    return res.status(400).json({ message: "Invalid day format" });
+  }
+  try {
+    const movementPurchases = await query(
+      `SELECT m.id,
+              m.created_at,
+              c.name AS buyer,
+              STRING_AGG(CONCAT(s.name, ' x', mi.quantity), ', ') AS items,
+              SUM(mi.quantity * mi.unit_price) AS total
+       FROM movements m
+       JOIN clients c ON c.id = m.client_id
+       JOIN movement_items mi ON mi.movement_id = m.id
+       JOIN sweets s ON s.id = mi.sweet_id
+       WHERE m.amount > 0
+         AND m.concept LIKE 'Compra%'
+         AND m.created_at::date = $1::date
+       GROUP BY m.id, m.created_at, c.name`,
+      [day]
+    );
+
+    const cashSales = await query(
+      `SELECT sa.id,
+              sa.created_at,
+              'Mostrador' AS buyer,
+              STRING_AGG(CONCAT(s.name, ' x', si.quantity), ', ') AS items,
+              SUM(si.quantity * si.unit_price) AS total
+       FROM sales sa
+       JOIN sale_items si ON si.sale_id = sa.id
+       JOIN sweets s ON s.id = si.sweet_id
+       WHERE sa.created_at::date = $1::date
+       GROUP BY sa.id, sa.created_at`,
+      [day]
+    );
+
+    const rows = [...movementPurchases.rows, ...cashSales.rows].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    return res.json(rows);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
 // CRUD Clients
 app.get("/api/clients", authGuard, async (req, res) => {
   try {
-    const result = await query("SELECT id, name, total_debt, points, phone FROM clients ORDER BY name ASC");
+    const result = await query("SELECT id, name, total_debt, points, phone FROM clients ORDER BY total_debt DESC");
     return res.json(result.rows);
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -199,49 +379,8 @@ app.post("/api/clients", authGuard, async (req, res) => {
 
 app.put("/api/clients/:id", authGuard, async (req, res) => {
   const { id } = req.params;
-  const { name, phone } = req.body || {};
-  try {
-    const result = await query(
-      "UPDATE clients SET name = $1, phone = $2 WHERE id = $3 RETURNING *",
-      [name, phone || null, id]
-    );
-    if (!result.rows.length) return res.status(404).json({ message: "Client not found" });
-    return res.json(result.rows[0]);
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
-});
-
-app.delete("/api/clients/:id", authGuard, async (req, res) => {
-  const { id } = req.params;
-  try {
-    await query("DELETE FROM clients WHERE id = $1", [id]);
-    return res.json({ message: "Client deleted successfully" });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
-});
-
-// Movements (Movimientos de cuenta cliente)
-app.get("/api/movements", authGuard, async (req, res) => {
-  try {
-    const result = await query(`
-      SELECT m.id, m.client_id, c.name AS client_name, m.concept, m.amount, m.points, m.created_at
-      FROM movements m
-      JOIN clients c ON m.client_id = c.id
-      ORDER BY m.created_at DESC
-    `);
-    return res.json(result.rows);
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
-});
-
-app.post("/api/movements", authGuard, async (req, res) => {
-  const { clientId, concept, amount, items, pointsUsed = 0 } = req.body || {};
-  if (!clientId || amount == null) {
-    return res.status(400).json({ message: "Missing required movement fields" });
-  }
+  const { name, totalDebt, points, phone } = req.body || {};
+  if (!name) return res.status(400).json({ message: "Missing name" });
 
   const dbPool = getPool();
   const clientConn = await dbPool.connect();
@@ -249,72 +388,32 @@ app.post("/api/movements", authGuard, async (req, res) => {
   try {
     await clientConn.query("BEGIN");
 
-    // Client verification
-    const clientRes = await clientConn.query("SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1", [clientId]);
-    if (!clientRes.rows.length) {
+    const currentClient = await clientConn.query("SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1", [id]);
+    if (!currentClient.rows.length) {
       await clientConn.query("ROLLBACK");
       return res.status(404).json({ message: "Client not found" });
     }
-    const clientObj = clientRes.rows[0];
 
-    const totalAmount = Number(amount);
-    const pUsed = Number(pointsUsed || 0);
-
-    // Insert Movement
-    const movRes = await clientConn.query(
-      "INSERT INTO movements (client_id, concept, amount, points) VALUES ($1, $2, $3, $4) RETURNING id",
-      [clientId, concept || "Compra", totalAmount, pUsed]
-    );
-    const movementId = movRes.rows[0].id;
-
-    let ticketItems = [];
-    const normalizedItems = Array.isArray(items) ? items : [];
-
-    if (normalizedItems.length > 0) {
-      for (const item of normalizedItems) {
-        const sweetRes = await clientConn.query("SELECT id, name, sale_price, stock FROM sweets WHERE id = $1", [item.sweetId]);
-        if (sweetRes.rows.length > 0) {
-          const sweet = sweetRes.rows[0];
-          const qty = Number(item.quantity);
-          const uPrice = Number(sweet.sale_price);
-
-          await clientConn.query(
-            "INSERT INTO movement_items (movement_id, sweet_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
-            [movementId, item.sweetId, qty, uPrice]
-          );
-
-          await clientConn.query(
-            "UPDATE sweets SET stock = stock - $1, sold_count = sold_count + $1 WHERE id = $2",
-            [qty, item.sweetId]
-          );
-
-          ticketItems.push({ name: sweet.name, quantity: qty, unitPrice: uPrice });
-        }
-      }
-    }
-
-    // Update Client Debt & Points
-    const settings = await getSettings();
-    const rewardFactor = parseFloat(settings.reward_factor || "0.10");
-
-    let newDebt = Number(clientObj.total_debt) + totalAmount;
-    let earnedPoints = totalAmount > 0 ? totalAmount * rewardFactor : 0;
-    let newPoints = Number(clientObj.points || 0) + earnedPoints - pUsed;
+    const previousDebt = Number(currentClient.rows[0].total_debt || 0);
+    const normalizedDebt = Number.isFinite(Number(totalDebt)) ? Number(totalDebt) : 0;
+    const normalizedPoints = Number.isFinite(Number(points)) ? Math.max(0, Number(points)) : 0;
 
     await clientConn.query(
-      "UPDATE clients SET total_debt = $1, points = $2 WHERE id = $3",
-      [newDebt, Math.max(0, newPoints), clientId]
+      "UPDATE clients SET name = $1, total_debt = $2, points = $3, phone = $4 WHERE id = $5",
+      [name, normalizedDebt, normalizedPoints, phone || null, id]
     );
 
+    const delta = Number((normalizedDebt - previousDebt).toFixed(2));
+    if (Math.abs(delta) > 0) {
+      const concept = `Ajuste por edicion de saldo (${name})`;
+      await clientConn.query(
+        "INSERT INTO movements (client_id, concept, amount) VALUES ($1, $2, $3)",
+        [id, concept, delta]
+      );
+    }
+
     await clientConn.query("COMMIT");
-
-    const updatedClientRes = await query("SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1", [clientId]);
-    const updatedClient = updatedClientRes.rows[0];
-
-    // WhatsApp Ticket Dispatch
-    sendWhatsAppTicketAutomatically(updatedClient, concept || "Compra", totalAmount, pUsed, ticketItems);
-
-    return res.json({ message: "Movement created successfully", movementId });
+    return res.json({ message: "Client updated" });
   } catch (error) {
     await clientConn.query("ROLLBACK");
     return res.status(500).json({ message: error.message });
@@ -323,21 +422,119 @@ app.post("/api/movements", authGuard, async (req, res) => {
   }
 });
 
-// Sales (Ventas al Contado)
-app.get("/api/sales", authGuard, async (req, res) => {
+app.delete("/api/clients/:id", authGuard, async (req, res) => {
+  const { id } = req.params;
   try {
-    const result = await query("SELECT id, total_amount, created_at FROM sales ORDER BY created_at DESC");
+    await query("DELETE FROM movements WHERE client_id = $1", [id]);
+    await query("DELETE FROM clients WHERE id = $1", [id]);
+    return res.json({ message: "Client deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.get("/api/clients/:id/debt-breakdown", authGuard, async (req, res) => {
+  const clientId = Number(req.params.id);
+  if (!Number.isInteger(clientId) || clientId <= 0) {
+    return res.status(400).json({ message: "Invalid client id" });
+  }
+  try {
+    const clientRes = await query("SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1", [clientId]);
+    if (!clientRes.rows.length) return res.status(404).json({ message: "Client not found" });
+
+    const client = clientRes.rows[0];
+
+    const movementsRes = await query(
+      `SELECT m.id AS movement_id, m.concept, m.amount, m.created_at,
+              mi.quantity, mi.unit_price, s.name AS sweet_name
+       FROM movements m
+       LEFT JOIN movement_items mi ON mi.movement_id = m.id
+       LEFT JOIN sweets s ON s.id = mi.sweet_id
+       WHERE m.client_id = $1 AND m.concept LIKE 'Compra%' AND m.amount > 0
+       ORDER BY m.created_at DESC`,
+      [clientId]
+    );
+
+    const movementsMap = {};
+    for (const row of movementsRes.rows) {
+      if (!movementsMap[row.movement_id]) {
+        movementsMap[row.movement_id] = {
+          id: row.movement_id,
+          concept: row.concept,
+          amount: Number(row.amount),
+          created_at: row.created_at,
+          items: []
+        };
+      }
+      if (row.sweet_name) {
+        movementsMap[row.movement_id].items.push({
+          name: row.sweet_name,
+          quantity: row.quantity,
+          unit_price: Number(row.unit_price)
+        });
+      }
+    }
+
+    const sortedMovements = Object.values(movementsMap).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    let remainingDebt = Number(client.total_debt || 0);
+    const movements = [];
+
+    for (const mov of sortedMovements) {
+      if (remainingDebt <= 0) break;
+      const movAmt = Number(mov.amount);
+      if (movAmt >= remainingDebt) {
+        movements.push({ ...mov, owed_amount: Number(remainingDebt.toFixed(2)) });
+        remainingDebt = 0;
+      } else {
+        movements.push({ ...mov, owed_amount: movAmt });
+        remainingDebt = Number((remainingDebt - movAmt).toFixed(2));
+      }
+    }
+
+    return res.json({ client, movements });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.get("/api/clients/:id/movements", authGuard, async (req, res) => {
+  const clientId = Number(req.params.id);
+  try {
+    const result = await query(
+      "SELECT id, concept, amount, points, created_at FROM movements WHERE client_id = $1 ORDER BY created_at DESC",
+      [clientId]
+    );
     return res.json(result.rows);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
 });
 
-app.post("/api/sales", authGuard, async (req, res) => {
-  const { totalAmount, items } = req.body || {};
-  if (!items || !items.length) {
-    return res.status(400).json({ message: "Sale must contain items" });
+app.get("/api/movements/:id/items", authGuard, async (req, res) => {
+  const movementId = Number(req.params.id);
+  if (!movementId) return res.status(400).json({ message: "Invalid movement id" });
+  try {
+    const result = await query(
+      "SELECT mi.id, mi.quantity, mi.unit_price, s.name FROM movement_items mi JOIN sweets s ON mi.sweet_id = s.id WHERE mi.movement_id = $1 ORDER BY mi.id",
+      [movementId]
+    );
+    return res.json(result.rows);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
+});
+
+app.delete("/api/clients/:clientId/movements/:movementId", authGuard, async (req, res) => {
+  const clientId = Number(req.params.clientId);
+  const movementId = Number(req.params.movementId);
+  const { password } = req.body || {};
+  const adminPass = process.env.ADMIN_PASS || "admin123";
+
+  if (!clientId || !movementId) return res.status(400).json({ message: "Invalid client or movement id" });
+  if (!password || password !== adminPass) return res.status(401).json({ message: "Contraseña incorrecta" });
 
   const dbPool = getPool();
   const clientConn = await dbPool.connect();
@@ -345,21 +542,250 @@ app.post("/api/sales", authGuard, async (req, res) => {
   try {
     await clientConn.query("BEGIN");
 
-    const saleRes = await clientConn.query(
-      "INSERT INTO sales (total_amount) VALUES ($1) RETURNING id",
-      [totalAmount]
+    const movRes = await clientConn.query(
+      "SELECT id, client_id, amount, concept, points FROM movements WHERE id = $1 AND client_id = $2",
+      [movementId, clientId]
     );
+    if (!movRes.rows.length) {
+      await clientConn.query("ROLLBACK");
+      return res.status(404).json({ message: "Movimiento no encontrado" });
+    }
+    const movement = movRes.rows[0];
+
+    const itemsRes = await clientConn.query(
+      "SELECT sweet_id, quantity FROM movement_items WHERE movement_id = $1",
+      [movementId]
+    );
+    for (const item of itemsRes.rows) {
+      await clientConn.query(
+        "UPDATE sweets SET stock = stock + $1, sold_count = sold_count - $1 WHERE id = $2",
+        [Number(item.quantity), Number(item.sweet_id)]
+      );
+    }
+
+    await clientConn.query("DELETE FROM movement_items WHERE movement_id = $1", [movementId]);
+    await clientConn.query("DELETE FROM movements WHERE id = $1", [movementId]);
+
+    const pointsToDeduct = Number(movement.points || 0);
+    await clientConn.query(
+      "UPDATE clients SET total_debt = total_debt - $1, points = GREATEST(0, points - $2) WHERE id = $3",
+      [Number(movement.amount), pointsToDeduct, clientId]
+    );
+
+    await clientConn.query("COMMIT");
+    return res.json({ message: "Movimiento eliminado" });
+  } catch (error) {
+    await clientConn.query("ROLLBACK");
+    return res.status(500).json({ message: error.message });
+  } finally {
+    clientConn.release();
+  }
+});
+
+app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
+  const clientId = Number(req.params.id);
+  const { amount, concept, items, payImmediately } = req.body || {};
+  const pointsUsed = Number(req.body.pointsUsed) || 0;
+
+  if (pointsUsed < 0) return res.status(400).json({ message: "Puntos a usar no pueden ser negativos" });
+
+  const dbPool = getPool();
+  const clientConn = await dbPool.connect();
+
+  try {
+    await clientConn.query("BEGIN");
+
+    let totalAmount = 0;
+    let normalizedItems = [];
+    const settings = await getSettings();
+
+    if (Array.isArray(items) && items.length > 0) {
+      normalizedItems = items
+        .map((item) => ({ sweetId: Number(item.sweetId), quantity: Number(item.quantity) }))
+        .filter((item) => Number.isFinite(item.sweetId) && Number.isFinite(item.quantity) && item.quantity > 0);
+
+      if (normalizedItems.length === 0) {
+        await clientConn.query("ROLLBACK");
+        return res.status(400).json({ message: "Missing items" });
+      }
+
+      for (const item of normalizedItems) {
+        const sweetRes = await clientConn.query("SELECT id, name, sale_price, stock FROM sweets WHERE id = $1", [item.sweetId]);
+        if (!sweetRes.rows.length) throw new Error("Sweet not found");
+        totalAmount += Number(sweetRes.rows[0].sale_price) * item.quantity;
+      }
+    } else {
+      if (!amount) {
+        await clientConn.query("ROLLBACK");
+        return res.status(400).json({ message: "Missing amount" });
+      }
+      totalAmount = Number(amount);
+      if (!Number.isFinite(totalAmount) || totalAmount <= 0) throw new Error("Monto de compra no válido");
+    }
+
+    if (pointsUsed > totalAmount) {
+      await clientConn.query("ROLLBACK");
+      return res.status(400).json({ message: "No se pueden usar más puntos que el total de la compra" });
+    }
+
+    if (pointsUsed > 0) {
+      const clientRes = await clientConn.query("SELECT points FROM clients WHERE id = $1", [clientId]);
+      if (!clientRes.rows.length) throw new Error("Client not found");
+      const clientPoints = Number(clientRes.rows[0].points || 0);
+      if (clientPoints < pointsUsed) {
+        throw new Error(`Puntos insuficientes. El cliente tiene ${clientPoints.toFixed(1)} pts.`);
+      }
+    }
+
+    const movRes = await clientConn.query(
+      "INSERT INTO movements (client_id, concept, amount, points) VALUES ($1, $2, $3, $4) RETURNING id",
+      [clientId, concept || "Compra", totalAmount, 0]
+    );
+    const movementId = movRes.rows[0].id;
+
+    let ticketItems = [];
+    if (normalizedItems.length > 0) {
+      for (const item of normalizedItems) {
+        const sweetRes = await clientConn.query("SELECT name, sale_price FROM sweets WHERE id = $1", [item.sweetId]);
+        const sweet = sweetRes.rows[0];
+        ticketItems.push({ name: sweet.name, quantity: item.quantity, unitPrice: Number(sweet.sale_price) });
+
+        await clientConn.query(
+          "INSERT INTO movement_items (movement_id, sweet_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
+          [movementId, item.sweetId, item.quantity, Number(sweet.sale_price)]
+        );
+        await clientConn.query(
+          "UPDATE sweets SET stock = stock - $1, sold_count = sold_count + $1 WHERE id = $2",
+          [item.quantity, item.sweetId]
+        );
+      }
+    }
+
+    if (pointsUsed > 0) {
+      await clientConn.query(
+        "UPDATE clients SET points = GREATEST(0, points - $1) WHERE id = $2",
+        [pointsUsed, clientId]
+      );
+      await clientConn.query(
+        "INSERT INTO movements (client_id, concept, amount, points) VALUES ($1, $2, $3, $4)",
+        [clientId, "Pago con puntos", -pointsUsed, -pointsUsed]
+      );
+    }
+
+    const remainingAmount = Number((totalAmount - pointsUsed).toFixed(2));
+    const shouldPay = !!payImmediately;
+    const rewardFactor = parseFloat(settings.reward_factor || "0.10");
+    const pointsEarned = settings.rewards_enabled === "true" || settings.rewards_enabled === true
+      ? Number((remainingAmount * rewardFactor).toFixed(2))
+      : 0;
+
+    if (shouldPay) {
+      await clientConn.query(
+        "INSERT INTO movements (client_id, concept, amount, points) VALUES ($1, $2, $3, $4)",
+        [clientId, "Pago de compra al instante", -remainingAmount, pointsEarned]
+      );
+      await clientConn.query(
+        "UPDATE clients SET points = points + $1 WHERE id = $2",
+        [pointsEarned, clientId]
+      );
+    } else {
+      await clientConn.query(
+        "UPDATE clients SET total_debt = total_debt + $1 WHERE id = $2",
+        [remainingAmount, clientId]
+      );
+    }
+
+    await clientConn.query("COMMIT");
+
+    const clientFinal = await query("SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1", [clientId]);
+    if (clientFinal.rows.length) {
+      sendWhatsAppTicketAutomatically(clientFinal.rows[0], concept || "Compra", totalAmount, pointsUsed, ticketItems);
+    }
+
+    return res.json({ message: "Purchase added", amount: totalAmount });
+  } catch (error) {
+    await clientConn.query("ROLLBACK");
+    return res.status(400).json({ message: error.message });
+  } finally {
+    clientConn.release();
+  }
+});
+
+app.post("/api/clients/:id/pay", authGuard, async (req, res) => {
+  try {
+    const clientId = Number(req.params.id);
+    const { amount, concept } = req.body || {};
+    const parsedAmount = Number(amount);
+
+    if (!Number.isInteger(clientId) || clientId <= 0 || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({ message: "Invalid client or amount" });
+    }
+
+    const clientRes = await query("SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1", [clientId]);
+    if (!clientRes.rows.length) return res.status(404).json({ message: "Client not found" });
+
+    const settings = await getSettings();
+    const rewardFactor = parseFloat(settings.reward_factor || "0.10");
+    const normalized = Math.abs(parsedAmount) * -1;
+    const pointsEarned = (settings.rewards_enabled === "true" || settings.rewards_enabled === true)
+      ? Number((Math.abs(parsedAmount) * rewardFactor).toFixed(2))
+      : 0;
+
+    await query(
+      "INSERT INTO movements (client_id, concept, amount, points) VALUES ($1, $2, $3, $4)",
+      [clientId, concept || "Pago", normalized, pointsEarned]
+    );
+
+    await query(
+      "UPDATE clients SET total_debt = total_debt - $1, points = points + $2 WHERE id = $3",
+      [Math.abs(parsedAmount), pointsEarned, clientId]
+    );
+
+    const updatedClientRes = await query("SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1", [clientId]);
+    if (updatedClientRes.rows.length) {
+      sendWhatsAppTicketAutomatically(updatedClientRes.rows[0], concept || "Pago", -Math.abs(parsedAmount));
+    }
+
+    return res.json({ message: "Payment registered" });
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+app.post("/api/sales", authGuard, async (req, res) => {
+  const { items } = req.body || {};
+  if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: "Missing items" });
+
+  const normalizedItems = items
+    .map((item) => ({ sweetId: Number(item.sweetId), quantity: Number(item.quantity) }))
+    .filter((item) => Number.isFinite(item.sweetId) && Number.isFinite(item.quantity) && item.quantity > 0);
+
+  if (normalizedItems.length === 0) return res.status(400).json({ message: "Missing items" });
+
+  const dbPool = getPool();
+  const clientConn = await dbPool.connect();
+
+  try {
+    await clientConn.query("BEGIN");
+
+    let totalAmount = 0;
+    for (const item of normalizedItems) {
+      const sweetRes = await clientConn.query("SELECT sale_price FROM sweets WHERE id = $1", [item.sweetId]);
+      if (!sweetRes.rows.length) throw new Error("Sweet not found");
+      totalAmount += Number(sweetRes.rows[0].sale_price) * item.quantity;
+    }
+
+    const saleRes = await clientConn.query("INSERT INTO sales (total_amount) VALUES ($1) RETURNING id", [totalAmount]);
     const saleId = saleRes.rows[0].id;
 
-    for (const item of items) {
+    for (const item of normalizedItems) {
       const sweetRes = await clientConn.query("SELECT sale_price FROM sweets WHERE id = $1", [item.sweetId]);
-      const uPrice = sweetRes.rows.length > 0 ? Number(sweetRes.rows[0].sale_price) : 0;
+      const uPrice = Number(sweetRes.rows[0].sale_price);
 
       await clientConn.query(
         "INSERT INTO sale_items (sale_id, sweet_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
         [saleId, item.sweetId, item.quantity, uPrice]
       );
-
       await clientConn.query(
         "UPDATE sweets SET stock = stock - $1, sold_count = sold_count + $1 WHERE id = $2",
         [item.quantity, item.sweetId]
@@ -367,10 +793,10 @@ app.post("/api/sales", authGuard, async (req, res) => {
     }
 
     await clientConn.query("COMMIT");
-    return res.json({ message: "Sale recorded successfully", saleId });
+    return res.json({ message: "Sale added", amount: totalAmount });
   } catch (error) {
     await clientConn.query("ROLLBACK");
-    return res.status(500).json({ message: error.message });
+    return res.status(400).json({ message: error.message });
   } finally {
     clientConn.release();
   }
@@ -390,8 +816,11 @@ app.post("/api/purchase-places", authGuard, async (req, res) => {
   const { name } = req.body || {};
   if (!name) return res.status(400).json({ message: "Place name is required" });
   try {
-    const result = await query("INSERT INTO purchase_places (name) VALUES ($1) RETURNING *", [name]);
-    return res.json(result.rows[0]);
+    const inserted = await query(
+      `INSERT INTO purchase_places (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING *`,
+      [String(name).trim()]
+    );
+    return res.json(inserted.rows[0]);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -413,13 +842,14 @@ app.get("/api/package-purchases", authGuard, async (req, res) => {
 
 app.post("/api/package-purchases", authGuard, async (req, res) => {
   const { sweetId, productName, placeId, packageCost } = req.body || {};
-  if (!productName || !placeId || packageCost == null) {
-    return res.status(400).json({ message: "Missing required fields" });
+  const normalizedName = String(productName || "").trim();
+  if (!placeId || !packageCost || (!sweetId && !normalizedName)) {
+    return res.status(400).json({ message: "Missing fields" });
   }
   try {
     const result = await query(
       "INSERT INTO package_purchases (sweet_id, product_name, place_id, package_cost) VALUES ($1, $2, $3, $4) RETURNING *",
-      [sweetId || null, productName, placeId, packageCost]
+      [sweetId ? Number(sweetId) : null, normalizedName, Number(placeId), Number(packageCost)]
     );
     return res.json(result.rows[0]);
   } catch (error) {
@@ -430,7 +860,12 @@ app.post("/api/package-purchases", authGuard, async (req, res) => {
 // Rewards (Premios) & Redemptions (Canjes)
 app.get("/api/rewards", authGuard, async (req, res) => {
   try {
-    const result = await query("SELECT id, name, points_cost, stock, sweet_id FROM rewards ORDER BY points_cost ASC");
+    const result = await query(`
+      SELECT r.id, r.name, r.points_cost, COALESCE(s.stock, r.stock) AS stock, r.sweet_id
+      FROM rewards r
+      LEFT JOIN sweets s ON r.sweet_id = s.id
+      ORDER BY r.name ASC
+    `);
     return res.json(result.rows);
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -442,7 +877,7 @@ app.post("/api/rewards", authGuard, async (req, res) => {
   try {
     const result = await query(
       "INSERT INTO rewards (name, points_cost, stock, sweet_id) VALUES ($1, $2, $3, $4) RETURNING *",
-      [name, pointsCost, stock || 0, sweetId || null]
+      [name, pointsCost, Number(stock) || 0, sweetId ? Number(sweetId) : null]
     );
     return res.json(result.rows[0]);
   } catch (error) {
@@ -450,11 +885,34 @@ app.post("/api/rewards", authGuard, async (req, res) => {
   }
 });
 
-app.post("/api/redemptions", authGuard, async (req, res) => {
-  const { clientId, rewardId, sweetId, pointsSpent } = req.body || {};
-  if (!clientId || pointsSpent == null) {
-    return res.status(400).json({ message: "Missing required redemption fields" });
+app.put("/api/rewards/:id", authGuard, async (req, res) => {
+  const { id } = req.params;
+  const { name, pointsCost, stock, sweetId } = req.body || {};
+  try {
+    const result = await query(
+      "UPDATE rewards SET name = $1, points_cost = $2, stock = $3, sweet_id = $4 WHERE id = $5 RETURNING *",
+      [name, pointsCost, Number(stock) || 0, sweetId ? Number(sweetId) : null, id]
+    );
+    return res.json(result.rows[0]);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
+});
+
+app.delete("/api/rewards/:id", authGuard, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await query("DELETE FROM rewards WHERE id = $1", [id]);
+    return res.json({ message: "Reward deleted" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.post("/api/clients/:id/redeem", authGuard, async (req, res) => {
+  const clientId = Number(req.params.id);
+  const { sweetId } = req.body || {};
+  if (!clientId || !sweetId) return res.status(400).json({ message: "Missing client or sweet ID" });
 
   const dbPool = getPool();
   const clientConn = await dbPool.connect();
@@ -462,40 +920,64 @@ app.post("/api/redemptions", authGuard, async (req, res) => {
   try {
     await clientConn.query("BEGIN");
 
-    const clientRes = await clientConn.query("SELECT points FROM clients WHERE id = $1", [clientId]);
+    const clientRes = await clientConn.query("SELECT id, name, points FROM clients WHERE id = $1", [clientId]);
     if (!clientRes.rows.length) {
       await clientConn.query("ROLLBACK");
       return res.status(404).json({ message: "Client not found" });
     }
+    const client = clientRes.rows[0];
+    const clientPoints = Number(client.points || 0);
 
-    const currentPoints = Number(clientRes.rows[0].points || 0);
-    const cost = Number(pointsSpent);
-
-    if (currentPoints < cost) {
+    const sweetRes = await clientConn.query("SELECT id, name, sale_price, stock FROM sweets WHERE id = $1", [sweetId]);
+    if (!sweetRes.rows.length) {
       await clientConn.query("ROLLBACK");
-      return res.status(400).json({ message: "Insufficient points" });
+      return res.status(404).json({ message: "Sweet not found" });
+    }
+    const sweet = sweetRes.rows[0];
+    const pointsCost = Number(sweet.sale_price);
+    const sweetStock = Number(sweet.stock || 0);
+
+    if (clientPoints < pointsCost) {
+      await clientConn.query("ROLLBACK");
+      return res.status(400).json({ message: `Puntos insuficientes. Tiene ${clientPoints.toFixed(1)} pts.` });
+    }
+    if (sweetStock <= 0) {
+      await clientConn.query("ROLLBACK");
+      return res.status(400).json({ message: "Dulce agotado (sin stock)." });
     }
 
-    await clientConn.query("UPDATE clients SET points = points - $1 WHERE id = $2", [cost, clientId]);
-
+    await clientConn.query("UPDATE clients SET points = GREATEST(0, points - $1) WHERE id = $2", [pointsCost, clientId]);
+    await clientConn.query("UPDATE sweets SET stock = stock - 1, sold_count = sold_count + 1 WHERE id = $1", [sweetId]);
+    await clientConn.query("INSERT INTO redemptions (client_id, sweet_id, points_spent) VALUES ($1, $2, $3)", [clientId, sweetId, pointsCost]);
     await clientConn.query(
-      "INSERT INTO redemptions (client_id, reward_id, sweet_id, points_spent) VALUES ($1, $2, $3, $4)",
-      [clientId, rewardId || null, sweetId || null, cost]
+      "INSERT INTO movements (client_id, concept, amount, points) VALUES ($1, $2, $3, $4)",
+      [clientId, `Canje de dulce: ${sweet.name}`, 0, -pointsCost]
     );
 
-    if (sweetId) {
-      await clientConn.query("UPDATE sweets SET stock = stock - 1 WHERE id = $1 AND stock > 0", [sweetId]);
-    } else if (rewardId) {
-      await clientConn.query("UPDATE rewards SET stock = stock - 1 WHERE id = $1 AND stock > 0", [rewardId]);
-    }
-
     await clientConn.query("COMMIT");
-    return res.json({ message: "Reward redeemed successfully" });
+    return res.json({ message: "Sweet redeemed successfully" });
   } catch (error) {
     await clientConn.query("ROLLBACK");
-    return res.status(400).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   } finally {
     clientConn.release();
+  }
+});
+
+app.get("/api/clients/:id/redemptions", authGuard, async (req, res) => {
+  try {
+    const clientId = Number(req.params.id);
+    const result = await query(
+      `SELECT r.id, r.points_spent, r.created_at, s.name AS reward_name
+       FROM redemptions r
+       JOIN sweets s ON r.sweet_id = s.id
+       WHERE r.client_id = $1
+       ORDER BY r.created_at DESC`,
+      [clientId]
+    );
+    return res.json(result.rows);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 });
 
