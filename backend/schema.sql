@@ -204,5 +204,25 @@ BEGIN
 END;
 GO
 
+-- Configuracion de WhatsApp
+IF OBJECT_ID('dbo.settings', 'U') IS NOT NULL
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM dbo.settings WHERE [key] = 'whatsapp_enabled')
+    INSERT INTO dbo.settings ([key], [value]) VALUES ('whatsapp_enabled', 'false');
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.settings WHERE [key] = 'whatsapp_gateway_url')
+    INSERT INTO dbo.settings ([key], [value]) VALUES ('whatsapp_gateway_url', 'http://openwa:2785');
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.settings WHERE [key] = 'whatsapp_api_key')
+    INSERT INTO dbo.settings ([key], [value]) VALUES ('whatsapp_api_key', '');
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.settings WHERE [key] = 'whatsapp_session_id')
+    INSERT INTO dbo.settings ([key], [value]) VALUES ('whatsapp_session_id', 'tiendita');
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.settings WHERE [key] = 'whatsapp_default_country')
+    INSERT INTO dbo.settings ([key], [value]) VALUES ('whatsapp_default_country', '52');
+END;
+GO
+
 
 

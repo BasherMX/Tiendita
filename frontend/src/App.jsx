@@ -190,7 +190,15 @@ export default function App() {
   const [payImmediately, setPayImmediately] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [redeemQuery, setRedeemQuery] = useState("");
-  const [settings, setSettings] = useState({ reward_factor: 0.10, rewards_enabled: true });
+  const [settings, setSettings] = useState({
+    reward_factor: 0.10,
+    rewards_enabled: true,
+    whatsapp_enabled: false,
+    whatsapp_gateway_url: "http://openwa:2785",
+    whatsapp_api_key: "",
+    whatsapp_session_id: "tiendita",
+    whatsapp_default_country: "52",
+  });
   const [redemptionStats, setRedemptionStats] = useState({ redemptions: [], totals: { total_count: 0, total_points: 0 }, bySweet: [] });
   const [redemptionStatsLoading, setRedemptionStatsLoading] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -208,6 +216,11 @@ export default function App() {
   const [newClientPhone, setNewClientPhone] = useState("");
   const [usePoints, setUsePoints] = useState(false);
   const [pointsToUse, setPointsToUse] = useState("");
+  const [whatsappStatus, setWhatsappStatus] = useState("DISCONNECTED");
+  const [whatsappQrCode, setWhatsappQrCode] = useState("");
+  const [checkingWhatsapp, setCheckingWhatsapp] = useState(false);
+  const [startingWhatsapp, setStartingWhatsapp] = useState(false);
+  const [loggingOutWhatsapp, setLoggingOutWhatsapp] = useState(false);
   const [movementAmount, setMovementAmount] = useState("");
   const [movementItems, setMovementItems] = useState([
     { id: Date.now(), sweetId: "", quantity: 1 },
@@ -573,6 +586,11 @@ export default function App() {
         setSettings({
           reward_factor: parseFloat(data.reward_factor) || 0.10,
           rewards_enabled: data.rewards_enabled === "true",
+          whatsapp_enabled: data.whatsapp_enabled === "true",
+          whatsapp_gateway_url: data.whatsapp_gateway_url || "http://openwa:2785",
+          whatsapp_api_key: data.whatsapp_api_key || "",
+          whatsapp_session_id: data.whatsapp_session_id || "tiendita",
+          whatsapp_default_country: data.whatsapp_default_country || "52",
         });
       }
     } catch (error) {
@@ -600,13 +618,14 @@ export default function App() {
     if (event) event.preventDefault();
     setSavingSettings(true);
     try {
+      const payload = { ...settings };
+      payload.rewards_enabled = settings.rewards_enabled ? "true" : "false";
+      payload.whatsapp_enabled = settings.whatsapp_enabled ? "true" : "false";
+
       const response = await authFetch(`${apiBase}/api/settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reward_factor: settings.reward_factor,
-          rewards_enabled: settings.rewards_enabled ? "true" : "false",
-        }),
+        body: JSON.stringify(payload),
       });
       if (response && response.ok) {
         await Swal.fire({
@@ -628,6 +647,109 @@ export default function App() {
       console.error("Error saving settings:", error);
     } finally {
       setSavingSettings(false);
+    }
+  }
+
+  async function loadWhatsappStatus() {
+    if (!token) return;
+    setCheckingWhatsapp(true);
+    try {
+      const response = await authFetch(`${apiBase}/api/whatsapp/status`);
+      if (response && response.ok) {
+        const data = await response.json();
+        setWhatsappStatus(data.status);
+        if (data.status === "QRCODE" || data.status === "qr_ready") {
+          loadWhatsappQr();
+        } else {
+          setWhatsappQrCode("");
+        }
+      }
+    } catch (error) {
+      console.error("Error loading WhatsApp status:", error);
+    } finally {
+      setCheckingWhatsapp(false);
+    }
+  }
+
+  async function loadWhatsappQr() {
+    try {
+      const response = await authFetch(`${apiBase}/api/whatsapp/session/qr`);
+      if (response && response.ok) {
+        const data = await response.json();
+        setWhatsappQrCode(data.qrCode);
+      }
+    } catch (error) {
+      console.error("Error loading WhatsApp QR:", error);
+    }
+  }
+
+  async function handleStartWhatsapp() {
+    setStartingWhatsapp(true);
+    try {
+      const response = await authFetch(`${apiBase}/api/whatsapp/session/start`, {
+        method: "POST"
+      });
+      if (response && response.ok) {
+        await Swal.fire({
+          icon: "info",
+          title: "Inicializando",
+          text: "La sesión se está inicializando. Por favor espera a que se genere el código QR si no estás conectado.",
+          timer: 2000,
+          showConfirmButton: false
+        });
+        loadWhatsappStatus();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        await Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: data.message || "No se pudo iniciar la sesión"
+        });
+      }
+    } catch (error) {
+      console.error("Error starting WhatsApp session:", error);
+    } finally {
+      setStartingWhatsapp(false);
+    }
+  }
+
+  async function handleLogoutWhatsapp() {
+    const confirm = await Swal.fire({
+      title: "¿Estás seguro?",
+      text: "Se cerrará la sesión actual de WhatsApp en el Gateway.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, cerrar sesión",
+      cancelButtonText: "Cancelar"
+    });
+    if (!confirm.isConfirmed) return;
+
+    setLoggingOutWhatsapp(true);
+    try {
+      const response = await authFetch(`${apiBase}/api/whatsapp/session/logout`, {
+        method: "POST"
+      });
+      if (response && response.ok) {
+        await Swal.fire({
+          icon: "success",
+          title: "Sesión cerrada",
+          timer: 1500,
+          showConfirmButton: false
+        });
+        setWhatsappStatus("DISCONNECTED");
+        setWhatsappQrCode("");
+      } else {
+        const data = await response.json().catch(() => ({}));
+        await Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: data.message || "No se pudo cerrar la sesión"
+        });
+      }
+    } catch (error) {
+      console.error("Error logging out WhatsApp session:", error);
+    } finally {
+      setLoggingOutWhatsapp(false);
     }
   }
 
@@ -895,8 +1017,18 @@ export default function App() {
       loadRewards();
       loadSettings();
       loadRedemptionStats();
+      loadWhatsappStatus();
     }
   }, [token]);
+
+  useEffect(() => {
+    if (!token || location.pathname !== "/whatsapp") return;
+    loadWhatsappStatus();
+    const interval = setInterval(() => {
+      loadWhatsappStatus();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [token, location.pathname, whatsappStatus]);
 
   useEffect(() => {
     if (token) {
@@ -1195,59 +1327,191 @@ export default function App() {
       return;
     }
 
+    Swal.showLoading();
     try {
-      const response = await authFetch(`${apiBase}/api/clients/${client.id}/debt-breakdown`);
-      if (!response || !response.ok) {
-        throw new Error("No se pudo obtener el desglose");
+      const response = await authFetch(`${apiBase}/api/clients/${client.id}/whatsapp-statement`, {
+        method: "POST"
+      });
+      if (response && response.ok) {
+        Swal.close();
+        await Swal.fire({
+          icon: "success",
+          title: "Enviado",
+          text: "El estado de cuenta se envió automáticamente por WhatsApp.",
+          timer: 2000,
+          showConfirmButton: false
+        });
+        return;
       }
+      throw new Error("API call failed");
+    } catch (apiError) {
+      console.warn("API send failed, falling back to manual redirect...", apiError);
       
-      const { client: clientData, movements } = await response.json();
-      
-      let message = `*Resumen de cuenta - Tiendita*\n\n`;
-      message += `Hola *${clientData.name}*, te comparto el estado actual de tu cuenta:\n\n`;
-      message += `*Saldo Total:* $${Number(clientData.total_debt).toFixed(2)}\n`;
-      message += `*Puntos Disponibles:* ${Number(clientData.points || 0).toFixed(1)} pts\n\n`;
-      
-      const purchases = movements.filter(m => m.amount > 0);
-      if (purchases.length > 0) {
-        message += `*Detalle de compras pendientes:*\n`;
-        purchases.forEach(m => {
-          const dateStr = new Date(m.created_at).toLocaleDateString("es-MX", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit"
-          });
+      try {
+        const response = await authFetch(`${apiBase}/api/clients/${client.id}/debt-breakdown`);
+        if (!response || !response.ok) {
+          throw new Error("No se pudo obtener el desglose");
+        }
+        
+        const { client: clientData, movements } = await response.json();
+        
+        let message = `*Resumen de cuenta - Tiendita*\n`;
+        const now = new Date();
+        const dateStr = now.toLocaleString("es-MX", {
+          timeZone: "America/Mexico_City",
+          day: "2-digit",
+          month: "2-digit",
+          year: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true
+        });
+        message += `📅 _Fecha: ${dateStr}_\n\n`;
+        message += `Hola *${clientData.name}*, te comparto el estado actual de tu cuenta:\n\n`;
+        
+        const purchases = movements.filter(m => m.amount > 0);
+        if (purchases.length > 0) {
+          message += `*Detalle de compras pendientes:*\n`;
           
-          if (m.owed_amount && Number(m.owed_amount) < Number(m.amount)) {
-            message += `• *${dateStr}*: ${m.concept} - $${Number(m.amount).toFixed(2)} (pendiente: $${Number(m.owed_amount).toFixed(2)})\n`;
-          } else {
-            message += `• *${dateStr}*: ${m.concept} - $${Number(m.amount).toFixed(2)}\n`;
-          }
-
-          if (m.items && m.items.length > 0) {
-            m.items.forEach(item => {
-              message += `  - ${item.quantity}x ${item.name} ($${Number(item.unit_price).toFixed(2)} c/u)\n`;
+          const purchasesByDate = {};
+          purchases.forEach(m => {
+            const mDate = new Date(m.created_at).toLocaleDateString("es-MX", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "2-digit"
             });
-          }
+            if (!purchasesByDate[mDate]) {
+              purchasesByDate[mDate] = [];
+            }
+            purchasesByDate[mDate].push(m);
+          });
+
+          const dateKeys = Object.keys(purchasesByDate);
+          dateKeys.forEach((mDate, idx) => {
+            if (idx > 0) {
+              message += `\n`; // Add an empty line between dates
+            }
+
+            const list = purchasesByDate[mDate];
+            let totalAmount = 0;
+            let totalOwedAmount = 0;
+            const mergedItemsMap = {};
+
+            list.forEach(m => {
+              totalAmount += Number(m.amount);
+              totalOwedAmount += Number(m.owed_amount !== undefined ? m.owed_amount : m.amount);
+              
+              if (m.items && m.items.length > 0) {
+                m.items.forEach(item => {
+                  if (!mergedItemsMap[item.name]) {
+                    mergedItemsMap[item.name] = {
+                      quantity: 0,
+                      unit_price: Number(item.unit_price),
+                      name: item.name
+                    };
+                  }
+                  mergedItemsMap[item.name].quantity += item.quantity;
+                });
+              }
+            });
+
+            const mergedItems = Object.values(mergedItemsMap);
+            const partialStr = (totalOwedAmount < totalAmount)
+              ? ` (pendiente: $${totalOwedAmount.toFixed(2)})`
+              : "";
+            
+            const concept = list.length === 1 ? list[0].concept : "Compra";
+
+            message += `• *${mDate}*:\n`;
+            message += `  - ${concept} - $${totalAmount.toFixed(2)}${partialStr}:\n`;
+            
+            if (mergedItems.length > 0) {
+              mergedItems.forEach(item => {
+                const lineTotal = item.quantity * item.unit_price;
+                message += `    • ${item.quantity}x ${item.name} ($${item.unit_price.toFixed(2)} c/u) - $${lineTotal.toFixed(2)}\n`;
+              });
+            }
+          });
+        } else {
+          message += `No tienes compras pendientes. ¡Tu saldo está al día!\n`;
+        }
+        
+        message += `\n───────────────────\n`;
+        
+        let debtLabel = "*Saldo Total:*";
+        let debtValue = Number(clientData.total_debt);
+        if (debtValue < 0) {
+          debtLabel = "*Saldo a favor:*";
+          debtValue = Math.abs(debtValue);
+        }
+        message += `💰 ${debtLabel} *$${debtValue.toFixed(2)}*\n`;
+        message += `⭐ *Puntos Disponibles:* ${Number(clientData.points || 0).toFixed(1)} pts\n\n`;
+        message += `¡Gracias por tu preferencia! 🙌`;
+
+        let cleanPhone = client.phone.replace(/\D/g, "");
+        if (cleanPhone.length === 10) {
+          cleanPhone = `52${cleanPhone}`;
+        }
+        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        Swal.close();
+        window.open(whatsappUrl, "_blank");
+      } catch (fallbackError) {
+        console.error("Error in WhatsApp manual fallback:", fallbackError);
+        Swal.close();
+        await Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "No se pudo generar el mensaje de WhatsApp. Inténtalo de nuevo.",
+        });
+      }
+    }
+  }
+
+  async function handleSendAllWhatsAppStatements() {
+    const confirm = await Swal.fire({
+      title: "¿Enviar todas las cuentas?",
+      text: "Se iniciará el proceso para enviar el estado de cuenta por WhatsApp a TODOS los clientes que tengan saldo deudor (> 0) y un número telefónico registrado.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Sí, enviar a todos",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#059669",
+      cancelButtonColor: "#6b7280"
+    });
+    if (!confirm.isConfirmed) return;
+
+    Swal.showLoading();
+    try {
+      const response = await authFetch(`${apiBase}/api/whatsapp/send-all-statements`, {
+        method: "POST"
+      });
+      if (response && response.ok) {
+        const data = await response.json();
+        Swal.close();
+        await Swal.fire({
+          icon: "success",
+          title: "Proceso Iniciado",
+          text: data.message || "Se inició el envío masivo en segundo plano.",
+          confirmButtonColor: "#059669"
         });
       } else {
-        message += `No tienes compras pendientes. ¡Tu saldo está al día!\n`;
+        const data = await response.json().catch(() => ({}));
+        Swal.close();
+        await Swal.fire({
+          icon: "info",
+          title: "Sin envíos",
+          text: data.message || "No se encontraron clientes con adeudos o con teléfonos registrados.",
+          confirmButtonColor: "#3b82f6"
+        });
       }
-      
-      message += `\n---------------------------------\n`;
-      message += `¡Gracias por tu preferencia!`;
-
-      const cleanPhone = client.phone.replace(/\D/g, "");
-      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, "_blank");
     } catch (error) {
-      console.error("Error sending WhatsApp:", error);
+      console.error("Error in bulk WhatsApp sending:", error);
+      Swal.close();
       await Swal.fire({
         icon: "error",
         title: "Error",
-        text: "No se pudo generar el mensaje de WhatsApp. Inténtalo de nuevo.",
+        text: "Ocurrió un error al intentar iniciar el envío múltiple.",
+        confirmButtonColor: "#ef4444"
       });
     }
   }
@@ -1595,6 +1859,186 @@ export default function App() {
     </div>
   );
 
+  const whatsappPanel = (
+    <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Settings Card */}
+        <div className="lg:col-span-2 rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 flex flex-col justify-between">
+          <div>
+            <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
+              <Icon path={mdiWhatsapp} size={1} className="text-emerald-500" />
+              Configuración de WhatsApp API Gateway
+            </div>
+            
+            <form onSubmit={handleSaveSettings} className="grid gap-4 sm:grid-cols-2">
+              <label className="sm:col-span-2 flex items-center gap-3 rounded-2xl border border-amber-100/70 bg-white/50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-800/50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-emerald-300 text-emerald-500 focus:ring-emerald-400 dark:border-slate-600 dark:bg-slate-700"
+                  checked={settings.whatsapp_enabled}
+                  onChange={(e) => setSettings({ ...settings, whatsapp_enabled: e.target.checked })}
+                />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Habilitar envíos automáticos de tickets</span>
+              </label>
+
+              <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                Dirección del Gateway (OpenWA URL)
+                <input
+                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                  placeholder="ej. http://openwa:2785"
+                  value={settings.whatsapp_gateway_url}
+                  onChange={(e) => setSettings({ ...settings, whatsapp_gateway_url: e.target.value })}
+                  required
+                />
+              </label>
+
+              <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                API Key (OpenWA)
+                <input
+                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                  placeholder="API Key"
+                  type="password"
+                  value={settings.whatsapp_api_key}
+                  onChange={(e) => setSettings({ ...settings, whatsapp_api_key: e.target.value })}
+                />
+              </label>
+
+              <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                ID de Sesión
+                <input
+                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                  placeholder="ej. tiendita"
+                  value={settings.whatsapp_session_id}
+                  onChange={(e) => setSettings({ ...settings, whatsapp_session_id: e.target.value })}
+                  required
+                />
+              </label>
+
+              <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                Prefijo Telefónico (País)
+                <input
+                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                  placeholder="ej. 52"
+                  value={settings.whatsapp_default_country}
+                  onChange={(e) => setSettings({ ...settings, whatsapp_default_country: e.target.value })}
+                  required
+                />
+              </label>
+
+              <div className="sm:col-span-2 flex justify-end mt-2">
+                <button
+                  type="submit"
+                  disabled={savingSettings}
+                  className="w-full sm:w-auto rounded-2xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition disabled:opacity-50"
+                >
+                  {savingSettings ? "Guardando..." : "Guardar Configuración"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {/* Connection Status Card */}
+        <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 flex flex-col justify-between items-center text-center">
+          <div className="w-full">
+            <div className="mb-4 text-lg font-semibold text-slate-800 dark:text-slate-100">
+              Estado de Conexión
+            </div>
+
+            {/* Badge Indicator */}
+            <div className="flex justify-center mb-6">
+              {(whatsappStatus === "CONNECTED" || whatsappStatus === "ready") ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  CONECTADO
+                </span>
+              ) : (whatsappStatus === "QRCODE" || whatsappStatus === "qr_ready") ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
+                  ESPERANDO QR
+                </span>
+              ) : (whatsappStatus === "INITIALIZING" || whatsappStatus === "initializing") ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-4 py-2 text-sm font-bold text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
+                  <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
+                  INICIALIZANDO...
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-4 py-2 text-sm font-bold text-rose-800 dark:bg-rose-950/50 dark:text-rose-300">
+                  <span className="h-2 w-2 rounded-full bg-rose-500"></span>
+                  DESCONECTADO
+                </span>
+              )}
+            </div>
+
+            {/* QR display or status text */}
+            <div className="flex flex-col items-center justify-center min-h-[220px]">
+              {(whatsappStatus === "CONNECTED" || whatsappStatus === "ready") ? (
+                <div className="space-y-2">
+                  <Icon path={mdiWhatsapp} size={4} className="text-emerald-500 mx-auto" />
+                  <p className="text-sm text-slate-500">La vinculación está activa. Los tickets automáticos se enviarán a los clientes registrados.</p>
+                </div>
+              ) : (whatsappStatus === "QRCODE" || whatsappStatus === "qr_ready") ? (
+                <div className="space-y-4">
+                  {whatsappQrCode ? (
+                    <div className="bg-white p-3 rounded-2xl shadow-inner border border-slate-200">
+                      <img src={whatsappQrCode} alt="WhatsApp QR Code" className="w-[180px] h-[180px]" />
+                    </div>
+                  ) : (
+                    <div className="w-[180px] h-[180px] flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-2xl">
+                      <span className="text-xs text-slate-400">Generando QR...</span>
+                    </div>
+                  )}
+                  <p className="text-xs text-slate-500 max-w-[200px]">Escanea este código QR en tu WhatsApp ("Dispositivos Vinculados") para activar el Gateway.</p>
+                </div>
+              ) : (whatsappStatus === "INITIALIZING" || whatsappStatus === "initializing") ? (
+                <div className="space-y-2">
+                  <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-sm text-slate-500">El servicio se está preparando. Espera unos segundos...</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Icon path={mdiWhatsapp} size={3} className="text-slate-300 dark:text-slate-700 mx-auto" />
+                  <p className="text-sm text-slate-500">Haz clic abajo para iniciar la sesión y obtener el código QR de vinculación.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="w-full pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-2 justify-center">
+            {!(whatsappStatus === "CONNECTED" || whatsappStatus === "ready") && !(whatsappStatus === "INITIALIZING" || whatsappStatus === "initializing") && (
+              <button
+                type="button"
+                onClick={handleStartWhatsapp}
+                disabled={startingWhatsapp}
+                className="rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2.5 transition disabled:opacity-50 flex-1"
+              >
+                {startingWhatsapp ? "Iniciando..." : "Inicializar Sesión"}
+              </button>
+            )}
+            {((whatsappStatus === "CONNECTED" || whatsappStatus === "ready") || (whatsappStatus === "QRCODE" || whatsappStatus === "qr_ready")) && (
+              <button
+                type="button"
+                onClick={handleLogoutWhatsapp}
+                disabled={loggingOutWhatsapp}
+                className="rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm px-5 py-2.5 transition disabled:opacity-50 flex-1"
+              >
+                {loggingOutWhatsapp ? "Cerrando..." : "Desvincular"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={loadWhatsappStatus}
+              disabled={checkingWhatsapp}
+              className="rounded-2xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-sm px-4 py-2.5 transition disabled:opacity-50"
+            >
+              🔄
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const rewardsPanel = (
     <div className="space-y-6">
       {/* Configuración de Recompensas */}
@@ -1771,6 +2215,7 @@ export default function App() {
                 },
                 { path: "/clientes", icon: mdiAccountGroup, label: "Clientes" },
                 { path: "/recompensas", icon: mdiGift, label: "Recompensas" },
+                { path: "/whatsapp", icon: mdiWhatsapp, label: "WhatsApp" },
                 { path: "/compras", icon: mdiStore, label: "Compras" },
                 {
                   path: "/estadisticas",
@@ -1861,6 +2306,7 @@ export default function App() {
                     label: "Clientes",
                   },
                   { path: "/recompensas", icon: mdiGift, label: "Recompensas" },
+                  { path: "/whatsapp", icon: mdiWhatsapp, label: "WhatsApp" },
                   { path: "/compras", icon: mdiStore, label: "Compras" },
                   {
                     path: "/estadisticas",
@@ -2228,14 +2674,24 @@ export default function App() {
                         <Icon path={mdiAccountGroup} size={1} />
                         {editingClient ? "Editar Cliente" : "Agregar Cliente"}
                       </div>
-                      <button
-                        type="button"
-                        onClick={openCashSaleModal}
-                        className="mb-4 flex items-center gap-2 rounded-2xl border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
-                      >
-                        <Icon path={mdiCashRegister} size={0.8} />
-                        Venta sin cliente
-                      </button>
+                       <div className="mb-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={openCashSaleModal}
+                          className="flex items-center gap-2 rounded-2xl border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                        >
+                          <Icon path={mdiCashRegister} size={0.8} />
+                          Venta sin cliente
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSendAllWhatsAppStatements}
+                          className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                        >
+                          <Icon path={mdiWhatsapp} size={0.8} />
+                          Enviar todas las cuentas
+                        </button>
+                      </div>
                       {editingClient ? (
                         <form
                           onSubmit={handleUpdateClient}
@@ -3223,6 +3679,17 @@ export default function App() {
             element={
               token ? (
                 rewardsPanel
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/whatsapp"
+            element={
+              token ? (
+                whatsappPanel
               ) : (
                 <Navigate to="/login" replace />
               )

@@ -47,5 +47,18 @@ services:
       - backend
     restart: unless-stopped
 
+  openwa:
+    image: ghcr.io/rmyndharis/openwa:latest
+    container_name: openwa
+    ports:
+      - "0.0.0.0:2785:2785"
+    environment:
+      - API_MASTER_KEY=tiendita_master_key_2026
+      - WEBHOOK_SSRF_PROTECT=false
+    volumes:
+      - openwa-data:/app/data
+    restart: unless-stopped
+
 volumes:
   db-data:
+  openwa-data:

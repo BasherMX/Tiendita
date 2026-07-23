@@ -826,6 +826,7 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
 
     const movementId = Number(movementResult.recordset[0].id);
 
+    let ticketItems = [];
     // 4. Save items & update sweets stock (only for items path)
     if (normalizedItems.length > 0) {
       // First construct map to reuse sweetsResult
@@ -842,6 +843,13 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
 
       for (const item of normalizedItems) {
         const sweet = sweetMap.get(item.sweetId);
+        if (sweet) {
+          ticketItems.push({
+            name: sweet.name,
+            quantity: item.quantity,
+            unitPrice: Number(sweet.sale_price)
+          });
+        }
         const itemRequest = new sql.Request(tx);
         await itemRequest
           .input("movementId", sql.Int, movementId)
@@ -914,6 +922,20 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
     }
 
     await tx.commit();
+
+    try {
+      const clientRes = await pool
+        .request()
+        .input("clientId", sql.Int, clientId)
+        .query("SELECT id, name, total_debt, points, phone FROM dbo.clients WHERE id = @clientId");
+      if (clientRes.recordset.length > 0) {
+        const client = clientRes.recordset[0];
+        sendWhatsAppTicketAutomatically(client, concept || "Compra", totalAmount, pointsUsed, ticketItems);
+      }
+    } catch (e) {
+      console.error("Error sending automatic purchase ticket:", e.message);
+    }
+
     return res.json({ message: "Purchase added", amount: totalAmount });
   } catch (error) {
     await tx.rollback();
@@ -1060,6 +1082,19 @@ app.post("/api/clients/:id/pay", authGuard, async (req, res) => {
       .query(
         "UPDATE dbo.clients SET total_debt = total_debt - @amount, points = points + @points WHERE id = @clientId",
       );
+
+    try {
+      const clientRes = await pool
+        .request()
+        .input("clientId", sql.Int, clientId)
+        .query("SELECT id, name, total_debt, points, phone FROM dbo.clients WHERE id = @clientId");
+      if (clientRes.recordset.length > 0) {
+        const client = clientRes.recordset[0];
+        sendWhatsAppTicketAutomatically(client, concept || "Pago", -Math.abs(parsedAmount));
+      }
+    } catch (e) {
+      console.error("Error sending automatic payment ticket:", e.message);
+    }
 
     return res.json({ message: "Payment registered" });
   } catch (error) {
@@ -1310,18 +1345,41 @@ async function getSettings() {
     const settingsMap = {
       reward_factor: 0.10,
       rewards_enabled: true,
+      whatsapp_enabled: false,
+      whatsapp_gateway_url: "http://openwa:2785",
+      whatsapp_api_key: "",
+      whatsapp_session_id: "tiendita",
+      whatsapp_default_country: "52",
     };
     result.recordset.forEach((row) => {
       if (row.key === "reward_factor") {
         settingsMap.reward_factor = parseFloat(row.value) || 0;
       } else if (row.key === "rewards_enabled") {
         settingsMap.rewards_enabled = row.value === "true";
+      } else if (row.key === "whatsapp_enabled") {
+        settingsMap.whatsapp_enabled = row.value === "true";
+      } else if (row.key === "whatsapp_gateway_url") {
+        settingsMap.whatsapp_gateway_url = row.value;
+      } else if (row.key === "whatsapp_api_key") {
+        settingsMap.whatsapp_api_key = row.value;
+      } else if (row.key === "whatsapp_session_id") {
+        settingsMap.whatsapp_session_id = row.value;
+      } else if (row.key === "whatsapp_default_country") {
+        settingsMap.whatsapp_default_country = row.value;
       }
     });
     return settingsMap;
   } catch (e) {
     console.error("Failed to load settings from DB, using defaults", e.message);
-    return { reward_factor: 0.10, rewards_enabled: true };
+    return {
+      reward_factor: 0.10,
+      rewards_enabled: true,
+      whatsapp_enabled: false,
+      whatsapp_gateway_url: "http://openwa:2785",
+      whatsapp_api_key: "",
+      whatsapp_session_id: "tiendita",
+      whatsapp_default_country: "52",
+    };
   }
 }
 
@@ -1334,6 +1392,11 @@ app.get("/api/settings", authGuard, async (req, res) => {
     });
     if (settingsMap.reward_factor == null) settingsMap.reward_factor = "0.10";
     if (settingsMap.rewards_enabled == null) settingsMap.rewards_enabled = "true";
+    if (settingsMap.whatsapp_enabled == null) settingsMap.whatsapp_enabled = "false";
+    if (settingsMap.whatsapp_gateway_url == null) settingsMap.whatsapp_gateway_url = "http://openwa:2785";
+    if (settingsMap.whatsapp_api_key == null) settingsMap.whatsapp_api_key = "";
+    if (settingsMap.whatsapp_session_id == null) settingsMap.whatsapp_session_id = "tiendita";
+    if (settingsMap.whatsapp_default_country == null) settingsMap.whatsapp_default_country = "52";
     return res.json(settingsMap);
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -1342,22 +1405,21 @@ app.get("/api/settings", authGuard, async (req, res) => {
 
 app.put("/api/settings", authGuard, async (req, res) => {
   try {
-    const { reward_factor, rewards_enabled } = req.body || {};
-    if (reward_factor == null || rewards_enabled == null) {
-      return res.status(400).json({ message: "Missing fields" });
-    }
-    
+    const body = req.body || {};
     const tx = new sql.Transaction(pool);
     await tx.begin();
     try {
-      await new sql.Request(tx)
-        .input("key", sql.NVarChar, "reward_factor")
-        .input("val", sql.NVarChar, String(reward_factor))
-        .query("UPDATE dbo.settings SET [value] = @val WHERE [key] = @key");
-      await new sql.Request(tx)
-        .input("key", sql.NVarChar, "rewards_enabled")
-        .input("val", sql.NVarChar, String(rewards_enabled))
-        .query("UPDATE dbo.settings SET [value] = @val WHERE [key] = @key");
+      for (const [key, value] of Object.entries(body)) {
+        await new sql.Request(tx)
+          .input("key", sql.NVarChar, key)
+          .input("val", sql.NVarChar, String(value))
+          .query(`
+            IF EXISTS (SELECT 1 FROM dbo.settings WHERE [key] = @key)
+              UPDATE dbo.settings SET [value] = @val WHERE [key] = @key
+            ELSE
+              INSERT INTO dbo.settings ([key], [value]) VALUES (@key, @val)
+          `);
+      }
       await tx.commit();
       return res.json({ message: "Settings updated" });
     } catch (e) {
@@ -1402,6 +1464,499 @@ app.get("/api/redemptions/stats", authGuard, async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 });
+
+// Helper to communicate with OpenWA
+async function callOpenWA(path, method = "GET", body = null) {
+  const settings = await getSettings();
+  const gatewayUrl = settings.whatsapp_gateway_url || "http://openwa:2785";
+  const apiKey = settings.whatsapp_api_key || "tiendita_master_key_2026";
+
+  const url = `${gatewayUrl}${path}`;
+  const headers = {
+    "X-API-Key": apiKey,
+    "Content-Type": "application/json"
+  };
+
+  const options = {
+    method,
+    headers
+  };
+
+  if (body) {
+    options.body = JSON.stringify(body);
+  }
+
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`OpenWA responded with ${res.status}: ${errText}`);
+  }
+  return await res.json();
+}
+
+// Helper to get or create a session by name, returning its database UUID
+async function resolveSessionId(name) {
+  try {
+    const sessions = await callOpenWA("/api/sessions", "GET");
+    const found = sessions.find(s => s.name === name);
+    let sessionId;
+    if (found) {
+      sessionId = found.id;
+    } else {
+      const newSession = await callOpenWA("/api/sessions", "POST", { name });
+      sessionId = newSession.id;
+    }
+
+    return sessionId;
+  } catch (error) {
+    console.error(`Failed to resolve session ID for name ${name}:`, error.message);
+    throw error;
+  }
+}
+
+// Format phone number to WhatsApp international standard
+function formatWhatsAppNumber(phone, defaultPrefix = "52") {
+  if (!phone) return null;
+  let cleaned = phone.replace(/\D/g, "");
+  if (!cleaned) return null;
+  if (cleaned.length === 10) {
+    cleaned = `${defaultPrefix}${cleaned}`;
+  }
+  // If it's a Mexican number (starts with 52) and is 12 digits, format as 521 + 10 digits mobile number
+  if (cleaned.startsWith("52") && cleaned.length === 12) {
+    cleaned = "521" + cleaned.substring(2);
+  }
+  return cleaned;
+}
+
+// Send automated ticket text
+async function sendWhatsAppTicketAutomatically(client, concept, amount, pointsUsed = 0, items = []) {
+  try {
+    const settings = await getSettings();
+    if (!settings.whatsapp_enabled) {
+      console.log("Automatic WhatsApp ticket disabled by settings.");
+      return;
+    }
+    if (!client.phone) {
+      console.log(`Client ${client.name} has no phone registered. Skipping ticket.`);
+      return;
+    }
+
+    const cleanPhone = formatWhatsAppNumber(client.phone, settings.whatsapp_default_country);
+    if (!cleanPhone) {
+      console.log(`Failed to format phone for client ${client.name}.`);
+      return;
+    }
+
+    const dateStr = new Date().toLocaleString("es-MX", {
+      timeZone: "America/Mexico_City",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    });
+
+    const displayAmount = Math.abs(amount);
+
+    let lines = [];
+    lines.push(`*Ticket de movimiento - Tiendita*`);
+    lines.push(`📅 _Fecha: ${dateStr}_`);
+    lines.push(``);
+    lines.push(`Hola *${client.name}*, te comparto el movimiento registrado en tu cuenta:`);
+    lines.push(``);
+    lines.push(`*Detalle:* ${concept}`);
+    lines.push(`*Monto:* $${Number(displayAmount).toFixed(2)}`);
+    if (pointsUsed > 0) {
+      lines.push(`*Puntos Usados:* -${Number(pointsUsed).toFixed(2)} pts`);
+    }
+    lines.push(``);
+
+    if (Array.isArray(items) && items.length > 0) {
+      lines.push(`*Detalle de compra:*`);
+      items.forEach(item => {
+        lines.push(`• ${item.quantity}x ${item.name} ($${Number(item.unitPrice).toFixed(2)} c/u)`);
+      });
+      lines.push(``);
+    }
+
+    lines.push(`───────────────────`);
+
+    let debtLabel = "*Saldo Total Actual:*";
+    let debtValue = Number(client.total_debt);
+    if (debtValue < 0) {
+      debtLabel = "*Saldo a favor:*";
+      debtValue = Math.abs(debtValue);
+    }
+
+    lines.push(`💰 ${debtLabel} *$${debtValue.toFixed(2)}*`);
+    lines.push(`⭐ *Puntos Disponibles:* ${Number(client.points || 0).toFixed(1)} pts`);
+    lines.push(``);
+    lines.push(`¡Gracias por tu preferencia! 🙌`);
+
+    const message = lines.join("\n");
+
+    const sessionName = settings.whatsapp_session_id || "tiendita";
+    const sessionId = await resolveSessionId(sessionName);
+    
+    await callOpenWA(`/api/sessions/${sessionId}/messages/send-text`, "POST", {
+      chatId: `${cleanPhone}@c.us`,
+      text: message
+    });
+    console.log(`WhatsApp ticket successfully sent automatically to ${cleanPhone}@c.us`);
+  } catch (error) {
+    console.error("Error running sendWhatsAppTicketAutomatically:", error.message);
+  }
+}
+
+// WhatsApp endpoints
+app.get("/api/whatsapp/status", authGuard, async (req, res) => {
+  try {
+    const settings = await getSettings();
+    const sessionName = settings.whatsapp_session_id || "tiendita";
+    try {
+      const sessionId = await resolveSessionId(sessionName);
+      const data = await callOpenWA(`/api/sessions/${sessionId}`);
+      return res.json({ status: data.status || "UNKNOWN", data });
+    } catch (err) {
+      return res.json({ status: "DISCONNECTED", message: err.message });
+    }
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.post("/api/whatsapp/session/start", authGuard, async (req, res) => {
+  try {
+    const settings = await getSettings();
+    const sessionName = settings.whatsapp_session_id || "tiendita";
+    
+    const sessionId = await resolveSessionId(sessionName);
+    const result = await callOpenWA(`/api/sessions/${sessionId}/start`, "POST");
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.get("/api/whatsapp/session/qr", authGuard, async (req, res) => {
+  try {
+    const settings = await getSettings();
+    const sessionName = settings.whatsapp_session_id || "tiendita";
+    try {
+      const sessionId = await resolveSessionId(sessionName);
+      const data = await callOpenWA(`/api/sessions/${sessionId}/qr`);
+      return res.json(data);
+    } catch (err) {
+      return res.status(400).json({ message: err.message });
+    }
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.post("/api/whatsapp/session/logout", authGuard, async (req, res) => {
+  try {
+    const settings = await getSettings();
+    const sessionName = settings.whatsapp_session_id || "tiendita";
+    try {
+      const sessionId = await resolveSessionId(sessionName);
+      const result = await callOpenWA(`/api/sessions/${sessionId}/stop`, "POST");
+      return res.json(result);
+    } catch (err) {
+      return res.status(400).json({ message: err.message });
+    }
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.post("/api/clients/:id/whatsapp-statement", authGuard, async (req, res) => {
+  try {
+    const clientId = Number(req.params.id);
+    const clientRes = await pool
+      .request()
+      .input("clientId", sql.Int, clientId)
+      .query("SELECT id, name, total_debt, points, phone FROM dbo.clients WHERE id = @clientId");
+
+    if (!clientRes.recordset.length) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+
+    const client = clientRes.recordset[0];
+    if (!client.phone) {
+      return res.status(400).json({ message: "Client has no registered phone number" });
+    }
+
+    const cleanPhone = formatWhatsAppNumber(client.phone);
+    if (!cleanPhone) {
+      return res.status(400).json({ message: "Invalid phone number format" });
+    }
+
+    const message = await generateStatementMessage(client);
+
+    const settings = await getSettings();
+    const sessionName = settings.whatsapp_session_id || "tiendita";
+    const sessionId = await resolveSessionId(sessionName);
+    
+    await callOpenWA(`/api/sessions/${sessionId}/messages/send-text`, "POST", {
+      chatId: `${cleanPhone}@c.us`,
+      text: message
+    });
+
+    return res.json({ message: "WhatsApp statement sent successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.post("/api/whatsapp/send-all-statements", authGuard, async (req, res) => {
+  try {
+    const clientsRes = await pool.request().query(`
+      SELECT id, name, total_debt, points, phone
+      FROM dbo.clients
+      WHERE total_debt > 0 AND phone IS NOT NULL AND phone != ''
+    `);
+    
+    const clients = clientsRes.recordset;
+    if (clients.length === 0) {
+      return res.json({ message: "No hay clientes con saldo deudor y teléfono registrado.", count: 0 });
+    }
+    
+    sendStatementsInBackground(clients);
+    
+    return res.json({ message: `Proceso iniciado para enviar ${clients.length} cuentas.`, count: clients.length });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+async function sendStatementsInBackground(clients) {
+  console.log(`Starting bulk statement send in background for ${clients.length} clients...`);
+  try {
+    const settings = await getSettings();
+    const sessionName = settings.whatsapp_session_id || "tiendita";
+    
+    let sessionId;
+    try {
+      sessionId = await resolveSessionId(sessionName);
+    } catch (e) {
+      console.error("Failed to resolve sessionId for bulk send:", e.message);
+      return;
+    }
+
+    for (const client of clients) {
+      try {
+        const cleanPhone = formatWhatsAppNumber(client.phone, settings.whatsapp_default_country);
+        if (!cleanPhone) continue;
+
+        const message = await generateStatementMessage(client);
+
+        await callOpenWA(`/api/sessions/${sessionId}/messages/send-text`, "POST", {
+          chatId: `${cleanPhone}@c.us`,
+          text: message
+        });
+        console.log(`Bulk sent WhatsApp ticket successfully to ${cleanPhone}@c.us (${client.name})`);
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (err) {
+        console.error(`Failed to bulk send statement to client ${client.name}:`, err.message);
+      }
+    }
+    console.log("Bulk statement send in background completed.");
+  } catch (error) {
+    console.error("Error in sendStatementsInBackground worker:", error.message);
+  }
+}
+
+app.post("/api/whatsapp/webhook", (req, res) => {
+  // WhatsApp interactive bot disabled per user request
+  return res.sendStatus(200);
+});
+
+async function findClientByWhatsAppPhone(waPhone) {
+  let searchPhone = waPhone;
+  if (waPhone.startsWith("521") && waPhone.length === 13) {
+    searchPhone = waPhone.substring(3);
+  } else if (waPhone.startsWith("52") && waPhone.length === 12) {
+    searchPhone = waPhone.substring(2);
+  } else if (waPhone.length > 10) {
+    searchPhone = waPhone.substring(waPhone.length - 10);
+  }
+
+  const result = await pool.request()
+    .input("searchPhone", sql.NVarChar, `%${searchPhone}`)
+    .query(`
+      SELECT id, name, total_debt, points, phone
+      FROM dbo.clients
+      WHERE phone LIKE @searchPhone OR REPLACE(REPLACE(phone, ' ', ''), '-', '') LIKE @searchPhone
+    `);
+  return result.recordset[0];
+}
+
+async function generateStatementMessage(client) {
+  const movementsResult = await pool.request()
+    .input("clientId", sql.Int, client.id)
+    .query(`
+      SELECT m.id, m.concept, m.amount, m.points, m.created_at
+      FROM dbo.movements m
+      WHERE m.client_id = @clientId
+      ORDER BY m.created_at DESC
+    `);
+
+  const movements = movementsResult.recordset;
+  
+  const itemsResult = await pool.request()
+    .input("clientId", sql.Int, client.id)
+    .query(`
+      SELECT mi.movement_id, mi.quantity, mi.unit_price, s.name
+      FROM dbo.movement_items mi
+      JOIN dbo.sweets s ON mi.sweet_id = s.id
+      JOIN dbo.movements m ON mi.movement_id = m.id
+      WHERE m.client_id = @clientId
+    `);
+
+  const itemsMap = new Map();
+  itemsResult.recordset.forEach((row) => {
+    if (!itemsMap.has(row.movement_id)) {
+      itemsMap.set(row.movement_id, []);
+    }
+    itemsMap.get(row.movement_id).push(row);
+  });
+
+  let totalDebt = Number(client.total_debt);
+  const pendingPurchases = [];
+
+  if (totalDebt > 0) {
+    let accumulated = 0;
+    for (const m of movements) {
+      const val = Number(m.amount);
+      if (val > 0) {
+        const mItems = itemsMap.get(m.id) || [];
+        const matchedItems = mItems.map(item => ({
+          quantity: item.quantity,
+          name: item.name,
+          unit_price: Number(item.unit_price)
+        }));
+
+        if (accumulated + val <= totalDebt) {
+          pendingPurchases.push({ ...m, owed_amount: val, items: matchedItems });
+          accumulated += val;
+        } else {
+          const partial = Number((totalDebt - accumulated).toFixed(2));
+          if (partial > 0) {
+            pendingPurchases.push({ ...m, owed_amount: partial, items: matchedItems });
+            accumulated += partial;
+          }
+        }
+        if (accumulated >= totalDebt) {
+          break;
+        }
+      }
+    }
+  }
+
+  const dateStr = new Date().toLocaleString("es-MX", {
+    timeZone: "America/Mexico_City",
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true
+  });
+
+  let lines = [];
+  lines.push(`*Resumen de cuenta - Tiendita*`);
+  lines.push(`📅 _Fecha: ${dateStr}_`);
+  lines.push(``);
+  lines.push(`Hola *${client.name}*, te comparto el estado actual de tu cuenta:`);
+  lines.push(``);
+
+  if (pendingPurchases.length > 0) {
+    lines.push(`*Detalle de compras pendientes:*`);
+    
+    const purchasesByDate = {};
+    pendingPurchases.forEach(m => {
+      const mDate = new Date(m.created_at).toLocaleDateString("es-MX", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit"
+      });
+      if (!purchasesByDate[mDate]) {
+        purchasesByDate[mDate] = [];
+      }
+      purchasesByDate[mDate].push(m);
+    });
+
+    const dateKeys = Object.keys(purchasesByDate);
+    dateKeys.forEach((mDate, idx) => {
+      if (idx > 0) {
+        lines.push(``); // Add an empty line between dates
+      }
+
+      const list = purchasesByDate[mDate];
+      let totalAmount = 0;
+      let totalOwedAmount = 0;
+      const mergedItemsMap = {};
+
+      list.forEach(m => {
+        totalAmount += Number(m.amount);
+        totalOwedAmount += Number(m.owed_amount !== undefined ? m.owed_amount : m.amount);
+        
+        if (m.items && m.items.length > 0) {
+          m.items.forEach(item => {
+            if (!mergedItemsMap[item.name]) {
+              mergedItemsMap[item.name] = {
+                quantity: 0,
+                unit_price: Number(item.unit_price),
+                name: item.name
+              };
+            }
+            mergedItemsMap[item.name].quantity += item.quantity;
+          });
+        }
+      });
+
+      const mergedItems = Object.values(mergedItemsMap);
+      const partialStr = (totalOwedAmount < totalAmount)
+        ? ` (pendiente: $${totalOwedAmount.toFixed(2)})`
+        : "";
+      
+      const concept = list.length === 1 ? list[0].concept : "Compra";
+
+      lines.push(`• *${mDate}*:`);
+      lines.push(`  - ${concept} - $${totalAmount.toFixed(2)}${partialStr}:`);
+      
+      if (mergedItems.length > 0) {
+        mergedItems.forEach(item => {
+          const lineTotal = item.quantity * item.unit_price;
+          lines.push(`    • ${item.quantity}x ${item.name} ($${item.unit_price.toFixed(2)} c/u) - $${lineTotal.toFixed(2)}`);
+        });
+      }
+    });
+  } else {
+    lines.push(`No tienes compras pendientes. ¡Tu saldo está al día!`);
+  }
+
+  lines.push(``);
+  lines.push(`───────────────────`);
+
+  let debtLabel = "*Saldo Total:*";
+  let debtValue = Number(client.total_debt);
+  if (debtValue < 0) {
+    debtLabel = "*Saldo a favor:*";
+    debtValue = Math.abs(debtValue);
+  }
+
+  lines.push(`💰 ${debtLabel} *$${debtValue.toFixed(2)}*`);
+  lines.push(`⭐ *Puntos Disponibles:* ${Number(client.points || 0).toFixed(1)} pts`);
+  lines.push(``);
+  lines.push(`¡Gracias por tu preferencia! 🙌`);
+
+  return lines.join("\n");
+}
 
 app.get("/health", (req, res) => {
   return res.json({ status: "ok" });
