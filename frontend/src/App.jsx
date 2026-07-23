@@ -39,7 +39,12 @@ import {
 import brandLogo from "../assets/logo.jpg";
 
 const apiBase =
-  import.meta.env.VITE_API_URL || `http://${window.location.hostname}:4000`;
+  import.meta.env.VITE_API_URL !== undefined
+    ? import.meta.env.VITE_API_URL
+    : (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+      ? `http://${window.location.hostname}:4000`
+      : "");
+
 
 function SweetCombobox({ value, onChange, sweets }) {
   const [query, setQuery] = useState("");
