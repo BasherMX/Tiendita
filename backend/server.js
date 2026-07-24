@@ -82,7 +82,7 @@ function authGuard(req, res, next) {
 }
 
 const defaultMetaToken = process.env.META_WHATSAPP_TOKEN || "EAAgKR2bTkxoBSOkaIPTz8ZAiZALqqxWOtfhu6nRuRzf5vw5mZAQNFNjnIBD4SZCa1FLjzh1P47HPURgZCzedgZBNgpVnvZA1hyxVRTrmtqJfhn0qiuZAm1l8K2U4ifFloVJZAjOmx6YQWpkxKjJIEPmwrJsMrUWMptZAM6nGTN9hpwhOFQwBP1rZBVDXv1t3M52QJg15tgRPNpO2HLxTiHWbdyy45x4ZBfLzllHJAPWNvpG706scv5lshaliDHI1YWQ0BI4XNgP91jo8xEy7HrgdSX2koWZC5pcaTnS3LJfgZD";
-const defaultPhoneId = process.env.META_PHONE_NUMBER_ID || "3346502871";
+const defaultPhoneId = process.env.META_PHONE_NUMBER_ID || "479295378592460";
 
 // Helper de Ajustes (Settings)
 async function getSettings() {
