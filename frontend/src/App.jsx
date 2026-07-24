@@ -240,6 +240,9 @@ export default function App() {
     { sweetId: "", quantity: 1 },
   ]);
   const [movementDetailModalOpen, setMovementDetailModalOpen] = useState(false);
+  const [clientModalOpen, setClientModalOpen] = useState(false);
+  const [sweetModalOpen, setSweetModalOpen] = useState(false);
+  const [mobileClientView, setMobileClientView] = useState("list");
   const [movementDetailItems, setMovementDetailItems] = useState([]);
   const [movementDetailTarget, setMovementDetailTarget] = useState(null);
   const [stats, setStats] = useState({
@@ -1105,6 +1108,7 @@ export default function App() {
     }
 
     setNewSweet({ name: "", purchasePrice: "", salePrice: "", stock: "" });
+    setSweetModalOpen(false);
     await Swal.fire({
       icon: "success",
       title: "Guardado",
@@ -1140,6 +1144,7 @@ export default function App() {
     }
 
     setEditingSweet(null);
+    setSweetModalOpen(false);
     await Swal.fire({
       icon: "success",
       title: "Actualizado",
@@ -1208,6 +1213,7 @@ export default function App() {
 
     setNewClient("");
     setNewClientPhone("");
+    setClientModalOpen(false);
     await Swal.fire({
       icon: "success",
       title: "Cliente creado",
@@ -1242,6 +1248,7 @@ export default function App() {
     }
 
     setEditingClient(null);
+    setClientModalOpen(false);
     await Swal.fire({
       icon: "success",
       title: "Actualizado",
@@ -1309,6 +1316,7 @@ export default function App() {
     movementsRequestRef.current = requestId;
 
     setSelectedClient(client);
+    setMobileClientView("detail");
     setMovements([]);
     setClientSubTab("movements");
     loadClientRedemptions(clientId);
@@ -2454,144 +2462,35 @@ export default function App() {
               token ? (
                 <div className="space-y-6">
                   <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-                    <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                      <Icon path={mdiCandycane} size={1} />
-                      {editingSweet ? "Editar Dulce" : "Agregar Dulce"}
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-lg font-semibold">
+                        <Icon path={mdiCandycane} size={1} className="text-amber-500" />
+                        <span>Inventario de Dulces ({filteredSweets.length})</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingSweet(null);
+                          setSweetModalOpen(true);
+                        }}
+                        className="flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-600 transition shadow-sm"
+                      >
+                        <Icon path={mdiPlusCircle} size={0.8} />
+                        Agregar Dulce
+                      </button>
                     </div>
-                    <form
-                      onSubmit={
-                        editingSweet ? handleUpdateSweet : handleAddSweet
-                      }
-                      className="grid gap-3"
-                    >
-                      <label className="grid gap-1 text-xs uppercase text-slate-500">
-                        Nombre
-                        <input
-                          className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                          placeholder="Nombre"
-                          value={
-                            editingSweet ? editingSweet.name : newSweet.name
-                          }
-                          onChange={(event) =>
-                            editingSweet
-                              ? setEditingSweet({
-                                  ...editingSweet,
-                                  name: event.target.value,
-                                })
-                              : setNewSweet({
-                                  ...newSweet,
-                                  name: event.target.value,
-                                })
-                          }
-                        />
-                      </label>
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <label className="grid gap-1 text-xs uppercase text-slate-500">
-                          Costo
-                          <input
-                            className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                            placeholder="Costo"
-                            type="number"
-                            step="0.01"
-                            value={
-                              editingSweet
-                                ? editingSweet.purchase_price
-                                : newSweet.purchasePrice
-                            }
-                            onChange={(event) =>
-                              editingSweet
-                                ? setEditingSweet({
-                                    ...editingSweet,
-                                    purchase_price: event.target.value,
-                                  })
-                                : setNewSweet({
-                                    ...newSweet,
-                                    purchasePrice: event.target.value,
-                                  })
-                            }
-                          />
-                        </label>
-                        <label className="grid gap-1 text-xs uppercase text-slate-500">
-                          Venta
-                          <input
-                            className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                            placeholder="Venta"
-                            type="number"
-                            step="0.01"
-                            value={
-                              editingSweet
-                                ? editingSweet.sale_price
-                                : newSweet.salePrice
-                            }
-                            onChange={(event) =>
-                              editingSweet
-                                ? setEditingSweet({
-                                    ...editingSweet,
-                                    sale_price: event.target.value,
-                                  })
-                                : setNewSweet({
-                                    ...newSweet,
-                                    salePrice: event.target.value,
-                                  })
-                            }
-                          />
-                        </label>
-                        <label className="grid gap-1 text-xs uppercase text-slate-500">
-                          Disponibles
-                          <input
-                            className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                            placeholder="Disponibles"
-                            type="number"
-                            min="0"
-                            value={
-                              editingSweet ? editingSweet.stock : newSweet.stock
-                            }
-                            onChange={(event) =>
-                              editingSweet
-                                ? setEditingSweet({
-                                    ...editingSweet,
-                                    stock: event.target.value,
-                                  })
-                                : setNewSweet({
-                                    ...newSweet,
-                                    stock: event.target.value,
-                                  })
-                            }
-                          />
-                        </label>
-                      </div>
-                      <div className="flex gap-2">
-                        <button className="flex-1 rounded-2xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-600">
-                          {editingSweet ? "Actualizar" : "Agregar"}
-                        </button>
-                        {editingSweet && (
-                          <button
-                            type="button"
-                            onClick={() => setEditingSweet(null)}
-                            className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold dark:border-slate-700"
-                          >
-                            Cancelar
-                          </button>
-                        )}
-                      </div>
-                    </form>
-                  </div>
 
-                  <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-                    <div className="mb-4 text-lg font-semibold">
-                      Listado de Dulces
-                    </div>
                     <div className="mb-4">
                       <input
                         className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700"
-                        placeholder="Buscar dulce"
+                        placeholder="Buscar dulce..."
                         value={sweetsQuery}
                         onChange={(event) => setSweetsQuery(event.target.value)}
                       />
                     </div>
-                    <div className="overflow-hidden rounded-2xl border border-amber-100/70 dark:border-slate-800">
+                    <div className="overflow-hidden rounded-2xl border border-amber-100/70 dark:border-slate-800 max-h-[60vh] overflow-y-auto">
                       <table className="min-w-full text-left text-sm">
-                        <thead className="bg-amber-50 text-amber-900 dark:bg-slate-800 dark:text-amber-200">
+                        <thead className="bg-amber-50 text-amber-900 dark:bg-slate-800 dark:text-amber-200 sticky top-0">
                           <tr>
                             <th className="px-4 py-2">Nombre</th>
                             <th className="px-4 py-2">
@@ -2642,7 +2541,10 @@ export default function App() {
                               <td className="px-4 py-2">
                                 <div className="flex gap-2">
                                   <button
-                                    onClick={() => setEditingSweet(sweet)}
+                                    onClick={() => {
+                                      setEditingSweet(sweet);
+                                      setSweetModalOpen(true);
+                                    }}
                                     className="rounded-lg bg-blue-500 p-1.5 text-white hover:bg-blue-600"
                                     title="Editar"
                                   >
@@ -2729,155 +2631,56 @@ export default function App() {
             element={
               token ? (
                 <div className="grid gap-6 lg:h-[calc(100vh-8rem)] lg:grid-cols-2">
-                  <div className="flex flex-col gap-6 lg:min-h-0">
-                    <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-                      <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                        <Icon path={mdiAccountGroup} size={1} />
-                        {editingClient ? "Editar Cliente" : "Agregar Cliente"}
-                      </div>
-                       <div className="mb-4 flex flex-wrap gap-2">
+                  {/* Left Column: Actions & Client List */}
+                  <div className={`flex flex-col gap-4 lg:min-h-0 ${mobileClientView === "detail" && selectedClient ? "hidden lg:flex" : "flex"}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingClient(null);
+                          setClientModalOpen(true);
+                        }}
+                        className="flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-600 transition shadow-sm"
+                      >
+                        <Icon path={mdiPlusCircle} size={0.8} />
+                        Nuevo Cliente
+                      </button>
+                      <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
                           onClick={openCashSaleModal}
-                          className="flex items-center gap-2 rounded-2xl border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                          className="flex items-center gap-1.5 rounded-2xl border border-amber-200 bg-white/80 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 dark:border-slate-700 dark:bg-slate-900 dark:text-amber-300"
                         >
-                          <Icon path={mdiCashRegister} size={0.8} />
+                          <Icon path={mdiCashRegister} size={0.7} />
                           Venta sin cliente
                         </button>
                         <button
                           type="button"
                           onClick={handleSendAllWhatsAppStatements}
-                          className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                          className="flex items-center gap-1.5 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300"
                         >
-                          <Icon path={mdiWhatsapp} size={0.8} />
-                          Enviar todas las cuentas
+                          <Icon path={mdiWhatsapp} size={0.7} />
+                          Enviar cuentas
                         </button>
                       </div>
-                      {editingClient ? (
-                        <form
-                          onSubmit={handleUpdateClient}
-                          className="grid gap-3"
-                        >
-                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
-                            Nombre
-                            <input
-                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                              placeholder="Nombre"
-                              value={editingClient.name}
-                              onChange={(event) =>
-                                setEditingClient({
-                                  ...editingClient,
-                                  name: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
-                            Teléfono (WhatsApp)
-                            <input
-                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                              placeholder="Ej. 4492777186"
-                              value={editingClient.phone || ""}
-                              onChange={(event) =>
-                                setEditingClient({
-                                  ...editingClient,
-                                  phone: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
-                            Saldo (+ o -)
-                            <input
-                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                              placeholder="Saldo (+ o -)"
-                              type="number"
-                              step="0.01"
-                              value={editingClient.total_debt}
-                              onChange={(event) =>
-                                setEditingClient({
-                                  ...editingClient,
-                                  total_debt: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
-                            Puntos
-                            <input
-                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                              placeholder="Puntos"
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              value={editingClient.points}
-                              onChange={(event) =>
-                                setEditingClient({
-                                  ...editingClient,
-                                  points: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-                          <div className="flex gap-2 mt-1">
-                            <button className="flex-1 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
-                              Actualizar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditingClient(null)}
-                              className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold dark:border-slate-700"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </form>
-                      ) : (
-                        <form onSubmit={handleAddClient} className="grid gap-3">
-                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
-                            Nombre
-                            <input
-                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                              placeholder="Nombre del cliente"
-                              value={newClient}
-                              onChange={(event) =>
-                                setNewClient(event.target.value)
-                              }
-                              required
-                            />
-                          </label>
-                          <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
-                            Teléfono (WhatsApp)
-                            <input
-                              className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
-                              placeholder="Ej. 4492777186"
-                              value={newClientPhone}
-                              onChange={(event) =>
-                                setNewClientPhone(event.target.value)
-                              }
-                            />
-                          </label>
-                          <button className="w-full flex items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
-                            <Icon path={mdiPlusCircle} size={0.8} />
-                            Crear
-                          </button>
-                        </form>
-                      )}
                     </div>
 
                     <div className="flex flex-1 flex-col rounded-3xl border border-amber-100/70 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 sm:p-6 lg:min-h-0">
-                      <div className="mb-4 text-lg font-semibold">Clientes</div>
-                      <div className="mb-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div className="text-lg font-semibold flex items-center gap-2">
+                          <Icon path={mdiAccountGroup} size={0.9} />
+                          <span>Clientes ({filteredClients.length})</span>
+                        </div>
+                      </div>
+                      <div className="mb-3">
                         <input
                           className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700"
-                          placeholder="Buscar cliente"
+                          placeholder="Buscar cliente por nombre o teléfono..."
                           value={clientsQuery}
-                          onChange={(event) =>
-                            setClientsQuery(event.target.value)
-                          }
+                          onChange={(event) => setClientsQuery(event.target.value)}
                         />
                       </div>
-                      <div className="flex-1 space-y-2 overflow-y-auto pr-1 lg:min-h-0">
+                      <div className="flex-1 space-y-2 overflow-y-auto pr-1 max-h-[60vh] lg:max-h-none lg:min-h-0">
                         {filteredClients.map((client) => (
                           <div
                             key={client.id}
@@ -2912,7 +2715,10 @@ export default function App() {
                             </button>
                             <div className="flex gap-1">
                               <button
-                                onClick={() => setEditingClient(client)}
+                                onClick={() => {
+                                  setEditingClient(client);
+                                  setClientModalOpen(true);
+                                }}
                                 className="rounded-lg bg-blue-500 p-1.5 text-white hover:bg-blue-600"
                                 title="Editar"
                               >
@@ -2929,13 +2735,24 @@ export default function App() {
                           </div>
                         ))}
                         {filteredClients.length === 0 && (
-                          <p className="text-sm text-slate-500">
-                            Sin clientes.
-                          </p>
+                          <p className="text-sm text-slate-500">Sin clientes registrados.</p>
                         )}
                       </div>
                     </div>
                   </div>
+
+                  {/* Right Column: Selected Client Detail */}
+                  <div className={`flex flex-col lg:min-h-0 ${mobileClientView === "list" && selectedClient ? "hidden lg:flex" : "flex"}`}>
+                    {selectedClient && (
+                      <button
+                        type="button"
+                        onClick={() => setMobileClientView("list")}
+                        className="mb-3 flex items-center gap-1 text-sm font-semibold text-amber-700 dark:text-amber-300 lg:hidden"
+                      >
+                        <Icon path={mdiChevronLeft} size={0.8} />
+                        Volver a lista de clientes
+                      </button>
+                    )}
                        {selectedClient && (
                     <div className="flex flex-col rounded-3xl border border-amber-100/70 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 sm:p-6 lg:min-h-0">
                       <div className="mb-4 text-lg font-semibold flex items-center justify-between">
@@ -4263,6 +4080,245 @@ export default function App() {
                   Cerrar
                 </button>
               </div>
+            </motion.div>
+        {clientModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md rounded-3xl border border-amber-100/70 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div className="mb-4 text-lg font-semibold flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Icon path={mdiAccountGroup} size={0.9} className="text-amber-500" />
+                  <span>{editingClient ? "Editar Cliente" : "Nuevo Cliente"}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClientModalOpen(false);
+                    setEditingClient(null);
+                  }}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <Icon path={mdiClose} size={0.8} />
+                </button>
+              </div>
+
+              {editingClient ? (
+                <form onSubmit={handleUpdateClient} className="grid gap-3">
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Nombre
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      placeholder="Nombre del cliente"
+                      value={editingClient.name}
+                      onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })}
+                      required
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Teléfono (WhatsApp)
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      placeholder="Ej. 4492777186"
+                      value={editingClient.phone || ""}
+                      onChange={(e) => setEditingClient({ ...editingClient, phone: e.target.value })}
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Saldo (+ o -)
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      type="number"
+                      step="0.01"
+                      value={editingClient.total_debt}
+                      onChange={(e) => setEditingClient({ ...editingClient, total_debt: e.target.value })}
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Puntos
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={editingClient.points}
+                      onChange={(e) => setEditingClient({ ...editingClient, points: e.target.value })}
+                    />
+                  </label>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setClientModalOpen(false);
+                        setEditingClient(null);
+                      }}
+                      className="flex-1 rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold dark:border-slate-700"
+                    >
+                      Cancelar
+                    </button>
+                    <button type="submit" className="flex-1 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                      Actualizar
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleAddClient} className="grid gap-3">
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Nombre
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      placeholder="Nombre del cliente"
+                      value={newClient}
+                      onChange={(e) => setNewClient(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Teléfono (WhatsApp)
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      placeholder="Ej. 4492777186"
+                      value={newClientPhone}
+                      onChange={(e) => setNewClientPhone(e.target.value)}
+                    />
+                  </label>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setClientModalOpen(false)}
+                      className="flex-1 rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold dark:border-slate-700"
+                    >
+                      Cancelar
+                    </button>
+                    <button type="submit" className="flex-1 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                      Crear Cliente
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+
+        {sweetModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md rounded-3xl border border-amber-100/70 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div className="mb-4 text-lg font-semibold flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Icon path={mdiCandycane} size={0.9} className="text-amber-500" />
+                  <span>{editingSweet ? "Editar Dulce" : "Nuevo Dulce"}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSweetModalOpen(false);
+                    setEditingSweet(null);
+                  }}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <Icon path={mdiClose} size={0.8} />
+                </button>
+              </div>
+
+              <form onSubmit={editingSweet ? handleUpdateSweet : handleAddSweet} className="grid gap-3">
+                <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                  Nombre
+                  <input
+                    className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                    placeholder="Nombre del dulce"
+                    value={editingSweet ? editingSweet.name : newSweet.name}
+                    onChange={(e) =>
+                      editingSweet
+                        ? setEditingSweet({ ...editingSweet, name: e.target.value })
+                        : setNewSweet({ ...newSweet, name: e.target.value })
+                    }
+                    required
+                  />
+                </label>
+                <div className="grid gap-3 grid-cols-3">
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Costo
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={editingSweet ? editingSweet.purchase_price : newSweet.purchasePrice}
+                      onChange={(e) =>
+                        editingSweet
+                          ? setEditingSweet({ ...editingSweet, purchase_price: e.target.value })
+                          : setNewSweet({ ...newSweet, purchasePrice: e.target.value })
+                      }
+                      required
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Venta
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={editingSweet ? editingSweet.sale_price : newSweet.salePrice}
+                      onChange={(e) =>
+                        editingSweet
+                          ? setEditingSweet({ ...editingSweet, sale_price: e.target.value })
+                          : setNewSweet({ ...newSweet, salePrice: e.target.value })
+                      }
+                      required
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
+                    Stock
+                    <input
+                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={editingSweet ? editingSweet.stock : newSweet.stock}
+                      onChange={(e) =>
+                        editingSweet
+                          ? setEditingSweet({ ...editingSweet, stock: e.target.value })
+                          : setNewSweet({ ...newSweet, stock: e.target.value })
+                      }
+                      required
+                    />
+                  </label>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSweetModalOpen(false);
+                      setEditingSweet(null);
+                    }}
+                    className="flex-1 rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold dark:border-slate-700"
+                  >
+                    Cancelar
+                  </button>
+                  <button type="submit" className="flex-1 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                    {editingSweet ? "Actualizar" : "Agregar Dulce"}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}
