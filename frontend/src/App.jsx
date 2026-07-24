@@ -2743,252 +2743,258 @@ export default function App() {
 
                   {/* Right Column: Selected Client Detail */}
                   <div className={`flex flex-col lg:min-h-0 ${mobileClientView === "list" && selectedClient ? "hidden lg:flex" : "flex"}`}>
-                    {selectedClient && (
-                      <button
-                        type="button"
-                        onClick={() => setMobileClientView("list")}
-                        className="mb-3 flex items-center gap-1 text-sm font-semibold text-amber-700 dark:text-amber-300 lg:hidden"
-                      >
-                        <Icon path={mdiChevronLeft} size={0.8} />
-                        Volver a lista de clientes
-                      </button>
-                    )}
-                       {selectedClient && (
-                    <div className="flex flex-col rounded-3xl border border-amber-100/70 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 sm:p-6 lg:min-h-0">
-                      <div className="mb-4 text-lg font-semibold flex items-center justify-between">
-                        <div>Detalle de {selectedClient.name}</div>
-                        <div className="flex items-center gap-1 rounded-2xl bg-amber-50 px-3 py-1 text-sm font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
-                          <Icon path={mdiStar} size={0.6} />
-                          {Number(selectedClient.points || 0).toFixed(1)} pts
-                        </div>
-                      </div>
-
-                      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between bg-amber-50/40 dark:bg-slate-800/40 rounded-2xl p-3 border border-amber-100/50 dark:border-slate-800">
-                        <div className="text-sm text-slate-500">
-                          {selectedClient.phone ? (
-                            <span>Teléfono: <span className="font-semibold text-slate-700 dark:text-slate-300">{selectedClient.phone}</span></span>
-                          ) : (
-                            <span className="italic text-slate-400">Sin teléfono registrado</span>
-                          )}
-                        </div>
+                    {selectedClient ? (
+                      <>
                         <button
                           type="button"
-                          onClick={() => handleSendWhatsApp(selectedClient)}
-                          className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white transition ${
-                            selectedClient.phone
-                              ? "bg-emerald-600 hover:bg-emerald-700"
-                              : "bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed opacity-60"
-                          }`}
+                          onClick={() => setMobileClientView("list")}
+                          className="mb-3 flex items-center gap-1 text-sm font-semibold text-amber-700 dark:text-amber-300 lg:hidden"
                         >
-                          <Icon path={mdiWhatsapp} size={0.6} />
-                          {selectedClient.phone ? "Enviar Cuenta" : "Sin WhatsApp"}
+                          <Icon path={mdiChevronLeft} size={0.8} />
+                          Volver a lista de clientes
                         </button>
-                      </div>
-
-                      {/* Sub-tabs */}
-                      <div className="mb-4 flex border-b border-amber-100 dark:border-slate-800">
-                        <button
-                          type="button"
-                          onClick={() => setClientSubTab("movements")}
-                          className={`flex-1 pb-2 text-center text-sm font-semibold transition ${
-                            clientSubTab === "movements"
-                              ? "border-b-2 border-amber-500 text-amber-800 dark:text-amber-300"
-                              : "text-slate-500 hover:text-slate-700"
-                          }`}
-                        >
-                          Movimientos
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setClientSubTab("redeem")}
-                          className={`flex-1 pb-2 text-center text-sm font-semibold transition ${
-                            clientSubTab === "redeem"
-                              ? "border-b-2 border-amber-500 text-amber-800 dark:text-amber-300"
-                              : "text-slate-500 hover:text-slate-700"
-                          }`}
-                        >
-                          Canjear
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setClientSubTab("redemptions")}
-                          className={`flex-1 pb-2 text-center text-sm font-semibold transition ${
-                            clientSubTab === "redemptions"
-                              ? "border-b-2 border-amber-500 text-amber-800 dark:text-amber-300"
-                              : "text-slate-500 hover:text-slate-700"
-                          }`}
-                        >
-                          Historial Canjes
-                        </button>
-                      </div>
-
-                      {clientSubTab === "movements" && (
-                        <>
-                          <div className="mb-4 grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => openMovementModal("purchase")}
-                              className="flex items-center justify-center gap-2 rounded-2xl bg-rose-500 px-2 py-2 text-sm font-semibold text-white hover:bg-rose-600"
-                            >
-                              <Icon path={mdiCashPlus} size={0.8} />
-                              Registrar compra
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openMovementModal("pay")}
-                              className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-2 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
-                            >
-                              <Icon path={mdiCashMinus} size={0.8} />
-                              Registrar pago
-                            </button>
-                          </div>
-                          <div className="flex-1 space-y-2 overflow-y-auto pr-1 lg:min-h-0">
-                            {movements.map((move) => {
-                              const isPurchase =
-                                String(move.concept || "")
-                                  .toLowerCase()
-                                  .includes("compra") && Number(move.amount) > 0;
-
-                              return (
-                                <div
-                                  key={move.id}
-                                  className="flex flex-col gap-2 rounded-2xl border border-amber-100/70 px-3 py-2 text-sm dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:px-4"
-                                >
-                                  <div>
-                                    <div className="font-semibold flex flex-wrap items-center gap-1.5">
-                                      <span>{move.concept}</span>
-                                      {Number(move.points) !== 0 && (
-                                        <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                          Number(move.points) > 0
-                                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                            : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
-                                        }`}>
-                                          <Icon path={mdiStar} size={0.4} />
-                                          {Number(move.points) > 0 ? `+${Number(move.points).toFixed(1)}` : `${Number(move.points).toFixed(1)}`} pts
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="text-xs text-slate-500">
-                                      {new Date(move.created_at).toLocaleString()}
-                                    </div>
-                                  </div>
-                                  <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-                                    <div
-                                      className={`font-semibold ${Number(move.amount) >= 0 ? "text-rose-500" : "text-emerald-500"}`}
-                                    >
-                                      ${Number(move.amount).toFixed(2)}
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteMovement(move)}
-                                      className="rounded-lg border border-rose-200 p-1 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-900/20"
-                                      title="Eliminar movimiento"
-                                    >
-                                      <Icon path={mdiDelete} size={0.7} />
-                                    </button>
-                                    {isPurchase && (
-                                      <button
-                                        type="button"
-                                        onClick={() => openMovementDetail(move)}
-                                        className="rounded-lg border border-amber-200 p-1 text-amber-700 hover:bg-amber-50"
-                                        title="Ver detalle"
-                                      >
-                                        <Icon path={mdiEye} size={0.7} />
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            {movements.length === 0 && (
-                              <p className="text-sm text-slate-500">
-                                Aun no hay movimientos.
-                              </p>
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      {clientSubTab === "redeem" && (
-                        <div className="flex-1 space-y-3 overflow-y-auto pr-1 lg:min-h-0">
-                          {!settings.rewards_enabled ? (
-                            <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4 text-center text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
-                              El sistema de recompensas ha sido desactivado temporalmente por la administración.
+                        <div className="flex flex-1 flex-col rounded-3xl border border-amber-100/70 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 sm:p-6 lg:min-h-0">
+                          <div className="mb-4 text-lg font-semibold flex items-center justify-between">
+                            <div>Detalle de {selectedClient.name}</div>
+                            <div className="flex items-center gap-1 rounded-2xl bg-amber-50 px-3 py-1 text-sm font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
+                              <Icon path={mdiStar} size={0.6} />
+                              {Number(selectedClient.points || 0).toFixed(1)} pts
                             </div>
-                          ) : (
+                          </div>
+
+                          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between bg-amber-50/40 dark:bg-slate-800/40 rounded-2xl p-3 border border-amber-100/50 dark:border-slate-800">
+                            <div className="text-sm text-slate-500">
+                              {selectedClient.phone ? (
+                                <span>Teléfono: <span className="font-semibold text-slate-700 dark:text-slate-300">{selectedClient.phone}</span></span>
+                              ) : (
+                                <span className="italic text-slate-400">Sin teléfono registrado</span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleSendWhatsApp(selectedClient)}
+                              className={`flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white transition ${
+                                selectedClient.phone
+                                  ? "bg-emerald-600 hover:bg-emerald-700"
+                                  : "bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed opacity-60"
+                              }`}
+                            >
+                              <Icon path={mdiWhatsapp} size={0.6} />
+                              {selectedClient.phone ? "Enviar Cuenta" : "Sin WhatsApp"}
+                            </button>
+                          </div>
+
+                          {/* Sub-tabs */}
+                          <div className="mb-4 flex border-b border-amber-100 dark:border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => setClientSubTab("movements")}
+                              className={`flex-1 pb-2 text-center text-sm font-semibold transition ${
+                                clientSubTab === "movements"
+                                  ? "border-b-2 border-amber-500 text-amber-800 dark:text-amber-300"
+                                  : "text-slate-500 hover:text-slate-700"
+                              }`}
+                            >
+                              Movimientos
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setClientSubTab("redeem")}
+                              className={`flex-1 pb-2 text-center text-sm font-semibold transition ${
+                                clientSubTab === "redeem"
+                                  ? "border-b-2 border-amber-500 text-amber-800 dark:text-amber-300"
+                                  : "text-slate-500 hover:text-slate-700"
+                              }`}
+                            >
+                              Canjear
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setClientSubTab("redemptions")}
+                              className={`flex-1 pb-2 text-center text-sm font-semibold transition ${
+                                clientSubTab === "redemptions"
+                                  ? "border-b-2 border-amber-500 text-amber-800 dark:text-amber-300"
+                                  : "text-slate-500 hover:text-slate-700"
+                              }`}
+                            >
+                              Historial Canjes
+                            </button>
+                          </div>
+
+                          {clientSubTab === "movements" && (
                             <>
-                              <div className="mb-2">
-                                <input
-                                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700"
-                                  placeholder="Buscar dulce para canje..."
-                                  value={redeemQuery}
-                                  onChange={(event) => setRedeemQuery(event.target.value)}
-                                />
+                              <div className="mb-4 grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openMovementModal("purchase")}
+                                  className="flex items-center justify-center gap-2 rounded-2xl bg-rose-500 px-2 py-2 text-sm font-semibold text-white hover:bg-rose-600"
+                                >
+                                  <Icon path={mdiCashPlus} size={0.8} />
+                                  Registrar compra
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openMovementModal("pay")}
+                                  className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-2 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+                                >
+                                  <Icon path={mdiCashMinus} size={0.8} />
+                                  Registrar pago
+                                </button>
                               </div>
-                              {filteredSweetsForRedeem.map((sweet) => {
-                                const cost = Number(sweet.sale_price);
-                                const canRedeem = Number(selectedClient.points || 0) >= cost && Number(sweet.stock || 0) > 0;
-                                return (
-                                  <div
-                                    key={sweet.id}
-                                    className="flex items-center justify-between rounded-2xl border border-amber-100/70 p-3 text-sm dark:border-slate-800 bg-white/60 dark:bg-slate-900/40"
-                                  >
-                                    <div>
-                                      <div className="font-semibold">{sweet.name}</div>
-                                      <div className="text-xs text-slate-500">
-                                        Costo: {cost.toFixed(1)} pts | Stock: {sweet.stock} uds
+                              <div className="flex-1 space-y-2 overflow-y-auto pr-1 lg:min-h-0">
+                                {movements.map((move) => {
+                                  const isPurchase =
+                                    String(move.concept || "")
+                                      .toLowerCase()
+                                      .includes("compra") && Number(move.amount) > 0;
+
+                                  return (
+                                    <div
+                                      key={move.id}
+                                      className="flex flex-col gap-2 rounded-2xl border border-amber-100/70 px-3 py-2 text-sm dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:px-4"
+                                    >
+                                      <div>
+                                        <div className="font-semibold flex flex-wrap items-center gap-1.5">
+                                          <span>{move.concept}</span>
+                                          {Number(move.points) !== 0 && (
+                                            <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                              Number(move.points) > 0
+                                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                                : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
+                                            }`}>
+                                              <Icon path={mdiStar} size={0.4} />
+                                              {Number(move.points) > 0 ? `+${Number(move.points).toFixed(1)}` : `${Number(move.points).toFixed(1)}`} pts
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                          {new Date(move.created_at).toLocaleString()}
+                                        </div>
+                                      </div>
+                                      <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+                                        <div
+                                          className={`font-semibold ${Number(move.amount) >= 0 ? "text-rose-500" : "text-emerald-500"}`}
+                                        >
+                                          ${Number(move.amount).toFixed(2)}
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteMovement(move)}
+                                          className="rounded-lg border border-rose-200 p-1 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-900/20"
+                                          title="Eliminar movimiento"
+                                        >
+                                          <Icon path={mdiDelete} size={0.7} />
+                                        </button>
+                                        {isPurchase && (
+                                          <button
+                                            type="button"
+                                            onClick={() => openMovementDetail(move)}
+                                            className="rounded-lg border border-amber-200 p-1 text-amber-700 hover:bg-amber-50"
+                                            title="Ver detalle"
+                                          >
+                                            <Icon path={mdiEye} size={0.7} />
+                                          </button>
+                                        )}
                                       </div>
                                     </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRedeemReward(sweet.id)}
-                                      disabled={!canRedeem}
-                                      className={`rounded-xl px-4 py-1.5 text-xs font-semibold text-white transition ${
-                                        canRedeem
-                                          ? "bg-amber-500 hover:bg-amber-600"
-                                          : "bg-slate-300 dark:bg-slate-800 cursor-not-allowed opacity-50"
-                                      }`}
-                                    >
-                                      Canjear
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                              {filteredSweetsForRedeem.length === 0 && (
-                                <p className="text-sm text-slate-500">No hay dulces disponibles para canje.</p>
-                              )}
+                                  );
+                                })}
+                                {movements.length === 0 && (
+                                  <p className="text-sm text-slate-500">
+                                    Aun no hay movimientos.
+                                  </p>
+                                )}
+                              </div>
                             </>
                           )}
-                        </div>
-                      )}
 
-                      {clientSubTab === "redemptions" && (
-                        <div className="flex-1 space-y-3 overflow-y-auto pr-1 lg:min-h-0">
-                          {redemptionsLoading ? (
-                            <p className="text-sm text-slate-500">Cargando historial...</p>
-                          ) : redemptions.map((red) => (
-                            <div
-                              key={red.id}
-                              className="flex items-center justify-between rounded-2xl border border-amber-100/70 p-3 text-sm dark:border-slate-800 bg-white/60 dark:bg-slate-900/40"
-                            >
-                              <div>
-                                <div className="font-semibold">{red.reward_name}</div>
-                                <div className="text-xs text-slate-500 font-mono">
-                                  {new Date(red.created_at).toLocaleString()}
+                          {clientSubTab === "redeem" && (
+                            <div className="flex-1 space-y-3 overflow-y-auto pr-1 lg:min-h-0">
+                              {!settings.rewards_enabled ? (
+                                <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4 text-center text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
+                                  El sistema de recompensas ha sido desactivado temporalmente por la administración.
                                 </div>
-                              </div>
-                              <div className="font-semibold text-amber-700 dark:text-amber-400">
-                                -{Number(red.points_spent).toFixed(1)} pts
-                              </div>
+                              ) : (
+                                <>
+                                  <div className="mb-2">
+                                    <input
+                                      className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700"
+                                      placeholder="Buscar dulce para canje..."
+                                      value={redeemQuery}
+                                      onChange={(event) => setRedeemQuery(event.target.value)}
+                                    />
+                                  </div>
+                                  {filteredSweetsForRedeem.map((sweet) => {
+                                    const cost = Number(sweet.sale_price);
+                                    const canRedeem = Number(selectedClient.points || 0) >= cost && Number(sweet.stock || 0) > 0;
+                                    return (
+                                      <div
+                                        key={sweet.id}
+                                        className="flex items-center justify-between rounded-2xl border border-amber-100/70 p-3 text-sm dark:border-slate-800 bg-white/60 dark:bg-slate-900/40"
+                                      >
+                                        <div>
+                                          <div className="font-semibold">{sweet.name}</div>
+                                          <div className="text-xs text-slate-500">
+                                            Costo: {cost.toFixed(1)} pts | Stock: {sweet.stock} uds
+                                          </div>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRedeemReward(sweet.id)}
+                                          disabled={!canRedeem}
+                                          className={`rounded-xl px-4 py-1.5 text-xs font-semibold text-white transition ${
+                                            canRedeem
+                                              ? "bg-amber-500 hover:bg-amber-600"
+                                              : "bg-slate-300 dark:bg-slate-800 cursor-not-allowed opacity-50"
+                                          }`}
+                                        >
+                                          Canjear
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                  {filteredSweetsForRedeem.length === 0 && (
+                                    <p className="text-sm text-slate-500">No hay dulces disponibles para canje.</p>
+                                  )}
+                                </>
+                              )}
                             </div>
-                          ))}
-                          {redemptions.length === 0 && !redemptionsLoading && (
-                            <p className="text-sm text-slate-500">El cliente no ha canjeado recompensas aún.</p>
+                          )}
+
+                          {clientSubTab === "redemptions" && (
+                            <div className="flex-1 space-y-3 overflow-y-auto pr-1 lg:min-h-0">
+                              {redemptionsLoading ? (
+                                <p className="text-sm text-slate-500">Cargando historial...</p>
+                              ) : redemptions.map((red) => (
+                                <div
+                                  key={red.id}
+                                  className="flex items-center justify-between rounded-2xl border border-amber-100/70 p-3 text-sm dark:border-slate-800 bg-white/60 dark:bg-slate-900/40"
+                                >
+                                  <div>
+                                    <div className="font-semibold">{red.reward_name}</div>
+                                    <div className="text-xs text-slate-500 font-mono">
+                                      {new Date(red.created_at).toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div className="font-semibold text-amber-700 dark:text-amber-400">
+                                    -{Number(red.points_spent).toFixed(1)} pts
+                                  </div>
+                                </div>
+                              ))}
+                              {redemptions.length === 0 && !redemptionsLoading && (
+                                <p className="text-sm text-slate-500">El cliente no ha canjeado recompensas aún.</p>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </>
+                    ) : (
+                      <div className="hidden lg:flex flex-1 flex-col items-center justify-center rounded-3xl border border-dashed border-amber-200 bg-white/40 p-8 text-center dark:border-slate-800 dark:bg-slate-900/20">
+                        <Icon path={mdiAccountGroup} size={2.5} className="text-slate-300 dark:text-slate-700 mb-2" />
+                        <p className="text-sm text-slate-500">Selecciona un cliente de la lista para ver sus movimientos y registrar compras o pagos.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <Navigate to="/login" replace />
@@ -4081,6 +4087,8 @@ export default function App() {
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
         {clientModalOpen && (
           <motion.div
             initial={{ opacity: 0 }}
