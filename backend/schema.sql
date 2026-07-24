@@ -87,16 +87,18 @@ CREATE TABLE IF NOT EXISTS redemptions (
 
 CREATE TABLE IF NOT EXISTS settings (
   key VARCHAR(50) PRIMARY KEY,
-  value VARCHAR(200) NOT NULL
+  value TEXT NOT NULL
 );
+
+ALTER TABLE settings ALTER COLUMN value TYPE TEXT;
 
 INSERT INTO settings (key, value) VALUES ('reward_factor', '0.10') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('rewards_enabled', 'true') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('whatsapp_enabled', 'false') ON CONFLICT (key) DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('whatsapp_enabled', 'true') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('whatsapp_provider', 'meta') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('whatsapp_gateway_url', 'http://openwa:2785') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('whatsapp_api_key', '') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('whatsapp_session_id', 'tiendita') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('whatsapp_default_country', '52') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('meta_whatsapp_token', '') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('meta_phone_number_id', '') ON CONFLICT (key) DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('meta_whatsapp_token', 'EAAgKR2bTkxoBSOkaIPTz8ZAiZALqqxWOtfhu6nRuRzf5vw5mZAQNFNjnIBD4SZCa1FLjzh1P47HPURgZCzedgZBNgpVnvZA1hyxVRTrmtqJfhn0qiuZAm1l8K2U4ifFloVJZAjOmx6YQWpkxKjJIEPmwrJsMrUWMptZAM6nGTN9hpwhOFQwBP1rZBVDXv1t3M52QJg15tgRPNpO2HLxTiHWbdyy45x4ZBfLzllHJAPWNvpG706scv5lshaliDHI1YWQ0BI4XNgP91jo8xEy7HrgdSX2koWZC5pcaTnS3LJfgZD') ON CONFLICT (key) DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('meta_phone_number_id', '3346502871') ON CONFLICT (key) DO NOTHING;

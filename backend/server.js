@@ -81,6 +81,9 @@ function authGuard(req, res, next) {
   }
 }
 
+const defaultMetaToken = process.env.META_WHATSAPP_TOKEN || "EAAgKR2bTkxoBSOkaIPTz8ZAiZALqqxWOtfhu6nRuRzf5vw5mZAQNFNjnIBD4SZCa1FLjzh1P47HPURgZCzedgZBNgpVnvZA1hyxVRTrmtqJfhn0qiuZAm1l8K2U4ifFloVJZAjOmx6YQWpkxKjJIEPmwrJsMrUWMptZAM6nGTN9hpwhOFQwBP1rZBVDXv1t3M52QJg15tgRPNpO2HLxTiHWbdyy45x4ZBfLzllHJAPWNvpG706scv5lshaliDHI1YWQ0BI4XNgP91jo8xEy7HrgdSX2koWZC5pcaTnS3LJfgZD";
+const defaultPhoneId = process.env.META_PHONE_NUMBER_ID || "3346502871";
+
 // Helper de Ajustes (Settings)
 async function getSettings() {
   try {
@@ -88,23 +91,33 @@ async function getSettings() {
     const settings = {
       reward_factor: 0.10,
       rewards_enabled: true,
-      whatsapp_enabled: false,
+      whatsapp_enabled: true,
       whatsapp_provider: "meta",
       whatsapp_gateway_url: "http://openwa:2785",
       whatsapp_api_key: "",
       whatsapp_session_id: "tiendita",
       whatsapp_default_country: "52",
+      meta_whatsapp_token: defaultMetaToken,
+      meta_phone_number_id: defaultPhoneId,
     };
     result.rows.forEach((row) => {
       if (row.key === "reward_factor") settings.reward_factor = parseFloat(row.value) || 0;
       else if (row.key === "rewards_enabled") settings.rewards_enabled = row.value === "true";
       else if (row.key === "whatsapp_enabled") settings.whatsapp_enabled = row.value === "true";
-      else settings[row.key] = row.value;
+      else if (row.value) settings[row.key] = row.value;
     });
     return settings;
   } catch (err) {
     console.error("Error reading settings:", err.message);
-    return { reward_factor: 0.10, rewards_enabled: true, whatsapp_enabled: false };
+    return {
+      reward_factor: 0.10,
+      rewards_enabled: true,
+      whatsapp_enabled: true,
+      whatsapp_provider: "meta",
+      meta_whatsapp_token: defaultMetaToken,
+      meta_phone_number_id: defaultPhoneId,
+      whatsapp_default_country: "52",
+    };
   }
 }
 
@@ -994,6 +1007,12 @@ app.get("/api/settings", authGuard, async (req, res) => {
 app.put("/api/settings", authGuard, async (req, res) => {
   const payload = req.body || {};
   try {
+    try {
+      await query("ALTER TABLE settings ALTER COLUMN value TYPE TEXT;");
+    } catch (e) {
+      // Ignorar si ya es de tipo TEXT
+    }
+
     for (const [key, value] of Object.entries(payload)) {
       await query(
         "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
