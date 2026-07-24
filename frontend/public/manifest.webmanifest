@@ -2,23 +2,30 @@
   "name": "Tiendita",
   "short_name": "Tiendita",
   "description": "Control de dulces, clientes y movimientos",
-  "start_url": "/",
+  "start_url": "/clientes",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#020617",
   "theme_color": "#f8fafc",
   "lang": "es-MX",
   "icons": [
     {
-      "src": "/logo.jpg",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/logo.jpg",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

@@ -2263,14 +2263,17 @@ export default function App() {
       <nav className="sticky top-0 z-20 border-b border-amber-100/60 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
           {/* Logo */}
-          <div className="flex shrink-0 items-center gap-2 text-lg font-semibold">
+          <button
+            onClick={() => navigateTo("/clientes")}
+            className="flex shrink-0 items-center gap-2 text-lg font-semibold hover:opacity-90 transition text-left"
+          >
             <img
               src={brandLogo}
               alt="Logo Tiendita"
               className="h-8 w-8 rounded-lg border border-amber-200 object-cover shadow-sm dark:border-slate-700"
             />
             Tiendita
-          </div>
+          </button>
 
           {/* Desktop nav - always visible */}
           {token && (
@@ -2454,7 +2457,7 @@ export default function App() {
             }
           />
 
-          <Route path="/" element={<div>{pricesPanel}</div>} />
+          <Route path="/" element={<Navigate to="/clientes" replace />} />
 
           <Route
             path="/inventario"
