@@ -2765,7 +2765,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between bg-amber-50/40 dark:bg-slate-800/40 rounded-2xl p-3 border border-amber-100/50 dark:border-slate-800">
+                          <div className="mb-4 flex items-center justify-between gap-2 bg-amber-50/40 dark:bg-slate-800/40 rounded-2xl p-3 border border-amber-100/50 dark:border-slate-800">
                             <div className="text-sm text-slate-500">
                               {selectedClient.phone ? (
                                 <span>Teléfono: <span className="font-semibold text-slate-700 dark:text-slate-300">{selectedClient.phone}</span></span>
@@ -3624,7 +3624,7 @@ export default function App() {
                       return (
                         <div
                           key={index}
-                          className="grid items-start gap-2 sm:grid-cols-[96px_minmax(0,1fr)_auto]"
+                          className="grid items-start gap-2 grid-cols-[68px_minmax(0,1fr)_auto]"
                         >
                           <label className="grid gap-1 text-xs uppercase text-slate-500">
                             Cantidad
@@ -3930,7 +3930,7 @@ export default function App() {
                     return (
                       <div
                         key={index}
-                        className="grid items-start gap-2 sm:grid-cols-[96px_minmax(0,1fr)_auto]"
+                        className="grid items-start gap-2 grid-cols-[68px_minmax(0,1fr)_auto]"
                       >
                         <label className="grid gap-1 text-xs uppercase text-slate-500">
                           Cantidad
