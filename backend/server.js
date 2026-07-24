@@ -81,8 +81,8 @@ function authGuard(req, res, next) {
   }
 }
 
-const defaultMetaToken = process.env.META_WHATSAPP_TOKEN || "EAAgKR2bTkxoBSCoiJnU4g9FO3Iiq2sWi4o0DSHZCOZCUYUjeZAtkgqH9qboErNPHdr83BzeB2zNHY9ZC0ZA5lHG4ZAFbrTdeGRQfGm493uIimj6alDAGLudti8BZALZBZBkXgcG6rGbyoPhWPYLS22WdW26QTRWPSdKjPYrMsMZCpdwUsEbu7Q4eZCgmfQg1XZAUyAZDZD";
-const defaultPhoneId = process.env.META_PHONE_NUMBER_ID || "479295378592460";
+const defaultMetaToken = process.env.META_WHATSAPP_TOKEN || "";
+const defaultPhoneId = process.env.META_PHONE_NUMBER_ID || "";
 
 // Helper de Ajustes (Settings)
 async function getSettings() {

@@ -100,5 +100,5 @@ INSERT INTO settings (key, value) VALUES ('whatsapp_gateway_url', 'http://openwa
 INSERT INTO settings (key, value) VALUES ('whatsapp_api_key', '') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('whatsapp_session_id', 'tiendita') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('whatsapp_default_country', '52') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('meta_whatsapp_token', 'EAAgKR2bTkxoBSCoiJnU4g9FO3Iiq2sWi4o0DSHZCOZCUYUjeZAtkgqH9qboErNPHdr83BzeB2zNHY9ZC0ZA5lHG4ZAFbrTdeGRQfGm493uIimj6alDAGLudti8BZALZBZBkXgcG6rGbyoPhWPYLS22WdW26QTRWPSdKjPYrMsMZCpdwUsEbu7Q4eZCgmfQg1XZAUyAZDZD') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
-INSERT INTO settings (key, value) VALUES ('meta_phone_number_id', '479295378592460') ON CONFLICT (key) DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('meta_whatsapp_token', '') ON CONFLICT (key) DO NOTHING;
+INSERT INTO settings (key, value) VALUES ('meta_phone_number_id', '') ON CONFLICT (key) DO NOTHING;
