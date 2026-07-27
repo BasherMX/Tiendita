@@ -36,7 +36,7 @@ import {
   mdiStar,
   mdiWhatsapp,
 } from "@mdi/js";
-import brandLogo from "../assets/logo.jpg";
+import brandLogo from "../assets/logo.png";
 
 const apiBase =
   import.meta.env.VITE_API_URL !== undefined
