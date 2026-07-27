@@ -1,4 +1,4 @@
-const CACHE_NAME = "tiendita-cache-v1.1.0";
+const CACHE_NAME = "tiendita-cache-v1.1.1";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -78,17 +78,15 @@ globalThis.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
-      return fetch(event.request)
-        .then((response) => {
-          if (response.ok && response.type === "basic") {
-            const clone = response.clone();
-            caches
-              .open(CACHE_NAME)
-              .then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match("/index.html"));
+      return fetch(event.request).then((response) => {
+        if (response.ok && response.type === "basic") {
+          const clone = response.clone();
+          caches
+            .open(CACHE_NAME)
+            .then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      });
     }),
   );
 });
