@@ -37,6 +37,7 @@ import {
   mdiWhatsapp,
 } from "@mdi/js";
 import brandLogo from "../assets/logo.png";
+import PwaInstallToast from "./PwaInstallToast.jsx";
 
 const apiBase =
   import.meta.env.VITE_API_URL !== undefined
@@ -4334,6 +4335,9 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <PwaInstallToast />
     </div>
   );
 }
+
