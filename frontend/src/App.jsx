@@ -2273,7 +2273,12 @@ export default function App() {
               alt="Logo Tiendita"
               className="h-8 w-8 rounded-lg border border-amber-200 object-cover shadow-sm dark:border-slate-700"
             />
-            Tiendita
+            <span className="flex items-center gap-1.5">
+              Tiendita
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
+                v1.1.0
+              </span>
+            </span>
           </button>
 
           {/* Desktop nav - always visible */}
