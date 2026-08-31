@@ -2276,6 +2276,7 @@ export default function App() {
             <span className="flex items-center gap-1.5">
               Tiendita
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
+                v1.1.0
                 v1.1.1
               </span>
             </span>
@@ -2463,6 +2464,7 @@ export default function App() {
             }
           />
 
+          <Route path="/" element={<Navigate to="/clientes" replace />} />
           <Route
             path="/"
             element={
