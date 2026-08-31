@@ -57,9 +57,11 @@ export async function query(text, params) {
 async function runSchema() {
   try {
     const schemaPath = path.join(process.cwd(), "schema.sql");
-    if (!fs.existsSync(schemaPath)) return;
-    const schema = fs.readFileSync(schemaPath, "utf-8");
-    await query(schema);
+    if (fs.existsSync(schemaPath)) {
+      const schema = fs.readFileSync(schemaPath, "utf-8");
+      await query(schema);
+    }
+    await query("ALTER TABLE clients ADD COLUMN IF NOT EXISTS public_code VARCHAR(10) UNIQUE");
     console.log("PostgreSQL schema execution completed");
   } catch (error) {
     console.error("Error executing schema:", error.message);
@@ -366,11 +368,36 @@ app.get("/api/stats/day/:day", authGuard, async (req, res) => {
   }
 });
 
+function generatePublicCode() {
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code = "";
+  for (let i = 0; i < 5; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
 // CRUD Clients
 app.get("/api/clients", authGuard, async (req, res) => {
   try {
-    const result = await query("SELECT id, name, total_debt, points, phone FROM clients ORDER BY total_debt DESC");
-    return res.json(result.rows);
+    const result = await query("SELECT id, name, total_debt, points, phone, public_code FROM clients ORDER BY total_debt DESC");
+    const rows = result.rows;
+    for (const client of rows) {
+      if (!client.public_code) {
+        let assigned = false;
+        while (!assigned) {
+          const code = generatePublicCode();
+          try {
+            await query("UPDATE clients SET public_code = $1 WHERE id = $2", [code, client.id]);
+            client.public_code = code;
+            assigned = true;
+          } catch (e) {
+            // Retry on collision
+          }
+        }
+      }
+    }
+    return res.json(rows);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -380,11 +407,90 @@ app.post("/api/clients", authGuard, async (req, res) => {
   const { name, phone } = req.body || {};
   if (!name) return res.status(400).json({ message: "Name is required" });
   try {
-    const result = await query(
-      "INSERT INTO clients (name, phone) VALUES ($1, $2) RETURNING *",
-      [name, phone || null]
+    let created = null;
+    while (!created) {
+      const publicCode = generatePublicCode();
+      try {
+        const result = await query(
+          "INSERT INTO clients (name, phone, public_code) VALUES ($1, $2, $3) RETURNING *",
+          [name, phone || null, publicCode]
+        );
+        created = result.rows[0];
+      } catch (err) {
+        if (!err.message.includes("unique")) throw err;
+      }
+    }
+    return res.json(created);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+// Rutas Públicas para Clientes (Sin Auth)
+app.get("/api/public/clients/:code", async (req, res) => {
+  const { code } = req.params;
+  try {
+    const clientRes = await query(
+      "SELECT name, total_debt, points, public_code FROM clients WHERE public_code = $1",
+      [code]
     );
-    return res.json(result.rows[0]);
+    if (!clientRes.rows.length) {
+      return res.status(404).json({ message: "Cliente no encontrado" });
+    }
+    return res.json(clientRes.rows[0]);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.get("/api/public/clients/:code/movements", async (req, res) => {
+  const { code } = req.params;
+  try {
+    const clientRes = await query(
+      "SELECT id FROM clients WHERE public_code = $1",
+      [code]
+    );
+    if (!clientRes.rows.length) {
+      return res.status(404).json({ message: "Cliente no encontrado" });
+    }
+    const clientId = clientRes.rows[0].id;
+    const movementsRes = await query(
+      `SELECT m.id AS movement_id, m.concept, m.amount, m.points, m.created_at,
+              mi.quantity, mi.unit_price, s.name AS sweet_name
+       FROM movements m
+       LEFT JOIN movement_items mi ON mi.movement_id = m.id
+       LEFT JOIN sweets s ON s.id = mi.sweet_id
+       WHERE m.client_id = $1
+       ORDER BY m.created_at DESC`,
+      [clientId]
+    );
+
+    const movementsMap = {};
+    for (const row of movementsRes.rows) {
+      if (!movementsMap[row.movement_id]) {
+        movementsMap[row.movement_id] = {
+          id: row.movement_id,
+          concept: row.concept,
+          amount: Number(row.amount),
+          points: Number(row.points || 0),
+          created_at: row.created_at,
+          items: []
+        };
+      }
+      if (row.sweet_name) {
+        movementsMap[row.movement_id].items.push({
+          name: row.sweet_name,
+          quantity: row.quantity,
+          unit_price: Number(row.unit_price)
+        });
+      }
+    }
+
+    const sortedMovements = Object.values(movementsMap).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    return res.json(sortedMovements);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

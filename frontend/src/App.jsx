@@ -6,6 +6,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useParams,
 } from "react-router-dom";
 import Swal from "sweetalert2";
 import Icon from "@mdi/react";
@@ -35,6 +36,7 @@ import {
   mdiGift,
   mdiStar,
   mdiWhatsapp,
+  mdiShareVariant,
 } from "@mdi/js";
 import brandLogo from "../assets/logo.png";
 import PwaInstallToast from "./PwaInstallToast.jsx";
@@ -42,10 +44,10 @@ import PwaInstallToast from "./PwaInstallToast.jsx";
 const apiBase =
   import.meta.env.VITE_API_URL !== undefined
     ? import.meta.env.VITE_API_URL
-    : (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    : window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1"
       ? `http://${window.location.hostname}:4000`
-      : "");
-
+      : "";
 
 function SweetCombobox({ value, onChange, sweets }) {
   const [query, setQuery] = useState("");
@@ -179,6 +181,196 @@ function formatRangeLabel(from, to) {
   return `${fromDate.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })} - ${toDate.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}`;
 }
 
+function PublicClientView() {
+  const { code } = useParams();
+  const [client, setClient] = useState(null);
+  const [movements, setMovements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [copiedClabe, setCopiedClabe] = useState(false);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const resClient = await fetch(`${apiBase}/api/public/clients/${code}`);
+        if (!resClient.ok) throw new Error("Cliente no encontrado o enlace inválido.");
+        const dataClient = await resClient.json();
+        setClient(dataClient);
+
+        const resMov = await fetch(`${apiBase}/api/public/clients/${code}/movements`);
+        if (resMov.ok) {
+          const dataMov = await resMov.json();
+          setMovements(dataMov);
+        }
+      } catch (err) {
+        setError(err.message || "Error al cargar la información.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (code) fetchData();
+  }, [code]);
+
+  function handleCopyClabe() {
+    navigator.clipboard.writeText("646990403801118437");
+    setCopiedClabe(true);
+    setTimeout(() => setCopiedClabe(false), 2000);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-950 dark:to-slate-900 text-slate-700 dark:text-slate-200">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="font-semibold text-sm">Cargando estado de cuenta...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !client) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-950 dark:to-slate-900 text-slate-700 dark:text-slate-200">
+        <div className="max-w-md w-full rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-xl text-center space-y-4 border border-amber-100 dark:border-slate-800">
+          <div className="text-rose-500 text-4xl font-bold">⚠️</div>
+          <h2 className="text-xl font-bold">Enlace no disponible</h2>
+          <p className="text-sm text-slate-500">{error || "El cliente no existe o el enlace es incorrecto."}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const debtVal = Number(client.total_debt || 0);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-amber-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-800 dark:text-slate-100 py-8 px-4 sm:px-6">
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="rounded-3xl border border-amber-100/70 bg-white/90 dark:border-slate-800 dark:bg-slate-900/80 p-6 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src={brandLogo} alt="Logo Tiendita" className="h-12 w-12 rounded-2xl border border-amber-200 object-cover shadow-sm dark:border-slate-700" />
+            <div>
+              <h1 className="text-xl font-bold">{client.name}</h1>
+              <p className="text-xs text-slate-500">Estado de Cuenta | Tiendita</p>
+            </div>
+          </div>
+          <a
+            href="https://wa.me/523346502871?text=Hola,%20quisiera%20consultar%20dudas%20sobre%20mi%20estado%20de%20cuenta"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 rounded-2xl bg-emerald-600 px-4 py-2 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition shadow-sm"
+          >
+            <Icon path={mdiWhatsapp} size={0.8} />
+            <span className="hidden sm:inline">WhatsApp</span>
+          </a>
+        </div>
+
+        {/* Resumen de Saldo y Puntos */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className={`rounded-3xl border p-6 shadow-sm flex flex-col justify-between ${
+            debtVal > 0 
+              ? "border-rose-200 bg-rose-50/70 dark:border-rose-900/50 dark:bg-rose-950/40" 
+              : debtVal < 0 
+                ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/50 dark:bg-emerald-950/40"
+                : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+          }`}>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              {debtVal > 0 ? "Saldo Pendiente (Deuda)" : debtVal < 0 ? "Saldo a Favor" : "Saldo al Día"}
+            </span>
+            <div className={`text-3xl font-extrabold mt-2 ${
+              debtVal > 0 ? "text-rose-600 dark:text-rose-400" : debtVal < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"
+            }`}>
+              ${Math.abs(debtVal).toFixed(2)}
+            </div>
+            <span className="text-[11px] text-slate-500 mt-1">
+              {debtVal > 0 ? "Importe total pendiente de pago" : debtVal < 0 ? "Crédito a tu favor" : "No tienes cuentas pendientes"}
+            </span>
+          </div>
+
+          <div className="rounded-3xl border border-amber-100/70 bg-white/90 dark:border-slate-800 dark:bg-slate-900/80 p-6 shadow-sm flex flex-col justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Puntos Acumulados</span>
+            <div className="text-3xl font-extrabold mt-2 text-amber-600 dark:text-amber-400 flex items-center gap-2">
+              <Icon path={mdiStar} size={1.1} />
+              <span>{Number(client.points || 0).toFixed(1)} pts</span>
+            </div>
+            <span className="text-[11px] text-slate-500 mt-1">Acumula puntos en cada compra y canjéalos</span>
+          </div>
+        </div>
+
+        {/* Historial de Movimientos */}
+        <div className="rounded-3xl border border-amber-100/70 bg-white/90 dark:border-slate-800 dark:bg-slate-900/80 p-6 shadow-sm space-y-4">
+          <h2 className="text-lg font-bold">Historial de Compras y Movimientos</h2>
+          {movements.length === 0 ? (
+            <p className="text-sm text-slate-500">No hay movimientos registrados.</p>
+          ) : (
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+              {movements.map((mov) => (
+                <div key={mov.id} className="rounded-2xl border border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-800/40 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold">{mov.concept}</span>
+                    <span className={`font-bold ${mov.amount > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                      {mov.amount > 0 ? `+$${mov.amount.toFixed(2)}` : `-$${Math.abs(mov.amount).toFixed(2)}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>{new Date(mov.created_at).toLocaleString()}</span>
+                    {mov.items && mov.items.length > 0 && (
+                      <span className="text-slate-500 font-medium">
+                        {mov.items.map(i => `${i.name} (${i.quantity})`).join(", ")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Datos de Transferencia Bancaria */}
+        <div className="rounded-3xl border border-amber-200/80 bg-amber-50/60 dark:border-slate-800 dark:bg-slate-900/90 p-6 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 text-lg font-bold text-amber-900 dark:text-amber-300">
+            <Icon path={mdiStore} size={0.9} />
+            <span>Datos para Pago por Transferencia</span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 text-sm">
+            <div className="bg-white/80 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-amber-100 dark:border-slate-700">
+              <span className="text-xs uppercase text-slate-400 font-semibold block">Banco</span>
+              <span className="font-bold text-slate-800 dark:text-slate-100 text-base">STP</span>
+            </div>
+
+            <div className="bg-white/80 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-amber-100 dark:border-slate-700">
+              <span className="text-xs uppercase text-slate-400 font-semibold block">Titular</span>
+              <span className="font-bold text-slate-800 dark:text-slate-100 text-base">brayan ulises vazquez</span>
+            </div>
+
+            <div className="sm:col-span-2 bg-white/90 dark:bg-slate-800/90 p-4 rounded-2xl border border-amber-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <span className="text-xs uppercase text-slate-400 font-semibold block">Cuenta CLABE</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-lg tracking-wider">646990403801118437</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyClabe}
+                className="flex items-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-4 py-2.5 transition shadow-sm"
+              >
+                <Icon path={mdiShareVariant} size={0.7} />
+                <span>{copiedClabe ? "¡CLABE Copiada!" : "Copiar CLABE"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center text-xs text-slate-400 pt-4">
+          <p>© {new Date().getFullYear()} Tiendita — Consulta de Estado de Cuenta</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [theme, setTheme] = useState(
     () => localStorage.getItem("theme") || "light",
@@ -197,7 +389,7 @@ export default function App() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [redeemQuery, setRedeemQuery] = useState("");
   const [settings, setSettings] = useState({
-    reward_factor: 0.10,
+    reward_factor: 0.1,
     rewards_enabled: true,
     whatsapp_enabled: false,
     whatsapp_provider: "meta",
@@ -208,7 +400,11 @@ export default function App() {
     meta_whatsapp_token: "",
     meta_phone_number_id: "",
   });
-  const [redemptionStats, setRedemptionStats] = useState({ redemptions: [], totals: { total_count: 0, total_points: 0 }, bySweet: [] });
+  const [redemptionStats, setRedemptionStats] = useState({
+    redemptions: [],
+    totals: { total_count: 0, total_points: 0 },
+    bySweet: [],
+  });
   const [redemptionStatsLoading, setRedemptionStatsLoading] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [movements, setMovements] = useState([]);
@@ -274,7 +470,12 @@ export default function App() {
   });
 
   const [rewards, setRewards] = useState([]);
-  const [newReward, setNewReward] = useState({ name: "", pointsCost: "", stock: "", sweetId: "" });
+  const [newReward, setNewReward] = useState({
+    name: "",
+    pointsCost: "",
+    stock: "",
+    sweetId: "",
+  });
   const [editingReward, setEditingReward] = useState(null);
   const [redemptions, setRedemptions] = useState([]);
   const [redemptionsLoading, setRedemptionsLoading] = useState(false);
@@ -282,6 +483,30 @@ export default function App() {
 
   const location = useLocation();
   const navigate = useNavigate();
+
+  if (location.pathname.startsWith("/c/")) {
+    return (
+      <Routes location={location}>
+        <Route path="/c/:code" element={<PublicClientView />} />
+      </Routes>
+    );
+  }
+
+  function handleShareClientLink(client) {
+    if (!client.public_code) {
+      Swal.fire("Error", "No se encontró el código público del cliente.", "error");
+      return;
+    }
+    const publicUrl = `${window.location.origin}/c/${client.public_code}`;
+    navigator.clipboard.writeText(publicUrl);
+    Swal.fire({
+      icon: "success",
+      title: "¡Enlace Copiado!",
+      text: `Se copió el enlace público para ${client.name}`,
+      timer: 2000,
+      showConfirmButton: false,
+    });
+  }
   const movementsRequestRef = useRef(0);
   const authFailHandledRef = useRef(false);
 
@@ -386,7 +611,7 @@ export default function App() {
 
   const projectedClientBalance = useMemo(() => {
     const current = Number(selectedClient?.total_debt || 0);
-    const pointsUsedNum = usePoints ? (Number(pointsToUse) || 0) : 0;
+    const pointsUsedNum = usePoints ? Number(pointsToUse) || 0 : 0;
     if (movementKind === "purchase") {
       if (payImmediately) {
         return current;
@@ -394,26 +619,45 @@ export default function App() {
       return current + movementPreviewAmount - pointsUsedNum;
     }
     return current + movementPreviewAmount;
-  }, [selectedClient, movementPreviewAmount, movementKind, payImmediately, usePoints, pointsToUse]);
+  }, [
+    selectedClient,
+    movementPreviewAmount,
+    movementKind,
+    payImmediately,
+    usePoints,
+    pointsToUse,
+  ]);
 
   const projectedPoints = useMemo(() => {
     const current = Number(selectedClient?.points || 0);
     if (!settings.rewards_enabled) return current;
-    const pointsUsedNum = usePoints ? (Number(pointsToUse) || 0) : 0;
+    const pointsUsedNum = usePoints ? Number(pointsToUse) || 0 : 0;
     if (movementKind === "purchase") {
       if (payImmediately) {
         const cashPortion = Math.max(0, movementPreviewAmount - pointsUsedNum);
-        const pointsEarned = Number((cashPortion * settings.reward_factor).toFixed(2));
+        const pointsEarned = Number(
+          (cashPortion * settings.reward_factor).toFixed(2),
+        );
         return Math.max(0, current - pointsUsedNum + pointsEarned);
       }
       return Math.max(0, current - pointsUsedNum);
     } else if (movementKind === "pay") {
       const paymentAmount = Math.abs(movementPreviewAmount);
-      const pointsEarned = Number((paymentAmount * settings.reward_factor).toFixed(2));
+      const pointsEarned = Number(
+        (paymentAmount * settings.reward_factor).toFixed(2),
+      );
       return current + pointsEarned;
     }
     return current;
-  }, [selectedClient, movementPreviewAmount, movementKind, payImmediately, settings, usePoints, pointsToUse]);
+  }, [
+    selectedClient,
+    movementPreviewAmount,
+    movementKind,
+    payImmediately,
+    settings,
+    usePoints,
+    pointsToUse,
+  ]);
 
   const filteredSweetsForRedeem = useMemo(() => {
     const query = redeemQuery.trim().toLowerCase();
@@ -421,7 +665,7 @@ export default function App() {
     return sortedSweets.filter((sweet) =>
       String(sweet.name || "")
         .toLowerCase()
-        .includes(query)
+        .includes(query),
     );
   }, [sortedSweets, redeemQuery]);
 
@@ -430,7 +674,7 @@ export default function App() {
     return sortedSweets.some(
       (sweet) =>
         projectedPoints >= Number(sweet.sale_price) &&
-        Number(sweet.stock || 0) > 0
+        Number(sweet.stock || 0) > 0,
     );
   }, [sortedSweets, projectedPoints, settings]);
 
@@ -596,11 +840,14 @@ export default function App() {
       if (response && response.ok) {
         const data = await response.json();
         setSettings({
-          reward_factor: parseFloat(data.reward_factor) || 0.10,
-          rewards_enabled: data.rewards_enabled === "true" || data.rewards_enabled === true,
-          whatsapp_enabled: data.whatsapp_enabled === "true" || data.whatsapp_enabled === true,
+          reward_factor: parseFloat(data.reward_factor) || 0.1,
+          rewards_enabled:
+            data.rewards_enabled === "true" || data.rewards_enabled === true,
+          whatsapp_enabled:
+            data.whatsapp_enabled === "true" || data.whatsapp_enabled === true,
           whatsapp_provider: data.whatsapp_provider || "meta",
-          whatsapp_gateway_url: data.whatsapp_gateway_url || "http://openwa:2785",
+          whatsapp_gateway_url:
+            data.whatsapp_gateway_url || "http://openwa:2785",
           whatsapp_api_key: data.whatsapp_api_key || "",
           whatsapp_session_id: data.whatsapp_session_id || "tiendita",
           whatsapp_default_country: data.whatsapp_default_country || "52",
@@ -701,16 +948,19 @@ export default function App() {
   async function handleStartWhatsapp() {
     setStartingWhatsapp(true);
     try {
-      const response = await authFetch(`${apiBase}/api/whatsapp/session/start`, {
-        method: "POST"
-      });
+      const response = await authFetch(
+        `${apiBase}/api/whatsapp/session/start`,
+        {
+          method: "POST",
+        },
+      );
       if (response && response.ok) {
         await Swal.fire({
           icon: "info",
           title: "Inicializando",
           text: "La sesión se está inicializando. Por favor espera a que se genere el código QR si no estás conectado.",
           timer: 2000,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
         loadWhatsappStatus();
       } else {
@@ -718,7 +968,7 @@ export default function App() {
         await Swal.fire({
           icon: "error",
           title: "Error",
-          text: data.message || "No se pudo iniciar la sesión"
+          text: data.message || "No se pudo iniciar la sesión",
         });
       }
     } catch (error) {
@@ -735,21 +985,24 @@ export default function App() {
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Sí, cerrar sesión",
-      cancelButtonText: "Cancelar"
+      cancelButtonText: "Cancelar",
     });
     if (!confirm.isConfirmed) return;
 
     setLoggingOutWhatsapp(true);
     try {
-      const response = await authFetch(`${apiBase}/api/whatsapp/session/logout`, {
-        method: "POST"
-      });
+      const response = await authFetch(
+        `${apiBase}/api/whatsapp/session/logout`,
+        {
+          method: "POST",
+        },
+      );
       if (response && response.ok) {
         await Swal.fire({
           icon: "success",
           title: "Sesión cerrada",
           timer: 1500,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
         setWhatsappStatus("DISCONNECTED");
         setWhatsappQrCode("");
@@ -758,7 +1011,7 @@ export default function App() {
         await Swal.fire({
           icon: "error",
           title: "Error",
-          text: data.message || "No se pudo cerrar la sesión"
+          text: data.message || "No se pudo cerrar la sesión",
         });
       }
     } catch (error) {
@@ -827,7 +1080,9 @@ export default function App() {
     if (!token || !clientId) return;
     setRedemptionsLoading(true);
     try {
-      const response = await authFetch(`${apiBase}/api/clients/${clientId}/redemptions`);
+      const response = await authFetch(
+        `${apiBase}/api/clients/${clientId}/redemptions`,
+      );
       if (!response) return;
       if (response.ok) {
         setRedemptions(await response.json());
@@ -863,16 +1118,19 @@ export default function App() {
   async function handleUpdateReward(event) {
     event.preventDefault();
     if (!editingReward.name || !editingReward.points_cost) return;
-    const response = await authFetch(`${apiBase}/api/rewards/${editingReward.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: editingReward.name,
-        pointsCost: editingReward.points_cost,
-        stock: editingReward.stock,
-        sweetId: editingReward.sweet_id,
-      }),
-    });
+    const response = await authFetch(
+      `${apiBase}/api/rewards/${editingReward.id}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editingReward.name,
+          pointsCost: editingReward.points_cost,
+          stock: editingReward.stock,
+          sweetId: editingReward.sweet_id,
+        }),
+      },
+    );
     if (!response) return;
     if (response.ok) {
       setEditingReward(null);
@@ -917,11 +1175,14 @@ export default function App() {
     if (!selectedClient) return;
     const client = selectedClient;
 
-    const response = await authFetch(`${apiBase}/api/clients/${client.id}/redeem`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sweetId }),
-    });
+    const response = await authFetch(
+      `${apiBase}/api/clients/${client.id}/redeem`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sweetId }),
+      },
+    );
     if (!response) return;
 
     if (!response.ok) {
@@ -1123,16 +1384,19 @@ export default function App() {
 
   async function handleUpdateSweet(event) {
     event.preventDefault();
-    const response = await authFetch(`${apiBase}/api/sweets/${editingSweet.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: editingSweet.name,
-        purchasePrice: editingSweet.purchase_price,
-        salePrice: editingSweet.sale_price,
-        stock: editingSweet.stock,
-      }),
-    });
+    const response = await authFetch(
+      `${apiBase}/api/sweets/${editingSweet.id}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editingSweet.name,
+          purchasePrice: editingSweet.purchase_price,
+          salePrice: editingSweet.sale_price,
+          stock: editingSweet.stock,
+        }),
+      },
+    );
     if (!response) return;
 
     if (!response.ok) {
@@ -1227,16 +1491,19 @@ export default function App() {
   async function handleUpdateClient(event) {
     event.preventDefault();
     const editedClientId = editingClient.id;
-    const response = await authFetch(`${apiBase}/api/clients/${editingClient.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: editingClient.name,
-        totalDebt: editingClient.total_debt,
-        points: editingClient.points,
-        phone: editingClient.phone,
-      }),
-    });
+    const response = await authFetch(
+      `${apiBase}/api/clients/${editingClient.id}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editingClient.name,
+          totalDebt: editingClient.total_debt,
+          points: editingClient.points,
+          phone: editingClient.phone,
+        }),
+      },
+    );
     if (!response) return;
 
     if (!response.ok) {
@@ -1349,9 +1616,12 @@ export default function App() {
 
     Swal.showLoading();
     try {
-      const response = await authFetch(`${apiBase}/api/clients/${client.id}/whatsapp-statement`, {
-        method: "POST"
-      });
+      const response = await authFetch(
+        `${apiBase}/api/clients/${client.id}/whatsapp-statement`,
+        {
+          method: "POST",
+        },
+      );
       if (response && response.ok) {
         Swal.close();
         await Swal.fire({
@@ -1359,22 +1629,27 @@ export default function App() {
           title: "Enviado",
           text: "El estado de cuenta se envió automáticamente por WhatsApp.",
           timer: 2000,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
         return;
       }
       throw new Error("API call failed");
     } catch (apiError) {
-      console.warn("API send failed, falling back to manual redirect...", apiError);
-      
+      console.warn(
+        "API send failed, falling back to manual redirect...",
+        apiError,
+      );
+
       try {
-        const response = await authFetch(`${apiBase}/api/clients/${client.id}/debt-breakdown`);
+        const response = await authFetch(
+          `${apiBase}/api/clients/${client.id}/debt-breakdown`,
+        );
         if (!response || !response.ok) {
           throw new Error("No se pudo obtener el desglose");
         }
-        
+
         const { client: clientData, movements } = await response.json();
-        
+
         let message = `*Resumen de cuenta - Tiendita*\n`;
         const now = new Date();
         const dateStr = now.toLocaleString("es-MX", {
@@ -1384,21 +1659,21 @@ export default function App() {
           year: "2-digit",
           hour: "2-digit",
           minute: "2-digit",
-          hour12: true
+          hour12: true,
         });
         message += `📅 _Fecha: ${dateStr}_\n\n`;
         message += `Hola *${clientData.name}*, te comparto el estado actual de tu cuenta:\n\n`;
-        
-        const purchases = movements.filter(m => m.amount > 0);
+
+        const purchases = movements.filter((m) => m.amount > 0);
         if (purchases.length > 0) {
           message += `*Detalle de compras pendientes:*\n`;
-          
+
           const purchasesByDate = {};
-          purchases.forEach(m => {
+          purchases.forEach((m) => {
             const mDate = new Date(m.created_at).toLocaleDateString("es-MX", {
               day: "2-digit",
               month: "2-digit",
-              year: "2-digit"
+              year: "2-digit",
             });
             if (!purchasesByDate[mDate]) {
               purchasesByDate[mDate] = [];
@@ -1417,17 +1692,19 @@ export default function App() {
             let totalOwedAmount = 0;
             const mergedItemsMap = {};
 
-            list.forEach(m => {
+            list.forEach((m) => {
               totalAmount += Number(m.amount);
-              totalOwedAmount += Number(m.owed_amount !== undefined ? m.owed_amount : m.amount);
-              
+              totalOwedAmount += Number(
+                m.owed_amount !== undefined ? m.owed_amount : m.amount,
+              );
+
               if (m.items && m.items.length > 0) {
-                m.items.forEach(item => {
+                m.items.forEach((item) => {
                   if (!mergedItemsMap[item.name]) {
                     mergedItemsMap[item.name] = {
                       quantity: 0,
                       unit_price: Number(item.unit_price),
-                      name: item.name
+                      name: item.name,
                     };
                   }
                   mergedItemsMap[item.name].quantity += item.quantity;
@@ -1436,17 +1713,18 @@ export default function App() {
             });
 
             const mergedItems = Object.values(mergedItemsMap);
-            const partialStr = (totalOwedAmount < totalAmount)
-              ? ` (pendiente: $${totalOwedAmount.toFixed(2)})`
-              : "";
-            
+            const partialStr =
+              totalOwedAmount < totalAmount
+                ? ` (pendiente: $${totalOwedAmount.toFixed(2)})`
+                : "";
+
             const concept = list.length === 1 ? list[0].concept : "Compra";
 
             message += `• *${mDate}*:\n`;
             message += `  - ${concept} - $${totalAmount.toFixed(2)}${partialStr}:\n`;
-            
+
             if (mergedItems.length > 0) {
-              mergedItems.forEach(item => {
+              mergedItems.forEach((item) => {
                 const lineTotal = item.quantity * item.unit_price;
                 message += `    • ${item.quantity}x ${item.name} ($${item.unit_price.toFixed(2)} c/u) - $${lineTotal.toFixed(2)}\n`;
               });
@@ -1455,9 +1733,9 @@ export default function App() {
         } else {
           message += `No tienes compras pendientes. ¡Tu saldo está al día!\n`;
         }
-        
+
         message += `\n───────────────────\n`;
-        
+
         let debtLabel = "*Saldo Total:*";
         let debtValue = Number(clientData.total_debt);
         if (debtValue < 0) {
@@ -1496,15 +1774,18 @@ export default function App() {
       confirmButtonText: "Sí, enviar a todos",
       cancelButtonText: "Cancelar",
       confirmButtonColor: "#059669",
-      cancelButtonColor: "#6b7280"
+      cancelButtonColor: "#6b7280",
     });
     if (!confirm.isConfirmed) return;
 
     Swal.showLoading();
     try {
-      const response = await authFetch(`${apiBase}/api/whatsapp/send-all-statements`, {
-        method: "POST"
-      });
+      const response = await authFetch(
+        `${apiBase}/api/whatsapp/send-all-statements`,
+        {
+          method: "POST",
+        },
+      );
       if (response && response.ok) {
         const data = await response.json();
         Swal.close();
@@ -1512,7 +1793,7 @@ export default function App() {
           icon: "success",
           title: "Proceso Iniciado",
           text: data.message || "Se inició el envío masivo en segundo plano.",
-          confirmButtonColor: "#059669"
+          confirmButtonColor: "#059669",
         });
       } else {
         const data = await response.json().catch(() => ({}));
@@ -1520,8 +1801,10 @@ export default function App() {
         await Swal.fire({
           icon: "info",
           title: "Sin envíos",
-          text: data.message || "No se encontraron clientes con adeudos o con teléfonos registrados.",
-          confirmButtonColor: "#3b82f6"
+          text:
+            data.message ||
+            "No se encontraron clientes con adeudos o con teléfonos registrados.",
+          confirmButtonColor: "#3b82f6",
         });
       }
     } catch (error) {
@@ -1531,7 +1814,7 @@ export default function App() {
         icon: "error",
         title: "Error",
         text: "Ocurrió un error al intentar iniciar el envío múltiple.",
-        confirmButtonColor: "#ef4444"
+        confirmButtonColor: "#ef4444",
       });
     }
   }
@@ -1889,16 +2172,26 @@ export default function App() {
               <Icon path={mdiWhatsapp} size={1} className="text-emerald-500" />
               Configuración de WhatsApp API Gateway
             </div>
-            
-            <form onSubmit={handleSaveSettings} className="grid gap-4 sm:grid-cols-2">
+
+            <form
+              onSubmit={handleSaveSettings}
+              className="grid gap-4 sm:grid-cols-2"
+            >
               <label className="sm:col-span-2 flex items-center gap-3 rounded-2xl border border-amber-100/70 bg-white/50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-800/50 cursor-pointer">
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-emerald-300 text-emerald-500 focus:ring-emerald-400 dark:border-slate-600 dark:bg-slate-700"
                   checked={settings.whatsapp_enabled}
-                  onChange={(e) => setSettings({ ...settings, whatsapp_enabled: e.target.checked })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      whatsapp_enabled: e.target.checked,
+                    })
+                  }
                 />
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Habilitar envíos automáticos de tickets</span>
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Habilitar envíos automáticos de tickets
+                </span>
               </label>
 
               <label className="sm:col-span-2 grid gap-1 text-xs uppercase text-slate-500 font-semibold">
@@ -1906,10 +2199,19 @@ export default function App() {
                 <select
                   className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-sm normal-case outline-none dark:border-slate-700 dark:bg-slate-800"
                   value={settings.whatsapp_provider || "meta"}
-                  onChange={(e) => setSettings({ ...settings, whatsapp_provider: e.target.value })}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      whatsapp_provider: e.target.value,
+                    })
+                  }
                 >
-                  <option value="meta">Meta WhatsApp Cloud API (Oficial Serverless - Vercel)</option>
-                  <option value="openwa">OpenWA Gateway (URL Externa con Contenedor)</option>
+                  <option value="meta">
+                    Meta WhatsApp Cloud API (Oficial Serverless - Vercel)
+                  </option>
+                  <option value="openwa">
+                    OpenWA Gateway (URL Externa con Contenedor)
+                  </option>
                 </select>
               </label>
 
@@ -1922,7 +2224,12 @@ export default function App() {
                       placeholder="ej. EAAG..."
                       type="password"
                       value={settings.meta_whatsapp_token || ""}
-                      onChange={(e) => setSettings({ ...settings, meta_whatsapp_token: e.target.value })}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          meta_whatsapp_token: e.target.value,
+                        })
+                      }
                     />
                   </label>
 
@@ -1932,7 +2239,12 @@ export default function App() {
                       className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
                       placeholder="ej. 105938472910..."
                       value={settings.meta_phone_number_id || ""}
-                      onChange={(e) => setSettings({ ...settings, meta_phone_number_id: e.target.value })}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          meta_phone_number_id: e.target.value,
+                        })
+                      }
                     />
                   </label>
 
@@ -1942,7 +2254,12 @@ export default function App() {
                       className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
                       placeholder="ej. 52"
                       value={settings.whatsapp_default_country || "52"}
-                      onChange={(e) => setSettings({ ...settings, whatsapp_default_country: e.target.value })}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          whatsapp_default_country: e.target.value,
+                        })
+                      }
                       required
                     />
                   </label>
@@ -1955,7 +2272,12 @@ export default function App() {
                       className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
                       placeholder="ej. https://tu-openwa.onrender.com"
                       value={settings.whatsapp_gateway_url || ""}
-                      onChange={(e) => setSettings({ ...settings, whatsapp_gateway_url: e.target.value })}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          whatsapp_gateway_url: e.target.value,
+                        })
+                      }
                       required
                     />
                   </label>
@@ -1967,7 +2289,12 @@ export default function App() {
                       placeholder="API Key"
                       type="password"
                       value={settings.whatsapp_api_key || ""}
-                      onChange={(e) => setSettings({ ...settings, whatsapp_api_key: e.target.value })}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          whatsapp_api_key: e.target.value,
+                        })
+                      }
                     />
                   </label>
 
@@ -1977,7 +2304,12 @@ export default function App() {
                       className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
                       placeholder="ej. tiendita"
                       value={settings.whatsapp_session_id || "tiendita"}
-                      onChange={(e) => setSettings({ ...settings, whatsapp_session_id: e.target.value })}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          whatsapp_session_id: e.target.value,
+                        })
+                      }
                       required
                     />
                   </label>
@@ -1988,7 +2320,12 @@ export default function App() {
                       className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
                       placeholder="ej. 52"
                       value={settings.whatsapp_default_country || "52"}
-                      onChange={(e) => setSettings({ ...settings, whatsapp_default_country: e.target.value })}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          whatsapp_default_country: e.target.value,
+                        })
+                      }
                       required
                     />
                   </label>
@@ -2017,17 +2354,19 @@ export default function App() {
 
             {/* Badge Indicator */}
             <div className="flex justify-center mb-6">
-              {(whatsappStatus === "CONNECTED" || whatsappStatus === "ready") ? (
+              {whatsappStatus === "CONNECTED" || whatsappStatus === "ready" ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   CONECTADO
                 </span>
-              ) : (whatsappStatus === "QRCODE" || whatsappStatus === "qr_ready") ? (
+              ) : whatsappStatus === "QRCODE" ||
+                whatsappStatus === "qr_ready" ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
                   <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
                   ESPERANDO QR
                 </span>
-              ) : (whatsappStatus === "INITIALIZING" || whatsappStatus === "initializing") ? (
+              ) : whatsappStatus === "INITIALIZING" ||
+                whatsappStatus === "initializing" ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-4 py-2 text-sm font-bold text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
                   <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
                   INICIALIZANDO...
@@ -2042,50 +2381,84 @@ export default function App() {
 
             {/* QR display or status text */}
             <div className="flex flex-col items-center justify-center min-h-[220px]">
-              {(whatsappStatus === "CONNECTED" || whatsappStatus === "ready") ? (
+              {whatsappStatus === "CONNECTED" || whatsappStatus === "ready" ? (
                 <div className="space-y-2">
-                  <Icon path={mdiWhatsapp} size={4} className="text-emerald-500 mx-auto" />
-                  <p className="text-sm text-slate-500">La vinculación está activa. Los tickets automáticos se enviarán a los clientes registrados.</p>
+                  <Icon
+                    path={mdiWhatsapp}
+                    size={4}
+                    className="text-emerald-500 mx-auto"
+                  />
+                  <p className="text-sm text-slate-500">
+                    La vinculación está activa. Los tickets automáticos se
+                    enviarán a los clientes registrados.
+                  </p>
                 </div>
-              ) : (whatsappStatus === "QRCODE" || whatsappStatus === "qr_ready") ? (
+              ) : whatsappStatus === "QRCODE" ||
+                whatsappStatus === "qr_ready" ? (
                 <div className="space-y-4">
                   {whatsappQrCode ? (
                     <div className="bg-white p-3 rounded-2xl shadow-inner border border-slate-200">
-                      <img src={whatsappQrCode} alt="WhatsApp QR Code" className="w-[180px] h-[180px]" />
+                      <img
+                        src={whatsappQrCode}
+                        alt="WhatsApp QR Code"
+                        className="w-[180px] h-[180px]"
+                      />
                     </div>
                   ) : (
                     <div className="w-[180px] h-[180px] flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-2xl">
-                      <span className="text-xs text-slate-400">Generando QR...</span>
+                      <span className="text-xs text-slate-400">
+                        Generando QR...
+                      </span>
                     </div>
                   )}
-                  <p className="text-xs text-slate-500 max-w-[200px]">Escanea este código QR en tu WhatsApp ("Dispositivos Vinculados") para activar el Gateway.</p>
+                  <p className="text-xs text-slate-500 max-w-[200px]">
+                    Escanea este código QR en tu WhatsApp ("Dispositivos
+                    Vinculados") para activar el Gateway.
+                  </p>
                 </div>
-              ) : (whatsappStatus === "INITIALIZING" || whatsappStatus === "initializing") ? (
+              ) : whatsappStatus === "INITIALIZING" ||
+                whatsappStatus === "initializing" ? (
                 <div className="space-y-2">
                   <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                  <p className="text-sm text-slate-500">El servicio se está preparando. Espera unos segundos...</p>
+                  <p className="text-sm text-slate-500">
+                    El servicio se está preparando. Espera unos segundos...
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Icon path={mdiWhatsapp} size={3} className="text-slate-300 dark:text-slate-700 mx-auto" />
-                  <p className="text-sm text-slate-500">Haz clic abajo para iniciar la sesión y obtener el código QR de vinculación.</p>
+                  <Icon
+                    path={mdiWhatsapp}
+                    size={3}
+                    className="text-slate-300 dark:text-slate-700 mx-auto"
+                  />
+                  <p className="text-sm text-slate-500">
+                    Haz clic abajo para iniciar la sesión y obtener el código QR
+                    de vinculación.
+                  </p>
                 </div>
               )}
             </div>
           </div>
 
           <div className="w-full pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-2 justify-center">
-            {!(whatsappStatus === "CONNECTED" || whatsappStatus === "ready") && !(whatsappStatus === "INITIALIZING" || whatsappStatus === "initializing") && (
-              <button
-                type="button"
-                onClick={handleStartWhatsapp}
-                disabled={startingWhatsapp}
-                className="rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2.5 transition disabled:opacity-50 flex-1"
-              >
-                {startingWhatsapp ? "Iniciando..." : "Inicializar Sesión"}
-              </button>
-            )}
-            {((whatsappStatus === "CONNECTED" || whatsappStatus === "ready") || (whatsappStatus === "QRCODE" || whatsappStatus === "qr_ready")) && (
+            {!(whatsappStatus === "CONNECTED" || whatsappStatus === "ready") &&
+              !(
+                whatsappStatus === "INITIALIZING" ||
+                whatsappStatus === "initializing"
+              ) && (
+                <button
+                  type="button"
+                  onClick={handleStartWhatsapp}
+                  disabled={startingWhatsapp}
+                  className="rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2.5 transition disabled:opacity-50 flex-1"
+                >
+                  {startingWhatsapp ? "Iniciando..." : "Inicializar Sesión"}
+                </button>
+              )}
+            {(whatsappStatus === "CONNECTED" ||
+              whatsappStatus === "ready" ||
+              whatsappStatus === "QRCODE" ||
+              whatsappStatus === "qr_ready") && (
               <button
                 type="button"
                 onClick={handleLogoutWhatsapp}
@@ -2117,15 +2490,22 @@ export default function App() {
           <Icon path={mdiGift} size={1} />
           Configuración del Sistema de Recompensas
         </div>
-        <form onSubmit={handleSaveSettings} className="grid gap-4 md:grid-cols-3 items-end">
+        <form
+          onSubmit={handleSaveSettings}
+          className="grid gap-4 md:grid-cols-3 items-end"
+        >
           <label className="flex items-center gap-3 rounded-2xl border border-amber-100/70 bg-white/50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-800/50 cursor-pointer">
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-amber-300 text-amber-500 focus:ring-amber-400 dark:border-slate-600 dark:bg-slate-700"
               checked={settings.rewards_enabled}
-              onChange={(e) => setSettings({ ...settings, rewards_enabled: e.target.checked })}
+              onChange={(e) =>
+                setSettings({ ...settings, rewards_enabled: e.target.checked })
+              }
             />
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Activar acumulación y canje</span>
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Activar acumulación y canje
+            </span>
           </label>
           <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
             Factor de Recompensa (% de la compra en puntos)
@@ -2138,7 +2518,10 @@ export default function App() {
               step="0.5"
               value={Number((settings.reward_factor * 100).toFixed(1))}
               onChange={(e) =>
-                setSettings({ ...settings, reward_factor: (parseFloat(e.target.value) || 0) / 100 })
+                setSettings({
+                  ...settings,
+                  reward_factor: (parseFloat(e.target.value) || 0) / 100,
+                })
               }
               required
             />
@@ -2157,21 +2540,33 @@ export default function App() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 flex items-center justify-between">
           <div>
-            <div className="text-xs uppercase text-slate-500 font-semibold">Total de Dulces Canjeados</div>
+            <div className="text-xs uppercase text-slate-500 font-semibold">
+              Total de Dulces Canjeados
+            </div>
             <div className="text-3xl font-bold mt-1 text-amber-700 dark:text-amber-400">
               {redemptionStats.totals?.total_count || 0} uds
             </div>
           </div>
-          <Icon path={mdiGift} size={1.8} className="opacity-20 text-amber-500" />
+          <Icon
+            path={mdiGift}
+            size={1.8}
+            className="opacity-20 text-amber-500"
+          />
         </div>
         <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 flex items-center justify-between">
           <div>
-            <div className="text-xs uppercase text-slate-500 font-semibold">Total de Puntos Canjeados</div>
+            <div className="text-xs uppercase text-slate-500 font-semibold">
+              Total de Puntos Canjeados
+            </div>
             <div className="text-3xl font-bold mt-1 text-amber-700 dark:text-amber-400">
               {Number(redemptionStats.totals?.total_points || 0).toFixed(1)} pts
             </div>
           </div>
-          <Icon path={mdiStar} size={1.8} className="opacity-20 text-amber-500" />
+          <Icon
+            path={mdiStar}
+            size={1.8}
+            className="opacity-20 text-amber-500"
+          />
         </div>
       </div>
 
@@ -2194,20 +2589,29 @@ export default function App() {
                 </thead>
                 <tbody className="divide-y divide-amber-100/70 dark:divide-slate-800">
                   {redemptionStats.redemptions?.map((red) => (
-                    <tr key={red.id} className="hover:bg-amber-50/60 dark:hover:bg-slate-800/70">
+                    <tr
+                      key={red.id}
+                      className="hover:bg-amber-50/60 dark:hover:bg-slate-800/70"
+                    >
                       <td className="px-4 py-2 font-mono text-xs">
                         {new Date(red.created_at).toLocaleString()}
                       </td>
-                      <td className="px-4 py-2 font-medium">{red.client_name}</td>
+                      <td className="px-4 py-2 font-medium">
+                        {red.client_name}
+                      </td>
                       <td className="px-4 py-2">{red.sweet_name}</td>
                       <td className="px-4 py-2 text-right text-amber-700 dark:text-amber-400 font-semibold">
                         -{Number(red.points_spent).toFixed(1)} pts
                       </td>
                     </tr>
                   ))}
-                  {(redemptionStats.redemptions == null || redemptionStats.redemptions.length === 0) && (
+                  {(redemptionStats.redemptions == null ||
+                    redemptionStats.redemptions.length === 0) && (
                     <tr>
-                      <td className="px-4 py-4 text-center text-slate-500" colSpan={4}>
+                      <td
+                        className="px-4 py-4 text-center text-slate-500"
+                        colSpan={4}
+                      >
                         No hay canjes registrados en el sistema.
                       </td>
                     </tr>
@@ -2235,17 +2639,26 @@ export default function App() {
                 </thead>
                 <tbody className="divide-y divide-amber-100/70 dark:divide-slate-800">
                   {redemptionStats.bySweet?.map((row, idx) => (
-                    <tr key={`${row.sweet_name}-${idx}`} className="hover:bg-amber-50/60 dark:hover:bg-slate-800/70">
-                      <td className="px-4 py-2 font-medium">{row.sweet_name}</td>
+                    <tr
+                      key={`${row.sweet_name}-${idx}`}
+                      className="hover:bg-amber-50/60 dark:hover:bg-slate-800/70"
+                    >
+                      <td className="px-4 py-2 font-medium">
+                        {row.sweet_name}
+                      </td>
                       <td className="px-4 py-2 text-center">{row.count} uds</td>
                       <td className="px-4 py-2 text-right text-amber-700 dark:text-amber-400 font-semibold">
                         {Number(row.total_points).toFixed(1)} pts
                       </td>
                     </tr>
                   ))}
-                  {(redemptionStats.bySweet == null || redemptionStats.bySweet.length === 0) && (
+                  {(redemptionStats.bySweet == null ||
+                    redemptionStats.bySweet.length === 0) && (
                     <tr>
-                      <td className="px-4 py-4 text-center text-slate-500" colSpan={3}>
+                      <td
+                        className="px-4 py-4 text-center text-slate-500"
+                        colSpan={3}
+                      >
                         Sin datos disponibles.
                       </td>
                     </tr>
@@ -2276,8 +2689,7 @@ export default function App() {
             <span className="flex items-center gap-1.5">
               Tiendita
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
-                v1.1.0
-                v1.1.1
+                v1.2.0
               </span>
             </span>
           </button>
@@ -2465,18 +2877,6 @@ export default function App() {
           />
 
           <Route path="/" element={<Navigate to="/clientes" replace />} />
-          <Route
-            path="/"
-            element={
-              token ? (
-                <div className="mx-auto w-full max-w-4xl">
-                  {pricesPanel}
-                </div>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
 
           <Route
             path="/inventario"
@@ -2486,8 +2886,14 @@ export default function App() {
                   <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-lg font-semibold">
-                        <Icon path={mdiCandycane} size={1} className="text-amber-500" />
-                        <span>Inventario de Dulces ({filteredSweets.length})</span>
+                        <Icon
+                          path={mdiCandycane}
+                          size={1}
+                          className="text-amber-500"
+                        />
+                        <span>
+                          Inventario de Dulces ({filteredSweets.length})
+                        </span>
                       </div>
                       <button
                         type="button"
@@ -2654,7 +3060,9 @@ export default function App() {
               token ? (
                 <div className="grid gap-6 lg:h-[calc(100vh-8rem)] lg:grid-cols-2">
                   {/* Left Column: Actions & Client List */}
-                  <div className={`flex flex-col gap-4 lg:min-h-0 ${mobileClientView === "detail" && selectedClient ? "hidden lg:flex" : "flex"}`}>
+                  <div
+                    className={`flex flex-col gap-4 lg:min-h-0 ${mobileClientView === "detail" && selectedClient ? "hidden lg:flex" : "flex"}`}
+                  >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <button
                         type="button"
@@ -2699,7 +3107,9 @@ export default function App() {
                           className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700"
                           placeholder="Buscar cliente por nombre o teléfono..."
                           value={clientsQuery}
-                          onChange={(event) => setClientsQuery(event.target.value)}
+                          onChange={(event) =>
+                            setClientsQuery(event.target.value)
+                          }
                         />
                       </div>
                       <div className="flex-1 space-y-2 overflow-y-auto pr-1 max-h-[60vh] lg:max-h-none lg:min-h-0">
@@ -2737,6 +3147,13 @@ export default function App() {
                             </button>
                             <div className="flex gap-1">
                               <button
+                                onClick={() => handleShareClientLink(client)}
+                                className="rounded-lg bg-emerald-500 p-1.5 text-white hover:bg-emerald-600"
+                                title="Copiar enlace público"
+                              >
+                                <Icon path={mdiShareVariant} size={0.6} />
+                              </button>
+                              <button
                                 onClick={() => {
                                   setEditingClient(client);
                                   setClientModalOpen(true);
@@ -2757,14 +3174,18 @@ export default function App() {
                           </div>
                         ))}
                         {filteredClients.length === 0 && (
-                          <p className="text-sm text-slate-500">Sin clientes registrados.</p>
+                          <p className="text-sm text-slate-500">
+                            Sin clientes registrados.
+                          </p>
                         )}
                       </div>
                     </div>
                   </div>
 
                   {/* Right Column: Selected Client Detail */}
-                  <div className={`flex flex-col lg:min-h-0 ${mobileClientView === "list" && selectedClient ? "hidden lg:flex" : "flex"}`}>
+                  <div
+                    className={`flex flex-col lg:min-h-0 ${mobileClientView === "list" && selectedClient ? "hidden lg:flex" : "flex"}`}
+                  >
                     {selectedClient ? (
                       <>
                         <button
@@ -2780,16 +3201,26 @@ export default function App() {
                             <div>Detalle de {selectedClient.name}</div>
                             <div className="flex items-center gap-1 rounded-2xl bg-amber-50 px-3 py-1 text-sm font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
                               <Icon path={mdiStar} size={0.6} />
-                              {Number(selectedClient.points || 0).toFixed(1)} pts
+                              {Number(selectedClient.points || 0).toFixed(
+                                1,
+                              )}{" "}
+                              pts
                             </div>
                           </div>
 
                           <div className="mb-4 flex items-center justify-between gap-2 bg-amber-50/40 dark:bg-slate-800/40 rounded-2xl p-3 border border-amber-100/50 dark:border-slate-800">
                             <div className="text-sm text-slate-500">
                               {selectedClient.phone ? (
-                                <span>Teléfono: <span className="font-semibold text-slate-700 dark:text-slate-300">{selectedClient.phone}</span></span>
+                                <span>
+                                  Teléfono:{" "}
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                    {selectedClient.phone}
+                                  </span>
+                                </span>
                               ) : (
-                                <span className="italic text-slate-400">Sin teléfono registrado</span>
+                                <span className="italic text-slate-400">
+                                  Sin teléfono registrado
+                                </span>
                               )}
                             </div>
                             <button
@@ -2802,7 +3233,9 @@ export default function App() {
                               }`}
                             >
                               <Icon path={mdiWhatsapp} size={0.6} />
-                              {selectedClient.phone ? "Enviar Cuenta" : "Sin WhatsApp"}
+                              {selectedClient.phone
+                                ? "Enviar Cuenta"
+                                : "Sin WhatsApp"}
                             </button>
                           </div>
 
@@ -2868,7 +3301,8 @@ export default function App() {
                                   const isPurchase =
                                     String(move.concept || "")
                                       .toLowerCase()
-                                      .includes("compra") && Number(move.amount) > 0;
+                                      .includes("compra") &&
+                                    Number(move.amount) > 0;
 
                                   return (
                                     <div
@@ -2879,18 +3313,25 @@ export default function App() {
                                         <div className="font-semibold flex flex-wrap items-center gap-1.5">
                                           <span>{move.concept}</span>
                                           {Number(move.points) !== 0 && (
-                                            <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                              Number(move.points) > 0
-                                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                                : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
-                                            }`}>
+                                            <span
+                                              className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                                Number(move.points) > 0
+                                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                                  : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
+                                              }`}
+                                            >
                                               <Icon path={mdiStar} size={0.4} />
-                                              {Number(move.points) > 0 ? `+${Number(move.points).toFixed(1)}` : `${Number(move.points).toFixed(1)}`} pts
+                                              {Number(move.points) > 0
+                                                ? `+${Number(move.points).toFixed(1)}`
+                                                : `${Number(move.points).toFixed(1)}`}{" "}
+                                              pts
                                             </span>
                                           )}
                                         </div>
                                         <div className="text-xs text-slate-500">
-                                          {new Date(move.created_at).toLocaleString()}
+                                          {new Date(
+                                            move.created_at,
+                                          ).toLocaleString()}
                                         </div>
                                       </div>
                                       <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
@@ -2901,7 +3342,9 @@ export default function App() {
                                         </div>
                                         <button
                                           type="button"
-                                          onClick={() => handleDeleteMovement(move)}
+                                          onClick={() =>
+                                            handleDeleteMovement(move)
+                                          }
                                           className="rounded-lg border border-rose-200 p-1 text-rose-600 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-900/20"
                                           title="Eliminar movimiento"
                                         >
@@ -2910,7 +3353,9 @@ export default function App() {
                                         {isPurchase && (
                                           <button
                                             type="button"
-                                            onClick={() => openMovementDetail(move)}
+                                            onClick={() =>
+                                              openMovementDetail(move)
+                                            }
                                             className="rounded-lg border border-amber-200 p-1 text-amber-700 hover:bg-amber-50"
                                             title="Ver detalle"
                                           >
@@ -2934,7 +3379,8 @@ export default function App() {
                             <div className="flex-1 space-y-3 overflow-y-auto pr-1 lg:min-h-0">
                               {!settings.rewards_enabled ? (
                                 <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4 text-center text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
-                                  El sistema de recompensas ha sido desactivado temporalmente por la administración.
+                                  El sistema de recompensas ha sido desactivado
+                                  temporalmente por la administración.
                                 </div>
                               ) : (
                                 <>
@@ -2943,26 +3389,35 @@ export default function App() {
                                       className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700"
                                       placeholder="Buscar dulce para canje..."
                                       value={redeemQuery}
-                                      onChange={(event) => setRedeemQuery(event.target.value)}
+                                      onChange={(event) =>
+                                        setRedeemQuery(event.target.value)
+                                      }
                                     />
                                   </div>
                                   {filteredSweetsForRedeem.map((sweet) => {
                                     const cost = Number(sweet.sale_price);
-                                    const canRedeem = Number(selectedClient.points || 0) >= cost && Number(sweet.stock || 0) > 0;
+                                    const canRedeem =
+                                      Number(selectedClient.points || 0) >=
+                                        cost && Number(sweet.stock || 0) > 0;
                                     return (
                                       <div
                                         key={sweet.id}
                                         className="flex items-center justify-between rounded-2xl border border-amber-100/70 p-3 text-sm dark:border-slate-800 bg-white/60 dark:bg-slate-900/40"
                                       >
                                         <div>
-                                          <div className="font-semibold">{sweet.name}</div>
+                                          <div className="font-semibold">
+                                            {sweet.name}
+                                          </div>
                                           <div className="text-xs text-slate-500">
-                                            Costo: {cost.toFixed(1)} pts | Stock: {sweet.stock} uds
+                                            Costo: {cost.toFixed(1)} pts |
+                                            Stock: {sweet.stock} uds
                                           </div>
                                         </div>
                                         <button
                                           type="button"
-                                          onClick={() => handleRedeemReward(sweet.id)}
+                                          onClick={() =>
+                                            handleRedeemReward(sweet.id)
+                                          }
                                           disabled={!canRedeem}
                                           className={`rounded-xl px-4 py-1.5 text-xs font-semibold text-white transition ${
                                             canRedeem
@@ -2976,7 +3431,9 @@ export default function App() {
                                     );
                                   })}
                                   {filteredSweetsForRedeem.length === 0 && (
-                                    <p className="text-sm text-slate-500">No hay dulces disponibles para canje.</p>
+                                    <p className="text-sm text-slate-500">
+                                      No hay dulces disponibles para canje.
+                                    </p>
                                   )}
                                 </>
                               )}
@@ -2986,34 +3443,52 @@ export default function App() {
                           {clientSubTab === "redemptions" && (
                             <div className="flex-1 space-y-3 overflow-y-auto pr-1 lg:min-h-0">
                               {redemptionsLoading ? (
-                                <p className="text-sm text-slate-500">Cargando historial...</p>
-                              ) : redemptions.map((red) => (
-                                <div
-                                  key={red.id}
-                                  className="flex items-center justify-between rounded-2xl border border-amber-100/70 p-3 text-sm dark:border-slate-800 bg-white/60 dark:bg-slate-900/40"
-                                >
-                                  <div>
-                                    <div className="font-semibold">{red.reward_name}</div>
-                                    <div className="text-xs text-slate-500 font-mono">
-                                      {new Date(red.created_at).toLocaleString()}
+                                <p className="text-sm text-slate-500">
+                                  Cargando historial...
+                                </p>
+                              ) : (
+                                redemptions.map((red) => (
+                                  <div
+                                    key={red.id}
+                                    className="flex items-center justify-between rounded-2xl border border-amber-100/70 p-3 text-sm dark:border-slate-800 bg-white/60 dark:bg-slate-900/40"
+                                  >
+                                    <div>
+                                      <div className="font-semibold">
+                                        {red.reward_name}
+                                      </div>
+                                      <div className="text-xs text-slate-500 font-mono">
+                                        {new Date(
+                                          red.created_at,
+                                        ).toLocaleString()}
+                                      </div>
+                                    </div>
+                                    <div className="font-semibold text-amber-700 dark:text-amber-400">
+                                      -{Number(red.points_spent).toFixed(1)} pts
                                     </div>
                                   </div>
-                                  <div className="font-semibold text-amber-700 dark:text-amber-400">
-                                    -{Number(red.points_spent).toFixed(1)} pts
-                                  </div>
-                                </div>
-                              ))}
-                              {redemptions.length === 0 && !redemptionsLoading && (
-                                <p className="text-sm text-slate-500">El cliente no ha canjeado recompensas aún.</p>
+                                ))
                               )}
+                              {redemptions.length === 0 &&
+                                !redemptionsLoading && (
+                                  <p className="text-sm text-slate-500">
+                                    El cliente no ha canjeado recompensas aún.
+                                  </p>
+                                )}
                             </div>
                           )}
                         </div>
                       </>
                     ) : (
                       <div className="hidden lg:flex flex-1 flex-col items-center justify-center rounded-3xl border border-dashed border-amber-200 bg-white/40 p-8 text-center dark:border-slate-800 dark:bg-slate-900/20">
-                        <Icon path={mdiAccountGroup} size={2.5} className="text-slate-300 dark:text-slate-700 mb-2" />
-                        <p className="text-sm text-slate-500">Selecciona un cliente de la lista para ver sus movimientos y registrar compras o pagos.</p>
+                        <Icon
+                          path={mdiAccountGroup}
+                          size={2.5}
+                          className="text-slate-300 dark:text-slate-700 mb-2"
+                        />
+                        <p className="text-sm text-slate-500">
+                          Selecciona un cliente de la lista para ver sus
+                          movimientos y registrar compras o pagos.
+                        </p>
                       </div>
                     )}
                   </div>
@@ -3582,24 +4057,12 @@ export default function App() {
 
           <Route
             path="/recompensas"
-            element={
-              token ? (
-                rewardsPanel
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
+            element={token ? rewardsPanel : <Navigate to="/login" replace />}
           />
 
           <Route
             path="/whatsapp"
-            element={
-              token ? (
-                whatsappPanel
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
+            element={token ? whatsappPanel : <Navigate to="/login" replace />}
           />
 
           <Route
@@ -3730,8 +4193,14 @@ export default function App() {
                   <div className="rounded-2xl border border-amber-100/70 bg-amber-50/20 p-4 dark:border-slate-800 dark:bg-slate-900/50 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Icon path={mdiStar} size={0.8} className="text-amber-500" />
-                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Usar puntos disponibles</span>
+                        <Icon
+                          path={mdiStar}
+                          size={0.8}
+                          className="text-amber-500"
+                        />
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                          Usar puntos disponibles
+                        </span>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
@@ -3741,8 +4210,12 @@ export default function App() {
                             const active = e.target.checked;
                             setUsePoints(active);
                             if (active) {
-                              const total = usesItems ? computedTotal : (Number(movementAmount) || 0);
-                              const available = Number(selectedClient?.points || 0);
+                              const total = usesItems
+                                ? computedTotal
+                                : Number(movementAmount) || 0;
+                              const available = Number(
+                                selectedClient?.points || 0,
+                              );
                               const defaultPoints = Math.min(available, total);
                               setPointsToUse(defaultPoints.toFixed(2));
                             } else {
@@ -3754,11 +4227,14 @@ export default function App() {
                         <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-500"></div>
                       </label>
                     </div>
-                    
+
                     {usePoints && (
                       <div className="grid gap-2 sm:grid-cols-2 items-center">
                         <div className="text-xs text-slate-500">
-                          Disponibles: <span className="font-semibold text-slate-700 dark:text-slate-300">{Number(selectedClient?.points || 0).toFixed(1)} pts</span>
+                          Disponibles:{" "}
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {Number(selectedClient?.points || 0).toFixed(1)} pts
+                          </span>
                         </div>
                         <div className="flex gap-2">
                           <input
@@ -3777,9 +4253,15 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => {
-                              const total = usesItems ? computedTotal : (Number(movementAmount) || 0);
-                              const available = Number(selectedClient?.points || 0);
-                              setPointsToUse(Math.min(available, total).toFixed(2));
+                              const total = usesItems
+                                ? computedTotal
+                                : Number(movementAmount) || 0;
+                              const available = Number(
+                                selectedClient?.points || 0,
+                              );
+                              setPointsToUse(
+                                Math.min(available, total).toFixed(2),
+                              );
                             }}
                             className="rounded-xl bg-amber-500 px-3 py-1 text-xs text-white hover:bg-amber-600 font-semibold"
                           >
@@ -3817,14 +4299,26 @@ export default function App() {
 
                   {movementKind === "purchase" ? (
                     <div className="rounded-2xl border border-amber-100/70 bg-amber-50/70 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/70">
-                      <div className="text-xs uppercase text-slate-500 font-semibold">Puntos actuales</div>
+                      <div className="text-xs uppercase text-slate-500 font-semibold">
+                        Puntos actuales
+                      </div>
                       <div className="font-semibold flex items-center gap-1.5 text-base mb-1">
-                        <Icon path={mdiStar} size={0.6} className="text-amber-500" />
+                        <Icon
+                          path={mdiStar}
+                          size={0.6}
+                          className="text-amber-500"
+                        />
                         {Number(selectedClient?.points || 0).toFixed(1)} pts
                       </div>
-                      <div className="text-xs uppercase text-slate-500 font-semibold">Puntos tras esta compra (preview)</div>
+                      <div className="text-xs uppercase text-slate-500 font-semibold">
+                        Puntos tras esta compra (preview)
+                      </div>
                       <div className="font-semibold flex items-center gap-1.5 text-base">
-                        <Icon path={mdiStar} size={0.6} className="text-amber-500" />
+                        <Icon
+                          path={mdiStar}
+                          size={0.6}
+                          className="text-amber-500"
+                        />
                         {projectedPoints.toFixed(1)} pts
                         {hasActiveRewards && (
                           <span className="text-amber-600 dark:text-amber-400 font-bold text-xs animate-pulse">
@@ -3835,14 +4329,26 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="rounded-2xl border border-amber-100/70 bg-amber-50/70 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/70">
-                      <div className="text-xs uppercase text-slate-500 font-semibold">Puntos actuales</div>
+                      <div className="text-xs uppercase text-slate-500 font-semibold">
+                        Puntos actuales
+                      </div>
                       <div className="font-semibold flex items-center gap-1.5 text-base mb-1">
-                        <Icon path={mdiStar} size={0.6} className="text-amber-500" />
+                        <Icon
+                          path={mdiStar}
+                          size={0.6}
+                          className="text-amber-500"
+                        />
                         {Number(selectedClient?.points || 0).toFixed(1)} pts
                       </div>
-                      <div className="text-xs uppercase text-slate-500 font-semibold">Puntos tras este pago (preview)</div>
+                      <div className="text-xs uppercase text-slate-500 font-semibold">
+                        Puntos tras este pago (preview)
+                      </div>
                       <div className="font-semibold flex items-center gap-1.5 text-base">
-                        <Icon path={mdiStar} size={0.6} className="text-amber-500" />
+                        <Icon
+                          path={mdiStar}
+                          size={0.6}
+                          className="text-amber-500"
+                        />
                         {projectedPoints.toFixed(1)} pts
                         {hasActiveRewards && (
                           <span className="text-amber-600 dark:text-amber-400 font-bold text-xs animate-pulse">
@@ -3877,8 +4383,18 @@ export default function App() {
                         className="rounded-r-2xl border-l border-amber-600 bg-amber-500 px-3 py-2 text-white hover:bg-amber-600 transition flex items-center justify-center"
                         title="Seleccionar modo de guardado"
                       >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M19 9l-7 7-7-7"
+                          />
                         </svg>
                       </button>
 
@@ -4126,8 +4642,14 @@ export default function App() {
             >
               <div className="mb-4 text-lg font-semibold flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Icon path={mdiAccountGroup} size={0.9} className="text-amber-500" />
-                  <span>{editingClient ? "Editar Cliente" : "Nuevo Cliente"}</span>
+                  <Icon
+                    path={mdiAccountGroup}
+                    size={0.9}
+                    className="text-amber-500"
+                  />
+                  <span>
+                    {editingClient ? "Editar Cliente" : "Nuevo Cliente"}
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -4149,7 +4671,12 @@ export default function App() {
                       className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
                       placeholder="Nombre del cliente"
                       value={editingClient.name}
-                      onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })}
+                      onChange={(e) =>
+                        setEditingClient({
+                          ...editingClient,
+                          name: e.target.value,
+                        })
+                      }
                       required
                     />
                   </label>
@@ -4159,7 +4686,12 @@ export default function App() {
                       className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm normal-case text-inherit outline-none dark:border-slate-700"
                       placeholder="Ej. 4492777186"
                       value={editingClient.phone || ""}
-                      onChange={(e) => setEditingClient({ ...editingClient, phone: e.target.value })}
+                      onChange={(e) =>
+                        setEditingClient({
+                          ...editingClient,
+                          phone: e.target.value,
+                        })
+                      }
                     />
                   </label>
                   <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
@@ -4169,7 +4701,12 @@ export default function App() {
                       type="number"
                       step="0.01"
                       value={editingClient.total_debt}
-                      onChange={(e) => setEditingClient({ ...editingClient, total_debt: e.target.value })}
+                      onChange={(e) =>
+                        setEditingClient({
+                          ...editingClient,
+                          total_debt: e.target.value,
+                        })
+                      }
                     />
                   </label>
                   <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
@@ -4180,7 +4717,12 @@ export default function App() {
                       step="0.1"
                       min="0"
                       value={editingClient.points}
-                      onChange={(e) => setEditingClient({ ...editingClient, points: e.target.value })}
+                      onChange={(e) =>
+                        setEditingClient({
+                          ...editingClient,
+                          points: e.target.value,
+                        })
+                      }
                     />
                   </label>
                   <div className="flex gap-2 mt-2">
@@ -4194,7 +4736,10 @@ export default function App() {
                     >
                       Cancelar
                     </button>
-                    <button type="submit" className="flex-1 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                    <button
+                      type="submit"
+                      className="flex-1 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+                    >
                       Actualizar
                     </button>
                   </div>
@@ -4228,7 +4773,10 @@ export default function App() {
                     >
                       Cancelar
                     </button>
-                    <button type="submit" className="flex-1 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                    <button
+                      type="submit"
+                      className="flex-1 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+                    >
                       Crear Cliente
                     </button>
                   </div>
@@ -4253,7 +4801,11 @@ export default function App() {
             >
               <div className="mb-4 text-lg font-semibold flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Icon path={mdiCandycane} size={0.9} className="text-amber-500" />
+                  <Icon
+                    path={mdiCandycane}
+                    size={0.9}
+                    className="text-amber-500"
+                  />
                   <span>{editingSweet ? "Editar Dulce" : "Nuevo Dulce"}</span>
                 </div>
                 <button
@@ -4268,7 +4820,10 @@ export default function App() {
                 </button>
               </div>
 
-              <form onSubmit={editingSweet ? handleUpdateSweet : handleAddSweet} className="grid gap-3">
+              <form
+                onSubmit={editingSweet ? handleUpdateSweet : handleAddSweet}
+                className="grid gap-3"
+              >
                 <label className="grid gap-1 text-xs uppercase text-slate-500 font-semibold">
                   Nombre
                   <input
@@ -4277,7 +4832,10 @@ export default function App() {
                     value={editingSweet ? editingSweet.name : newSweet.name}
                     onChange={(e) =>
                       editingSweet
-                        ? setEditingSweet({ ...editingSweet, name: e.target.value })
+                        ? setEditingSweet({
+                            ...editingSweet,
+                            name: e.target.value,
+                          })
                         : setNewSweet({ ...newSweet, name: e.target.value })
                     }
                     required
@@ -4291,11 +4849,21 @@ export default function App() {
                       type="number"
                       step="0.01"
                       placeholder="0.00"
-                      value={editingSweet ? editingSweet.purchase_price : newSweet.purchasePrice}
+                      value={
+                        editingSweet
+                          ? editingSweet.purchase_price
+                          : newSweet.purchasePrice
+                      }
                       onChange={(e) =>
                         editingSweet
-                          ? setEditingSweet({ ...editingSweet, purchase_price: e.target.value })
-                          : setNewSweet({ ...newSweet, purchasePrice: e.target.value })
+                          ? setEditingSweet({
+                              ...editingSweet,
+                              purchase_price: e.target.value,
+                            })
+                          : setNewSweet({
+                              ...newSweet,
+                              purchasePrice: e.target.value,
+                            })
                       }
                       required
                     />
@@ -4307,11 +4875,21 @@ export default function App() {
                       type="number"
                       step="0.01"
                       placeholder="0.00"
-                      value={editingSweet ? editingSweet.sale_price : newSweet.salePrice}
+                      value={
+                        editingSweet
+                          ? editingSweet.sale_price
+                          : newSweet.salePrice
+                      }
                       onChange={(e) =>
                         editingSweet
-                          ? setEditingSweet({ ...editingSweet, sale_price: e.target.value })
-                          : setNewSweet({ ...newSweet, salePrice: e.target.value })
+                          ? setEditingSweet({
+                              ...editingSweet,
+                              sale_price: e.target.value,
+                            })
+                          : setNewSweet({
+                              ...newSweet,
+                              salePrice: e.target.value,
+                            })
                       }
                       required
                     />
@@ -4326,7 +4904,10 @@ export default function App() {
                       value={editingSweet ? editingSweet.stock : newSweet.stock}
                       onChange={(e) =>
                         editingSweet
-                          ? setEditingSweet({ ...editingSweet, stock: e.target.value })
+                          ? setEditingSweet({
+                              ...editingSweet,
+                              stock: e.target.value,
+                            })
                           : setNewSweet({ ...newSweet, stock: e.target.value })
                       }
                       required
@@ -4344,7 +4925,10 @@ export default function App() {
                   >
                     Cancelar
                   </button>
-                  <button type="submit" className="flex-1 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                  <button
+                    type="submit"
+                    className="flex-1 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+                  >
                     {editingSweet ? "Actualizar" : "Agregar Dulce"}
                   </button>
                 </div>
@@ -4358,4 +4942,3 @@ export default function App() {
     </div>
   );
 }
-
