@@ -194,11 +194,14 @@ function PublicClientView() {
       try {
         setLoading(true);
         const resClient = await fetch(`${apiBase}/api/public/clients/${code}`);
-        if (!resClient.ok) throw new Error("Cliente no encontrado o enlace inválido.");
+        if (!resClient.ok)
+          throw new Error("Cliente no encontrado o enlace inválido.");
         const dataClient = await resClient.json();
         setClient(dataClient);
 
-        const resMov = await fetch(`${apiBase}/api/public/clients/${code}/movements`);
+        const resMov = await fetch(
+          `${apiBase}/api/public/clients/${code}/movements`,
+        );
         if (resMov.ok) {
           const dataMov = await resMov.json();
           setMovements(dataMov);
@@ -235,7 +238,9 @@ function PublicClientView() {
         <div className="max-w-md w-full rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-xl text-center space-y-4 border border-amber-100 dark:border-slate-800">
           <div className="text-rose-500 text-4xl font-bold">⚠️</div>
           <h2 className="text-xl font-bold">Enlace no disponible</h2>
-          <p className="text-sm text-slate-500">{error || "El cliente no existe o el enlace es incorrecto."}</p>
+          <p className="text-sm text-slate-500">
+            {error || "El cliente no existe o el enlace es incorrecto."}
+          </p>
         </div>
       </div>
     );
@@ -249,10 +254,16 @@ function PublicClientView() {
         {/* Header */}
         <div className="rounded-3xl border border-amber-100/70 bg-white/90 dark:border-slate-800 dark:bg-slate-900/80 p-6 shadow-sm flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={brandLogo} alt="Logo Tiendita" className="h-12 w-12 rounded-2xl border border-amber-200 object-cover shadow-sm dark:border-slate-700" />
+            <img
+              src={brandLogo}
+              alt="Logo Tiendita"
+              className="h-12 w-12 rounded-2xl border border-amber-200 object-cover shadow-sm dark:border-slate-700"
+            />
             <div>
               <h1 className="text-xl font-bold">{client.name}</h1>
-              <p className="text-xs text-slate-500">Estado de Cuenta | Tiendita</p>
+              <p className="text-xs text-slate-500">
+                Estado de Cuenta | Tiendita
+              </p>
             </div>
           </div>
           <a
@@ -268,56 +279,89 @@ function PublicClientView() {
 
         {/* Resumen de Saldo y Puntos */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className={`rounded-3xl border p-6 shadow-sm flex flex-col justify-between ${
-            debtVal > 0 
-              ? "border-rose-200 bg-rose-50/70 dark:border-rose-900/50 dark:bg-rose-950/40" 
-              : debtVal < 0 
-                ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/50 dark:bg-emerald-950/40"
-                : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
-          }`}>
+          <div
+            className={`rounded-3xl border p-6 shadow-sm flex flex-col justify-between ${
+              debtVal > 0
+                ? "border-rose-200 bg-rose-50/70 dark:border-rose-900/50 dark:bg-rose-950/40"
+                : debtVal < 0
+                  ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/50 dark:bg-emerald-950/40"
+                  : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+            }`}
+          >
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              {debtVal > 0 ? "Saldo Pendiente (Deuda)" : debtVal < 0 ? "Saldo a Favor" : "Saldo al Día"}
+              {debtVal > 0
+                ? "Saldo Pendiente (Deuda)"
+                : debtVal < 0
+                  ? "Saldo a Favor"
+                  : "Saldo al Día"}
             </span>
-            <div className={`text-3xl font-extrabold mt-2 ${
-              debtVal > 0 ? "text-rose-600 dark:text-rose-400" : debtVal < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"
-            }`}>
+            <div
+              className={`text-3xl font-extrabold mt-2 ${
+                debtVal > 0
+                  ? "text-rose-600 dark:text-rose-400"
+                  : debtVal < 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-slate-700 dark:text-slate-300"
+              }`}
+            >
               ${Math.abs(debtVal).toFixed(2)}
             </div>
             <span className="text-[11px] text-slate-500 mt-1">
-              {debtVal > 0 ? "Importe total pendiente de pago" : debtVal < 0 ? "Crédito a tu favor" : "No tienes cuentas pendientes"}
+              {debtVal > 0
+                ? "Importe total pendiente de pago"
+                : debtVal < 0
+                  ? "Crédito a tu favor"
+                  : "No tienes cuentas pendientes"}
             </span>
           </div>
 
           <div className="rounded-3xl border border-amber-100/70 bg-white/90 dark:border-slate-800 dark:bg-slate-900/80 p-6 shadow-sm flex flex-col justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Puntos Acumulados</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Puntos Acumulados
+            </span>
             <div className="text-3xl font-extrabold mt-2 text-amber-600 dark:text-amber-400 flex items-center gap-2">
               <Icon path={mdiStar} size={1.1} />
               <span>{Number(client.points || 0).toFixed(1)} pts</span>
             </div>
-            <span className="text-[11px] text-slate-500 mt-1">Acumula puntos en cada compra y canjéalos</span>
+            <span className="text-[11px] text-slate-500 mt-1">
+              Acumula puntos en cada compra y canjéalos
+            </span>
           </div>
         </div>
 
         {/* Historial de Movimientos */}
         <div className="rounded-3xl border border-amber-100/70 bg-white/90 dark:border-slate-800 dark:bg-slate-900/80 p-6 shadow-sm space-y-4">
-          <h2 className="text-lg font-bold">Historial de Compras y Movimientos</h2>
+          <h2 className="text-lg font-bold">
+            Historial de Compras y Movimientos
+          </h2>
           {movements.length === 0 ? (
-            <p className="text-sm text-slate-500">No hay movimientos registrados.</p>
+            <p className="text-sm text-slate-500">
+              No hay movimientos registrados.
+            </p>
           ) : (
             <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
               {movements.map((mov) => (
-                <div key={mov.id} className="rounded-2xl border border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-800/40 space-y-2">
+                <div
+                  key={mov.id}
+                  className="rounded-2xl border border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-800/40 space-y-2"
+                >
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-semibold">{mov.concept}</span>
-                    <span className={`font-bold ${mov.amount > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-                      {mov.amount > 0 ? `+$${mov.amount.toFixed(2)}` : `-$${Math.abs(mov.amount).toFixed(2)}`}
+                    <span
+                      className={`font-bold ${mov.amount > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}
+                    >
+                      {mov.amount > 0
+                        ? `+$${mov.amount.toFixed(2)}`
+                        : `-$${Math.abs(mov.amount).toFixed(2)}`}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-slate-400">
                     <span>{new Date(mov.created_at).toLocaleString()}</span>
                     {mov.items && mov.items.length > 0 && (
                       <span className="text-slate-500 font-medium">
-                        {mov.items.map(i => `${i.name} (${i.quantity})`).join(", ")}
+                        {mov.items
+                          .map((i) => `${i.name} (${i.quantity})`)
+                          .join(", ")}
                       </span>
                     )}
                   </div>
@@ -336,19 +380,31 @@ function PublicClientView() {
 
           <div className="grid gap-3 sm:grid-cols-2 text-sm">
             <div className="bg-white/80 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-amber-100 dark:border-slate-700">
-              <span className="text-xs uppercase text-slate-400 font-semibold block">Banco</span>
-              <span className="font-bold text-slate-800 dark:text-slate-100 text-base">STP</span>
+              <span className="text-xs uppercase text-slate-400 font-semibold block">
+                Banco
+              </span>
+              <span className="font-bold text-slate-800 dark:text-slate-100 text-base">
+                STP
+              </span>
             </div>
 
             <div className="bg-white/80 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-amber-100 dark:border-slate-700">
-              <span className="text-xs uppercase text-slate-400 font-semibold block">Titular</span>
-              <span className="font-bold text-slate-800 dark:text-slate-100 text-base">brayan ulises vazquez</span>
+              <span className="text-xs uppercase text-slate-400 font-semibold block">
+                Titular
+              </span>
+              <span className="font-bold text-slate-800 dark:text-slate-100 text-base">
+                brayan ulises vazquez
+              </span>
             </div>
 
             <div className="sm:col-span-2 bg-white/90 dark:bg-slate-800/90 p-4 rounded-2xl border border-amber-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <span className="text-xs uppercase text-slate-400 font-semibold block">Cuenta CLABE</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-lg tracking-wider">646990403801118437</span>
+                <span className="text-xs uppercase text-slate-400 font-semibold block">
+                  Cuenta CLABE
+                </span>
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-lg tracking-wider">
+                  646990403801118437
+                </span>
               </div>
               <button
                 type="button"
@@ -364,7 +420,9 @@ function PublicClientView() {
 
         {/* Footer */}
         <div className="text-center text-xs text-slate-400 pt-4">
-          <p>© {new Date().getFullYear()} Tiendita — Consulta de Estado de Cuenta</p>
+          <p>
+            © {new Date().getFullYear()} Tiendita — Consulta de Estado de Cuenta
+          </p>
         </div>
       </div>
     </div>
@@ -494,7 +552,11 @@ export default function App() {
 
   function handleShareClientLink(client) {
     if (!client.public_code) {
-      Swal.fire("Error", "No se encontró el código público del cliente.", "error");
+      Swal.fire(
+        "Error",
+        "No se encontró el código público del cliente.",
+        "error",
+      );
       return;
     }
     const publicUrl = `${window.location.origin}/c/${client.public_code}`;
