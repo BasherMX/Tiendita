@@ -2751,7 +2751,7 @@ export default function App() {
             <span className="flex items-center gap-1.5">
               Tiendita
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
-                v1.2.1
+                v1.2.2
               </span>
             </span>
           </button>
@@ -2847,7 +2847,11 @@ export default function App() {
             >
               <div className="flex flex-wrap gap-4">
                 {[
-                  { path: "/precios", icon: mdiClipboardList, label: "Precios" },
+                  {
+                    path: "/precios",
+                    icon: mdiClipboardList,
+                    label: "Precios",
+                  },
                   {
                     path: "/inventario",
                     icon: mdiCandycane,
@@ -2942,9 +2946,7 @@ export default function App() {
             path="/"
             element={
               token ? (
-                <div className="mx-auto w-full max-w-4xl">
-                  {pricesPanel}
-                </div>
+                <div className="mx-auto w-full max-w-4xl">{pricesPanel}</div>
               ) : (
                 <Navigate to="/login" replace />
               )
@@ -2954,9 +2956,7 @@ export default function App() {
             path="/precios"
             element={
               token ? (
-                <div className="mx-auto w-full max-w-4xl">
-                  {pricesPanel}
-                </div>
+                <div className="mx-auto w-full max-w-4xl">{pricesPanel}</div>
               ) : (
                 <Navigate to="/login" replace />
               )
