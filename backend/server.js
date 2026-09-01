@@ -67,9 +67,6 @@ async function runSchema() {
       const schema = fs.readFileSync(schemaPath, "utf-8");
       await query(schema);
     }
-    await query(
-      "ALTER TABLE clients ADD COLUMN IF NOT EXISTS public_code VARCHAR(10) UNIQUE",
-    );
     console.log("PostgreSQL schema execution completed");
   } catch (error) {
     console.error("Error executing schema:", error.message);
@@ -396,41 +393,66 @@ app.get("/api/stats/day/:day", authGuard, async (req, res) => {
   }
 });
 
-function generatePublicCode() {
-  const chars =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const ALPHABET = "9A1b2C3d4E5f6G7h8I0jKlMnOpQrStUvWxYzaBcDeFgHiJkLmNoPqRsTuVwXyZ";
+const N_BIG = 916132832n; // 62^5
+const M_BIG = 387420489n;
+const S_BIG = 123456789n;
+
+function modInverse(a, m) {
+  let m0 = m, t, q;
+  let x0 = 0n, x1 = 1n;
+  if (m === 1n) return 0n;
+  while (a > 1n) {
+    q = a / m;
+    t = m;
+    m = a % m;
+    a = t;
+    t = x0;
+    x0 = x1 - q * x0;
+    x1 = t;
+  }
+  if (x1 < 0n) x1 += m0;
+  return x1;
+}
+
+const M_INV = modInverse(M_BIG, N_BIG);
+
+function encodeClientId(id) {
+  if (!id) return "";
+  let x = (BigInt(id) * M_BIG + S_BIG) % N_BIG;
   let code = "";
   for (let i = 0; i < 5; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code = ALPHABET[Number(x % 62n)] + code;
+    x = x / 62n;
   }
   return code;
+}
+
+function decodeClientCode(code) {
+  if (!code || code.length !== 5) return null;
+  let x = 0n;
+  for (let i = 0; i < 5; i++) {
+    const idx = ALPHABET.indexOf(code[i]);
+    if (idx === -1) return null;
+    x = x * 62n + BigInt(idx);
+  }
+  let unshifted = (x - S_BIG) % N_BIG;
+  if (unshifted < 0n) unshifted += N_BIG;
+  let id = (unshifted * M_INV) % N_BIG;
+  const numId = Number(id);
+  return numId > 0 && numId < 10000000 ? numId : null;
 }
 
 // CRUD Clients
 app.get("/api/clients", authGuard, async (req, res) => {
   try {
     const result = await query(
-      "SELECT id, name, total_debt, points, phone, public_code FROM clients ORDER BY total_debt DESC",
+      "SELECT id, name, total_debt, points, phone FROM clients ORDER BY total_debt DESC",
     );
-    const rows = result.rows;
-    for (const client of rows) {
-      if (!client.public_code) {
-        let assigned = false;
-        while (!assigned) {
-          const code = generatePublicCode();
-          try {
-            await query("UPDATE clients SET public_code = $1 WHERE id = $2", [
-              code,
-              client.id,
-            ]);
-            client.public_code = code;
-            assigned = true;
-          } catch (e) {
-            // Retry on collision
-          }
-        }
-      }
-    }
+    const rows = result.rows.map((c) => ({
+      ...c,
+      public_code: encodeClientId(c.id),
+    }));
     return res.json(rows);
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -441,20 +463,15 @@ app.post("/api/clients", authGuard, async (req, res) => {
   const { name, phone } = req.body || {};
   if (!name) return res.status(400).json({ message: "Name is required" });
   try {
-    let created = null;
-    while (!created) {
-      const publicCode = generatePublicCode();
-      try {
-        const result = await query(
-          "INSERT INTO clients (name, phone, public_code) VALUES ($1, $2, $3) RETURNING *",
-          [name, phone || null, publicCode],
-        );
-        created = result.rows[0];
-      } catch (err) {
-        if (!err.message.includes("unique")) throw err;
-      }
-    }
-    return res.json(created);
+    const result = await query(
+      "INSERT INTO clients (name, phone) VALUES ($1, $2) RETURNING *",
+      [name, phone || null],
+    );
+    const newClient = result.rows[0];
+    return res.json({
+      ...newClient,
+      public_code: encodeClientId(newClient.id),
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -463,15 +480,22 @@ app.post("/api/clients", authGuard, async (req, res) => {
 // Rutas Públicas para Clientes (Sin Auth)
 app.get("/api/public/clients/:code", async (req, res) => {
   const { code } = req.params;
+  const clientId = decodeClientCode(code);
+  if (!clientId) {
+    return res.status(404).json({ message: "Enlace inválido o cliente no encontrado" });
+  }
   try {
     const clientRes = await query(
-      "SELECT name, total_debt, points, public_code FROM clients WHERE public_code = $1",
-      [code],
+      "SELECT name, total_debt, points FROM clients WHERE id = $1",
+      [clientId],
     );
     if (!clientRes.rows.length) {
       return res.status(404).json({ message: "Cliente no encontrado" });
     }
-    return res.json(clientRes.rows[0]);
+    return res.json({
+      ...clientRes.rows[0],
+      public_code: code,
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -479,15 +503,11 @@ app.get("/api/public/clients/:code", async (req, res) => {
 
 app.get("/api/public/clients/:code/movements", async (req, res) => {
   const { code } = req.params;
+  const clientId = decodeClientCode(code);
+  if (!clientId) {
+    return res.status(404).json({ message: "Enlace inválido o cliente no encontrado" });
+  }
   try {
-    const clientRes = await query(
-      "SELECT id FROM clients WHERE public_code = $1",
-      [code],
-    );
-    if (!clientRes.rows.length) {
-      return res.status(404).json({ message: "Cliente no encontrado" });
-    }
-    const clientId = clientRes.rows[0].id;
     const movementsRes = await query(
       `SELECT m.id AS movement_id, m.concept, m.amount, m.points, m.created_at,
               mi.quantity, mi.unit_price, s.name AS sweet_name
