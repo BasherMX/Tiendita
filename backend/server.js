@@ -393,14 +393,18 @@ app.get("/api/stats/day/:day", authGuard, async (req, res) => {
   }
 });
 
-const ALPHABET = "9A1b2C3d4E5f6G7h8I0jKlMnOpQrStUvWxYzaBcDeFgHiJkLmNoPqRsTuVwXyZ";
+const ALPHABET =
+  "9A1b2C3d4E5f6G7h8I0jKlMnOpQrStUvWxYzaBcDeFgHiJkLmNoPqRsTuVwXyZ";
 const N_BIG = 916132832n; // 62^5
 const M_BIG = 387420489n;
 const S_BIG = 123456789n;
 
 function modInverse(a, m) {
-  let m0 = m, t, q;
-  let x0 = 0n, x1 = 1n;
+  let m0 = m,
+    t,
+    q;
+  let x0 = 0n,
+    x1 = 1n;
   if (m === 1n) return 0n;
   while (a > 1n) {
     q = a / m;
@@ -482,7 +486,9 @@ app.get("/api/public/clients/:code", async (req, res) => {
   const { code } = req.params;
   const clientId = decodeClientCode(code);
   if (!clientId) {
-    return res.status(404).json({ message: "Enlace inválido o cliente no encontrado" });
+    return res
+      .status(404)
+      .json({ message: "Enlace inválido o cliente no encontrado" });
   }
   try {
     const clientRes = await query(
@@ -505,7 +511,9 @@ app.get("/api/public/clients/:code/movements", async (req, res) => {
   const { code } = req.params;
   const clientId = decodeClientCode(code);
   if (!clientId) {
-    return res.status(404).json({ message: "Enlace inválido o cliente no encontrado" });
+    return res
+      .status(404)
+      .json({ message: "Enlace inválido o cliente no encontrado" });
   }
   try {
     const movementsRes = await query(
@@ -841,11 +849,9 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
 
     if (pointsUsed > totalAmount) {
       await clientConn.query("ROLLBACK");
-      return res
-        .status(400)
-        .json({
-          message: "No se pueden usar más puntos que el total de la compra",
-        });
+      return res.status(400).json({
+        message: "No se pueden usar más puntos que el total de la compra",
+      });
     }
 
     if (pointsUsed > 0) {
@@ -1242,11 +1248,9 @@ app.post("/api/clients/:id/redeem", authGuard, async (req, res) => {
 
     if (clientPoints < pointsCost) {
       await clientConn.query("ROLLBACK");
-      return res
-        .status(400)
-        .json({
-          message: `Puntos insuficientes. Tiene ${clientPoints.toFixed(1)} pts.`,
-        });
+      return res.status(400).json({
+        message: `Puntos insuficientes. Tiene ${clientPoints.toFixed(1)} pts.`,
+      });
     }
     if (sweetStock <= 0) {
       await clientConn.query("ROLLBACK");
