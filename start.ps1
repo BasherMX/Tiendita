@@ -174,7 +174,7 @@ if ($ready) {
     Write-Host "  Backend    -> http://localhost:4000" -ForegroundColor Cyan
     Write-Host "  SQL Server -> localhost:14330" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  Usuario: admin   Contrasena: admin123" -ForegroundColor White
+    Write-Host "  Usuario: admin   Contrasena: Tiendita321" -ForegroundColor White
     Write-Host ""
     Write-Host "Para detener: podman-compose down (o via SSH)" -ForegroundColor Yellow
 } else {

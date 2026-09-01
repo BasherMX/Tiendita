@@ -278,9 +278,9 @@ function PublicClientView() {
         </div>
 
         {/* Resumen de Saldo y Puntos */}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <div
-            className={`rounded-3xl border p-6 shadow-sm flex flex-col justify-between ${
+            className={`rounded-3xl border p-4 sm:p-6 shadow-sm flex flex-col justify-between ${
               debtVal > 0
                 ? "border-rose-200 bg-rose-50/70 dark:border-rose-900/50 dark:bg-rose-950/40"
                 : debtVal < 0
@@ -288,15 +288,15 @@ function PublicClientView() {
                   : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
             }`}
           >
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
               {debtVal > 0
-                ? "Saldo Pendiente (Deuda)"
+                ? "Saldo Pendiente"
                 : debtVal < 0
                   ? "Saldo a Favor"
                   : "Saldo al Día"}
             </span>
             <div
-              className={`text-3xl font-extrabold mt-2 ${
+              className={`text-xl sm:text-3xl font-extrabold mt-1 sm:mt-2 ${
                 debtVal > 0
                   ? "text-rose-600 dark:text-rose-400"
                   : debtVal < 0
@@ -306,25 +306,25 @@ function PublicClientView() {
             >
               ${Math.abs(debtVal).toFixed(2)}
             </div>
-            <span className="text-[11px] text-slate-500 mt-1">
+            <span className="text-[10px] sm:text-[11px] text-slate-500 mt-1">
               {debtVal > 0
-                ? "Importe total pendiente de pago"
+                ? "Pendiente de pago"
                 : debtVal < 0
                   ? "Crédito a tu favor"
-                  : "No tienes cuentas pendientes"}
+                  : "Cuentas al día"}
             </span>
           </div>
 
-          <div className="rounded-3xl border border-amber-100/70 bg-white/90 dark:border-slate-800 dark:bg-slate-900/80 p-6 shadow-sm flex flex-col justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Puntos Acumulados
+          <div className="rounded-3xl border border-amber-100/70 bg-white/90 dark:border-slate-800 dark:bg-slate-900/80 p-4 sm:p-6 shadow-sm flex flex-col justify-between">
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Puntos
             </span>
-            <div className="text-3xl font-extrabold mt-2 text-amber-600 dark:text-amber-400 flex items-center gap-2">
-              <Icon path={mdiStar} size={1.1} />
+            <div className="text-xl sm:text-3xl font-extrabold mt-1 sm:mt-2 text-amber-600 dark:text-amber-400 flex items-center gap-1 sm:gap-2">
+              <Icon path={mdiStar} size={0.9} />
               <span>{Number(client.points || 0).toFixed(1)} pts</span>
             </div>
-            <span className="text-[11px] text-slate-500 mt-1">
-              Acumula puntos en cada compra y canjéalos
+            <span className="text-[10px] sm:text-[11px] text-slate-500 mt-1">
+              Acumulados en compras
             </span>
           </div>
         </div>

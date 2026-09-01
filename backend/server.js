@@ -138,7 +138,7 @@ async function getSettings() {
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body || {};
   const adminUser = process.env.ADMIN_USER || "admin";
-  const adminPass = process.env.ADMIN_PASS || "admin123";
+  const adminPass = process.env.ADMIN_PASS || "Tiendita321";
 
   if (username !== adminUser || password !== adminPass) {
     return res.status(401).json({ message: "Invalid credentials" });
@@ -732,7 +732,7 @@ app.delete(
     const clientId = Number(req.params.clientId);
     const movementId = Number(req.params.movementId);
     const { password } = req.body || {};
-    const adminPass = process.env.ADMIN_PASS || "admin123";
+    const adminPass = process.env.ADMIN_PASS || "Tiendita321";
 
     if (!clientId || !movementId)
       return res.status(400).json({ message: "Invalid client or movement id" });
