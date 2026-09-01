@@ -1805,8 +1805,12 @@ export default function App() {
           debtValue = Math.abs(debtValue);
         }
         message += `💰 ${debtLabel} *$${debtValue.toFixed(2)}*\n`;
-        message += `⭐ *Puntos Disponibles:* ${Number(clientData.points || 0).toFixed(1)} pts\n\n`;
-        message += `¡Gracias por tu preferencia! 🙌`;
+        message += `⭐ *Puntos Disponibles:* ${Number(clientData.points || 0).toFixed(1)} pts\n`;
+        if (client.public_code) {
+          const publicUrl = `${window.location.origin}/c/${client.public_code}`;
+          message += `\n🔗 *Consulta tu estado de cuenta completo aquí:*\n${publicUrl}\n`;
+        }
+        message += `\n¡Gracias por tu preferencia! 🙌`;
 
         let cleanPhone = client.phone.replace(/\D/g, "");
         if (cleanPhone.length === 10) {
@@ -2751,7 +2755,7 @@ export default function App() {
             <span className="flex items-center gap-1.5">
               Tiendita
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
-                v1.2.2
+                v1.3.0
               </span>
             </span>
           </button>

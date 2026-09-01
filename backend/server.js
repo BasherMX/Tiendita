@@ -1479,6 +1479,12 @@ async function sendWhatsAppTicketAutomatically(
     lines.push(
       `⭐ *Puntos Disponibles:* ${Number(client.points || 0).toFixed(1)} pts`,
     );
+    const ticketCode = encodeClientId(client.id);
+    if (ticketCode) {
+      lines.push(``);
+      lines.push(`🔗 *Consulta tu estado de cuenta completo aquí:*`);
+      lines.push(`https://tiendita-mx.vercel.app/c/${ticketCode}`);
+    }
     lines.push(``);
     lines.push(`¡Gracias por tu preferencia! 🙌`);
 
@@ -1548,7 +1554,12 @@ app.post("/api/clients/:id/whatsapp-statement", authGuard, async (req, res) => {
         .status(400)
         .json({ message: "Client has no registered phone number" });
 
-    const message = `Hola ${client.name}, tu saldo total en Tiendita es de $${Number(client.total_debt).toFixed(2)} y cuentas con ${Number(client.points || 0).toFixed(1)} pts. ¡Gracias!`;
+    const stmtCode = encodeClientId(client.id);
+    let linkStr = "";
+    if (stmtCode) {
+      linkStr = `\n\n🔗 *Consulta tu estado de cuenta completo aquí:*\nhttps://tiendita-mx.vercel.app/c/${stmtCode}`;
+    }
+    const message = `Hola ${client.name}, tu saldo total en Tiendita es de $${Number(client.total_debt).toFixed(2)} y cuentas con ${Number(client.points || 0).toFixed(1)} pts.${linkStr}\n\n¡Gracias por tu preferencia! 🙌`;
     await sendWhatsAppMessage(client.phone, message);
 
     return res.json({ message: "WhatsApp statement sent successfully" });
