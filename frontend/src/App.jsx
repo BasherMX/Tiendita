@@ -188,6 +188,7 @@ function PublicClientView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copiedClabe, setCopiedClabe] = useState(false);
+  const [selectedMovement, setSelectedMovement] = useState(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -358,11 +359,14 @@ function PublicClientView() {
                   <div className="flex items-center justify-between text-xs text-slate-400">
                     <span>{new Date(mov.created_at).toLocaleString()}</span>
                     {mov.items && mov.items.length > 0 && (
-                      <span className="text-slate-500 font-medium">
-                        {mov.items
-                          .map((i) => `${i.name} (${i.quantity})`)
-                          .join(", ")}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMovement(mov)}
+                        className="rounded-lg border border-amber-200 p-1 text-amber-700 hover:bg-amber-50 dark:border-amber-900/50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                        title="Ver detalle"
+                      >
+                        <Icon path={mdiEye} size={0.7} />
+                      </button>
                     )}
                   </div>
                 </div>
@@ -425,6 +429,70 @@ function PublicClientView() {
           </p>
         </div>
       </div>
+
+      {selectedMovement && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="w-full max-w-2xl rounded-3xl border border-amber-100/70 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div className="mb-2 text-lg font-semibold">
+              Detalle de movimiento
+            </div>
+            <div className="mb-4 text-sm text-slate-500">
+              {selectedMovement.concept || "Compra"} -{" "}
+              {new Date(selectedMovement.created_at).toLocaleString()}
+            </div>
+            
+            <div className="overflow-hidden rounded-2xl border border-amber-100/70 dark:border-slate-800">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-amber-50 text-amber-900 dark:bg-slate-800 dark:text-amber-200">
+                  <tr>
+                    <th className="px-4 py-2">Dulce</th>
+                    <th className="px-4 py-2">Cantidad</th>
+                    <th className="px-4 py-2">Precio</th>
+                    <th className="px-4 py-2">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-100/70 dark:divide-slate-800">
+                  {selectedMovement.items.map((item, idx) => (
+                    <tr key={`${item.id || idx}-${idx}`}>
+                      <td className="px-4 py-2">{item.name}</td>
+                      <td className="px-4 py-2">{item.quantity}</td>
+                      <td className="px-4 py-2">
+                        ${Number(item.unit_price || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-2">
+                        $
+                        {(
+                          Number(item.unit_price || 0) *
+                          Number(item.quantity || 0)
+                        ).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedMovement(null)}
+                className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold dark:border-slate-700"
+              >
+                Cerrar
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }
