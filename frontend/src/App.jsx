@@ -2760,7 +2760,7 @@ export default function App() {
           {token && (
             <div className="hidden flex-1 items-center gap-1 text-sm md:flex">
               {[
-                { path: "/", icon: mdiClipboardList, label: "Precios" },
+                { path: "/precios", icon: mdiClipboardList, label: "Precios" },
                 {
                   path: "/inventario",
                   icon: mdiCandycane,
@@ -2847,7 +2847,7 @@ export default function App() {
             >
               <div className="flex flex-wrap gap-4">
                 {[
-                  { path: "/", icon: mdiClipboardList, label: "Precios" },
+                  { path: "/precios", icon: mdiClipboardList, label: "Precios" },
                   {
                     path: "/inventario",
                     icon: mdiCandycane,
@@ -2938,7 +2938,30 @@ export default function App() {
             }
           />
 
-          <Route path="/" element={<Navigate to="/clientes" replace />} />
+          <Route
+            path="/"
+            element={
+              token ? (
+                <div className="mx-auto w-full max-w-4xl">
+                  {pricesPanel}
+                </div>
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/precios"
+            element={
+              token ? (
+                <div className="mx-auto w-full max-w-4xl">
+                  {pricesPanel}
+                </div>
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
 
           <Route
             path="/inventario"
