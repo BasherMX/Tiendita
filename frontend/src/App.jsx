@@ -922,9 +922,10 @@ export default function App() {
     try {
       const response = await fetch(`${apiBase}/api/prices`);
       const data = await response.json();
-      setPrices(data);
+      setPrices(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error loading prices:", error);
+      setPrices([]);
     }
   }
 
@@ -3844,7 +3845,7 @@ export default function App() {
 
                   <div className="grid gap-6 lg:grid-cols-3">
                     <div className="space-y-6 lg:col-span-2">
-                      <div className="relative left-1/2 w-screen -translate-x-1/2 rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+                      <div className="w-full min-w-0 rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
                         <div className="mb-3 flex items-center justify-between gap-2">
                           <div className="text-lg font-semibold">
                             Monto de venta por dia
