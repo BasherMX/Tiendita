@@ -29,6 +29,7 @@ export function getPool() {
     if (connectionString) {
       pool = new pg.Pool({
         connectionString,
+        options: "-c timezone=America/Mexico_City",
         ssl:
           process.env.DB_ENCRYPT === "true" ||
           connectionString.includes("sslmode=require") ||
@@ -43,6 +44,7 @@ export function getPool() {
         host: process.env.DB_HOST || "localhost",
         port: Number(process.env.DB_PORT || 5432),
         database: process.env.DB_NAME || "tiendita",
+        options: "-c timezone=America/Mexico_City",
         ssl:
           process.env.DB_ENCRYPT === "true"
             ? { rejectUnauthorized: false }
@@ -225,11 +227,11 @@ app.get("/api/sweets/stats", authGuard, async (req, res) => {
     const totals = await query(
       "SELECT COUNT(*) AS total_products, COALESCE(SUM(stock), 0) AS total_stock, COALESCE(SUM(sold_count), 0) AS total_sold FROM sweets",
     );
-    const topSeller = await query(
-      "SELECT name, sold_count FROM sweets ORDER BY sold_count DESC, name ASC LIMIT 1",
+    const topSellers = await query(
+      "SELECT id, name, sold_count FROM sweets WHERE sold_count > 0 ORDER BY sold_count DESC, name ASC LIMIT 3",
     );
-    const lowSeller = await query(
-      "SELECT name, sold_count FROM sweets ORDER BY sold_count ASC, name ASC LIMIT 1",
+    const lowSellers = await query(
+      "SELECT id, name, sold_count FROM sweets WHERE created_at <= CURRENT_TIMESTAMP - INTERVAL '30 days' ORDER BY sold_count ASC, name ASC LIMIT 3",
     );
     const lowStock = await query(
       "SELECT name, stock FROM sweets ORDER BY stock ASC, name ASC LIMIT 1",
@@ -240,8 +242,10 @@ app.get("/api/sweets/stats", authGuard, async (req, res) => {
         total_stock: 0,
         total_sold: 0,
       },
-      topSeller: topSeller.rows[0] || null,
-      lowSeller: lowSeller.rows[0] || null,
+      topSellers: topSellers.rows || [],
+      lowSellers: lowSellers.rows || [],
+      topSeller: topSellers.rows[0] || null,
+      lowSeller: lowSellers.rows[0] || null,
       lowStock: lowStock.rows[0] || null,
     });
   } catch (error) {
@@ -278,11 +282,11 @@ app.get("/api/stats", authGuard, async (req, res) => {
       ORDER BY day DESC
     `);
 
-    const topSeller = await query(
-      "SELECT name, sold_count FROM sweets ORDER BY sold_count DESC, name ASC LIMIT 1",
+    const topSellers = await query(
+      "SELECT id, name, sold_count FROM sweets WHERE sold_count > 0 ORDER BY sold_count DESC, name ASC LIMIT 3",
     );
-    const lowSeller = await query(
-      "SELECT name, sold_count FROM sweets ORDER BY sold_count ASC, name ASC LIMIT 1",
+    const lowSellers = await query(
+      "SELECT id, name, sold_count FROM sweets WHERE created_at <= CURRENT_TIMESTAMP - INTERVAL '30 days' ORDER BY sold_count ASC, name ASC LIMIT 3",
     );
     const lowStock = await query(
       "SELECT id, name, stock FROM sweets WHERE stock <= $1 ORDER BY stock ASC, name ASC",
@@ -291,8 +295,10 @@ app.get("/api/stats", authGuard, async (req, res) => {
 
     return res.json({
       dailyTotals: dailyTotals.rows || [],
-      topSeller: topSeller.rows[0] || null,
-      lowSeller: lowSeller.rows[0] || null,
+      topSellers: topSellers.rows || [],
+      lowSellers: lowSellers.rows || [],
+      topSeller: topSellers.rows[0] || null,
+      lowSeller: lowSellers.rows[0] || null,
       lowStock: lowStock.rows || [],
       thresholds: {
         low: lowStockThreshold,
@@ -1214,6 +1220,68 @@ app.post("/api/package-purchases", authGuard, async (req, res) => {
     return res.json(result.rows[0]);
   } catch (error) {
     return res.status(500).json({ message: error.message });
+  }
+});
+
+app.post("/api/package-purchases/ticket", authGuard, async (req, res) => {
+  const { placeId, items } = req.body || {};
+  if (!placeId || !Array.isArray(items) || items.length === 0) {
+    return res
+      .status(400)
+      .json({ message: "Ticket requires a place and items" });
+  }
+
+  const normalizedItems = items
+    .map((item) => ({
+      sweetId: item.sweetId ? Number(item.sweetId) : null,
+      productName: String(item.productName || "").trim(),
+      quantity: Number(item.quantity),
+      packageCost: Number(item.packageCost),
+    }))
+    .filter(
+      (item) =>
+        item.productName &&
+        Number.isFinite(item.quantity) &&
+        item.quantity > 0 &&
+        Number.isFinite(item.packageCost) &&
+        item.packageCost >= 0,
+    );
+
+  if (normalizedItems.length === 0) {
+    return res.status(400).json({ message: "Ticket has no valid items" });
+  }
+
+  const dbPool = getPool();
+  const clientConn = await dbPool.connect();
+  try {
+    await clientConn.query("BEGIN");
+    const inserted = [];
+    for (const item of normalizedItems) {
+      if (item.sweetId) {
+        const sweet = await clientConn.query(
+          "SELECT id FROM sweets WHERE id = $1 FOR UPDATE",
+          [item.sweetId],
+        );
+        if (!sweet.rows.length) throw new Error("Product not found");
+        await clientConn.query(
+          "UPDATE sweets SET stock = stock + $1 WHERE id = $2",
+          [item.quantity, item.sweetId],
+        );
+      }
+
+      const result = await clientConn.query(
+        "INSERT INTO package_purchases (sweet_id, product_name, place_id, package_cost) VALUES ($1, $2, $3, $4) RETURNING *",
+        [item.sweetId, item.productName, Number(placeId), item.packageCost],
+      );
+      inserted.push(result.rows[0]);
+    }
+    await clientConn.query("COMMIT");
+    return res.json({ message: "Purchase ticket added", items: inserted });
+  } catch (error) {
+    await clientConn.query("ROLLBACK");
+    return res.status(400).json({ message: error.message });
+  } finally {
+    clientConn.release();
   }
 });
 

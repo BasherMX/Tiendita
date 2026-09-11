@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
   Navigate,
   Route,
   Routes,
@@ -172,11 +181,12 @@ function getCurrentWeekRange() {
   return { from: toIsoDay(monday), to: toIsoDay(sunday) };
 }
 
-function getLast30DaysRange() {
-  const to = new Date();
-  const from = new Date(to);
-  from.setDate(to.getDate() - 29);
-  return { from: toIsoDay(from), to: toIsoDay(to) };
+function getCurrentMonthRange() {
+  const now = new Date();
+  return {
+    from: toIsoDay(new Date(now.getFullYear(), now.getMonth(), 1)),
+    to: toIsoDay(now),
+  };
 }
 
 function getMonthlyRange(shift = 0) {
@@ -613,11 +623,17 @@ export default function App() {
   const [purchasePlaces, setPurchasePlaces] = useState([]);
   const [packagePurchases, setPackagePurchases] = useState([]);
   const [newPlace, setNewPlace] = useState("");
-  const [purchaseForm, setPurchaseForm] = useState({
-    sweetId: "",
-    productName: "",
+  const [purchaseTicket, setPurchaseTicket] = useState({
     placeId: "",
-    packageCost: "",
+    items: [
+      {
+        id: Date.now(),
+        sweetId: "",
+        productName: "",
+        quantity: 1,
+        packageCost: "",
+      },
+    ],
   });
 
   const [rewards, setRewards] = useState([]);
@@ -1400,20 +1416,35 @@ export default function App() {
 
   async function handleAddPackagePurchase(event) {
     event.preventDefault();
-    const selectedSweet = sweetById.get(String(purchaseForm.sweetId));
-    const payload = {
-      sweetId: purchaseForm.sweetId ? Number(purchaseForm.sweetId) : null,
-      productName:
-        selectedSweet?.name || String(purchaseForm.productName || "").trim(),
-      placeId: Number(purchaseForm.placeId),
-      packageCost: Number(purchaseForm.packageCost),
-    };
+    const items = purchaseTicket.items
+      .map((item) => {
+        const selectedSweet = sweetById.get(String(item.sweetId));
+        return {
+          sweetId: item.sweetId ? Number(item.sweetId) : null,
+          productName:
+            selectedSweet?.name || String(item.productName || "").trim(),
+          quantity: Number(item.quantity),
+          packageCost: Number(item.packageCost),
+        };
+      })
+      .filter(
+        (item) =>
+          item.productName && item.quantity > 0 && item.packageCost >= 0,
+      );
 
-    const response = await authFetch(`${apiBase}/api/package-purchases`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    if (!purchaseTicket.placeId || !items.length) return;
+
+    const response = await authFetch(
+      `${apiBase}/api/package-purchases/ticket`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          placeId: Number(purchaseTicket.placeId),
+          items,
+        }),
+      },
+    );
     if (!response) return;
 
     if (!response.ok) {
@@ -1425,13 +1456,45 @@ export default function App() {
       return;
     }
 
-    setPurchaseForm({
-      sweetId: "",
-      productName: "",
-      placeId: "",
-      packageCost: "",
+    setPurchaseTicket({
+      placeId: purchaseTicket.placeId,
+      items: [
+        {
+          id: Date.now(),
+          sweetId: "",
+          productName: "",
+          quantity: 1,
+          packageCost: "",
+        },
+      ],
     });
-    loadPackagePurchases();
+    await Promise.all([loadPackagePurchases(), loadSweets(), loadStats()]);
+  }
+
+  function addPurchaseTicketItem() {
+    setPurchaseTicket((ticket) => ({
+      ...ticket,
+      items: [
+        ...ticket.items,
+        {
+          id: Date.now(),
+          sweetId: "",
+          productName: "",
+          quantity: 1,
+          packageCost: "",
+        },
+      ],
+    }));
+  }
+
+  function removePurchaseTicketItem(itemId) {
+    setPurchaseTicket((ticket) => ({
+      ...ticket,
+      items:
+        ticket.items.length === 1
+          ? ticket.items
+          : ticket.items.filter((item) => item.id !== itemId),
+    }));
   }
 
   function removeMovementItem(index) {
@@ -1466,6 +1529,25 @@ export default function App() {
       loadWhatsappStatus();
     }
   }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    const refreshStats = () => {
+      loadStats();
+      loadWeekStats();
+      loadSalesChart();
+      loadSweetStats();
+    };
+    const interval = setInterval(refreshStats, 30000);
+    return () => clearInterval(interval);
+  }, [
+    token,
+    periodMode,
+    periodShift,
+    salesChartRange,
+    salesChartDates.from,
+    salesChartDates.to,
+  ]);
   useEffect(() => {
     if (token) loadSalesChart();
   }, [token, salesChartRange, salesChartDates.from, salesChartDates.to]);
@@ -3219,22 +3301,40 @@ export default function App() {
                         </div>
                       </div>
                       <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-                        <div className="text-slate-500">Mas vendido</div>
-                        <div className="text-base font-semibold">
-                          {stockStats.topSeller?.name || "Sin datos"}
+                        <div className="mb-2 text-slate-500">
+                          Top 3 mas vendidos
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {stockStats.topSeller?.sold_count || 0} vendidos
-                        </div>
+                        {(stockStats.topSellers || []).map((seller, index) => (
+                          <div
+                            key={seller.id}
+                            className="flex justify-between gap-2 border-b border-amber-100/70 py-1 last:border-0 dark:border-slate-800"
+                          >
+                            <span className="truncate">
+                              {index + 1}. {seller.name}
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              {seller.sold_count}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                       <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-                        <div className="text-slate-500">Menos vendido</div>
-                        <div className="text-base font-semibold">
-                          {stockStats.lowSeller?.name || "Sin datos"}
+                        <div className="mb-2 text-slate-500">
+                          Top 3 menos vendidos
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {stockStats.lowSeller?.sold_count || 0} vendidos
-                        </div>
+                        {(stockStats.lowSellers || []).map((seller, index) => (
+                          <div
+                            key={seller.id}
+                            className="flex justify-between gap-2 border-b border-amber-100/70 py-1 last:border-0 dark:border-slate-800"
+                          >
+                            <span className="truncate">
+                              {index + 1}. {seller.name}
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              {seller.sold_count}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                       <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
                         <div className="text-slate-500">Stock mas bajo</div>
@@ -3744,7 +3844,7 @@ export default function App() {
 
                   <div className="grid gap-6 lg:grid-cols-3">
                     <div className="space-y-6 lg:col-span-2">
-                      <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+                      <div className="relative left-1/2 w-screen -translate-x-1/2 rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
                         <div className="mb-3 flex items-center justify-between gap-2">
                           <div className="text-lg font-semibold">
                             Monto de venta por dia
@@ -3876,12 +3976,12 @@ export default function App() {
                               if (range === "week") {
                                 setSalesChartDates(getCurrentWeekRange());
                               } else if (range === "month") {
-                                setSalesChartDates(getLast30DaysRange());
+                                setSalesChartDates(getCurrentMonthRange());
                               }
                             }}
                           >
                             <option value="week">Semana actual</option>
-                            <option value="month">Ultimo mes</option>
+                            <option value="month">Mes actual</option>
                             <option value="history">Historico</option>
                             <option value="custom">Rango personalizado</option>
                           </select>
@@ -3923,80 +4023,59 @@ export default function App() {
                             Cargando ventas...
                           </p>
                         ) : chartData.rows.length ? (
-                          <div className="overflow-x-auto">
-                            <svg
-                              viewBox="0 0 760 270"
-                              className="h-72 min-w-[620px] w-full"
-                              role="img"
-                              aria-label="Ventas por dia"
-                            >
-                              <line
-                                x1="48"
-                                y1="220"
-                                x2="730"
-                                y2="220"
-                                stroke="currentColor"
-                                className="text-amber-200 dark:text-slate-700"
-                              />
-                              <polyline
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="3"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="text-amber-500 dark:text-amber-400"
-                                points={chartData.rows
-                                  .map((item, index) => {
-                                    const x =
-                                      chartData.rows.length === 1
-                                        ? 390
-                                        : 48 +
-                                          (index * 682) /
-                                            (chartData.rows.length - 1);
-                                    const y =
-                                      220 - (item.total / chartData.max) * 170;
-                                    return `${x},${y}`;
-                                  })
-                                  .join(" ")}
-                              />
-                              {chartData.rows.map((item, index) => {
-                                const x =
-                                  chartData.rows.length === 1
-                                    ? 390
-                                    : 48 +
-                                      (index * 682) /
-                                        (chartData.rows.length - 1);
-                                const y =
-                                  220 - (item.total / chartData.max) * 170;
-                                return (
-                                  <g key={`${item.dayLabel}-${index}`}>
-                                    <circle
-                                      cx={x}
-                                      cy={y}
-                                      r="6"
-                                      className="fill-white stroke-amber-500 dark:fill-slate-900 dark:stroke-amber-400"
-                                      strokeWidth="3"
-                                    />
-                                    <text
-                                      x={x}
-                                      y="245"
-                                      textAnchor="middle"
-                                      className="fill-slate-500 text-[11px]"
-                                    >
-                                      {item.dayLabel}
-                                    </text>
-                                    <text
-                                      x={x}
-                                      y={Math.max(16, y - 12)}
-                                      textAnchor="middle"
-                                      className="fill-slate-700 text-[11px] font-semibold dark:fill-slate-200"
-                                    >
-                                      ${item.total.toFixed(0)}
-                                    </text>
-                                  </g>
-                                );
-                              })}
-                            </svg>
+                          <div className="h-80 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart
+                                data={chartData.rows}
+                                margin={{
+                                  top: 18,
+                                  right: 18,
+                                  left: 4,
+                                  bottom: 8,
+                                }}
+                              >
+                                <CartesianGrid
+                                  strokeDasharray="3 3"
+                                  vertical={false}
+                                  stroke="#fde68a"
+                                />
+                                <XAxis
+                                  dataKey="dayLabel"
+                                  tick={{ fontSize: 11 }}
+                                  tickLine={false}
+                                  axisLine={false}
+                                />
+                                <YAxis
+                                  tick={{ fontSize: 11 }}
+                                  tickLine={false}
+                                  axisLine={false}
+                                  width={48}
+                                  tickFormatter={(value) => `$${value}`}
+                                />
+                                <Tooltip
+                                  formatter={(value) => [
+                                    `$${Number(value).toFixed(2)}`,
+                                    "Ventas",
+                                  ]}
+                                  labelFormatter={(label) => `Día ${label}`}
+                                />
+                                <Line
+                                  type="monotone"
+                                  dataKey="total"
+                                  stroke="#f59e0b"
+                                  strokeWidth={3}
+                                  dot={{
+                                    r: 5,
+                                    fill: "#fff",
+                                    stroke: "#f59e0b",
+                                    strokeWidth: 3,
+                                  }}
+                                  activeDot={{ r: 8 }}
+                                  animationDuration={900}
+                                  animationEasing="ease-out"
+                                />
+                              </LineChart>
+                            </ResponsiveContainer>
                           </div>
                         ) : (
                           <p className="text-sm text-slate-500">
@@ -4009,14 +4088,23 @@ export default function App() {
                           Top 5 mejores clientes
                         </div>
                         {salesChart.topClients.length ? (
-                          <div className="space-y-3">
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                             {salesChart.topClients.map((client, index) => (
                               <div
                                 key={client.id}
-                                className="flex items-center gap-3 rounded-2xl border border-amber-100/70 px-4 py-3 dark:border-slate-800"
+                                className="flex min-w-0 items-center gap-3 rounded-2xl border border-amber-100/70 px-4 py-3 dark:border-slate-800"
                               >
-                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700 dark:bg-slate-800 dark:text-amber-300">
-                                  {index + 1}
+                                <span
+                                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-lg dark:bg-slate-800"
+                                  title={`Lugar ${index + 1}`}
+                                >
+                                  {index === 0
+                                    ? "🥇"
+                                    : index === 1
+                                      ? "🥈"
+                                      : index === 2
+                                        ? "🥉"
+                                        : index + 1}
                                 </span>
                                 <div className="min-w-0 flex-1">
                                   <div className="truncate font-semibold">
@@ -4042,22 +4130,48 @@ export default function App() {
 
                     <div className="space-y-4">
                       <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-                        <div className="text-slate-500">Mas vendido</div>
-                        <div className="text-base font-semibold">
-                          {stats.topSeller?.name || "Sin datos"}
+                        <div className="mb-3 font-semibold">
+                          Top 3 mas vendidos
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {stats.topSeller?.sold_count || 0} vendidos
-                        </div>
+                        {(stats.topSellers || []).map((seller, index) => (
+                          <div
+                            key={seller.id}
+                            className="flex items-center justify-between border-b border-amber-100/70 py-2 last:border-0 dark:border-slate-800"
+                          >
+                            <span className="truncate pr-2">
+                              {index + 1}. {seller.name}
+                            </span>
+                            <span className="shrink-0 text-xs text-slate-500">
+                              {seller.sold_count} uds
+                            </span>
+                          </div>
+                        ))}
+                        {!stats.topSellers?.length && (
+                          <p className="text-xs text-slate-500">Sin datos</p>
+                        )}
                       </div>
                       <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-                        <div className="text-slate-500">Menos vendido</div>
-                        <div className="text-base font-semibold">
-                          {stats.lowSeller?.name || "Sin datos"}
+                        <div className="mb-3 font-semibold">
+                          Top 3 menos vendidos
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {stats.lowSeller?.sold_count || 0} vendidos
-                        </div>
+                        {(stats.lowSellers || []).map((seller, index) => (
+                          <div
+                            key={seller.id}
+                            className="flex items-center justify-between border-b border-amber-100/70 py-2 last:border-0 dark:border-slate-800"
+                          >
+                            <span className="truncate pr-2">
+                              {index + 1}. {seller.name}
+                            </span>
+                            <span className="shrink-0 text-xs text-slate-500">
+                              {seller.sold_count} uds
+                            </span>
+                          </div>
+                        ))}
+                        {!stats.lowSellers?.length && (
+                          <p className="text-xs text-slate-500">
+                            Sin productos con más de 30 días.
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -4197,7 +4311,7 @@ export default function App() {
                   <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
                     <div className="mb-4 text-lg font-semibold">Reestock</div>
                     {stats.lowStock?.length ? (
-                      <div className="grid gap-3 md:grid-cols-2">
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         {stats.lowStock.map((item) => {
                           const lowLimit = stats.thresholds?.low ?? 10;
                           const criticalLimit = stats.thresholds?.critical ?? 3;
@@ -4210,7 +4324,7 @@ export default function App() {
                           return (
                             <div
                               key={item.id}
-                              className={`rounded-2xl border px-4 py-3 text-sm ${styleClass}`}
+                              className={`rounded-xl border px-3 py-2 text-xs ${styleClass}`}
                             >
                               <div className="font-semibold">{item.name}</div>
                               <div>
@@ -4239,56 +4353,26 @@ export default function App() {
               token ? (
                 <div className="space-y-6">
                   <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-                    <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
+                    <div className="mb-2 flex items-center gap-2 text-lg font-semibold">
                       <Icon path={mdiPackageVariantClosed} size={1} />
-                      Registro de compras por paquete
+                      Registrar ticket de reestock
                     </div>
+                    <p className="mb-4 text-sm text-slate-500">
+                      Agrega varios productos al mismo ticket. La cantidad se
+                      suma al stock existente.
+                    </p>
                     <form
                       onSubmit={handleAddPackagePurchase}
-                      className="grid gap-3 md:grid-cols-2"
+                      className="space-y-4"
                     >
-                      <label className="grid gap-1 text-xs uppercase text-slate-500">
-                        Producto existente
-                        <select
-                          className="rounded-2xl border border-amber-100/70 px-4 py-2 text-sm normal-case outline-none dark:border-slate-700"
-                          value={purchaseForm.sweetId}
-                          onChange={(event) =>
-                            setPurchaseForm((prev) => ({
-                              ...prev,
-                              sweetId: event.target.value,
-                            }))
-                          }
-                        >
-                          <option value="">Seleccionar...</option>
-                          {sortedSweets.map((sweet) => (
-                            <option key={sweet.id} value={sweet.id}>
-                              {sweet.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="grid gap-1 text-xs uppercase text-slate-500">
-                        O agregar producto nuevo
-                        <input
-                          className="rounded-2xl border border-amber-100/70 px-4 py-2 text-sm normal-case outline-none dark:border-slate-700"
-                          placeholder="Nombre producto"
-                          value={purchaseForm.productName}
-                          onChange={(event) =>
-                            setPurchaseForm((prev) => ({
-                              ...prev,
-                              productName: event.target.value,
-                            }))
-                          }
-                        />
-                      </label>
                       <label className="grid gap-1 text-xs uppercase text-slate-500">
                         Lugar de compra
                         <select
                           className="rounded-2xl border border-amber-100/70 px-4 py-2 text-sm normal-case outline-none dark:border-slate-700"
-                          value={purchaseForm.placeId}
+                          value={purchaseTicket.placeId}
                           onChange={(event) =>
-                            setPurchaseForm((prev) => ({
-                              ...prev,
+                            setPurchaseTicket((ticket) => ({
+                              ...ticket,
                               placeId: event.target.value,
                             }))
                           }
@@ -4301,24 +4385,131 @@ export default function App() {
                           ))}
                         </select>
                       </label>
-                      <label className="grid gap-1 text-xs uppercase text-slate-500">
-                        Costo por paquete
-                        <input
-                          className="rounded-2xl border border-amber-100/70 px-4 py-2 text-sm normal-case outline-none dark:border-slate-700"
-                          type="number"
-                          step="0.01"
-                          value={purchaseForm.packageCost}
-                          onChange={(event) =>
-                            setPurchaseForm((prev) => ({
-                              ...prev,
-                              packageCost: event.target.value,
-                            }))
-                          }
-                        />
-                      </label>
-                      <button className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 md:col-span-2">
-                        Guardar compra
-                      </button>
+                      <div className="space-y-3">
+                        {purchaseTicket.items.map((item, index) => (
+                          <div
+                            key={item.id}
+                            className="grid gap-3 rounded-2xl border border-amber-100/70 p-3 dark:border-slate-800 md:grid-cols-[minmax(0,1.5fr)_110px_150px_auto]"
+                          >
+                            <label className="grid gap-1 text-xs uppercase text-slate-500">
+                              Producto {index + 1}
+                              <select
+                                className="rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
+                                value={item.sweetId}
+                                onChange={(event) =>
+                                  setPurchaseTicket((ticket) => ({
+                                    ...ticket,
+                                    items: ticket.items.map((line) =>
+                                      line.id === item.id
+                                        ? {
+                                            ...line,
+                                            sweetId: event.target.value,
+                                            productName: "",
+                                          }
+                                        : line,
+                                    ),
+                                  }))
+                                }
+                              >
+                                <option value="">
+                                  Producto nuevo / manual
+                                </option>
+                                {sortedSweets.map((sweet) => (
+                                  <option key={sweet.id} value={sweet.id}>
+                                    {sweet.name}
+                                  </option>
+                                ))}
+                              </select>
+                              {!item.sweetId && (
+                                <input
+                                  className="mt-1 rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
+                                  placeholder="Nombre del producto"
+                                  value={item.productName}
+                                  onChange={(event) =>
+                                    setPurchaseTicket((ticket) => ({
+                                      ...ticket,
+                                      items: ticket.items.map((line) =>
+                                        line.id === item.id
+                                          ? {
+                                              ...line,
+                                              productName: event.target.value,
+                                            }
+                                          : line,
+                                      ),
+                                    }))
+                                  }
+                                />
+                              )}
+                            </label>
+                            <label className="grid gap-1 text-xs uppercase text-slate-500">
+                              Cantidad
+                              <input
+                                className="rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={item.quantity}
+                                onChange={(event) =>
+                                  setPurchaseTicket((ticket) => ({
+                                    ...ticket,
+                                    items: ticket.items.map((line) =>
+                                      line.id === item.id
+                                        ? {
+                                            ...line,
+                                            quantity: event.target.value,
+                                          }
+                                        : line,
+                                    ),
+                                  }))
+                                }
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs uppercase text-slate-500">
+                              Costo paquete
+                              <input
+                                className="rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.packageCost}
+                                onChange={(event) =>
+                                  setPurchaseTicket((ticket) => ({
+                                    ...ticket,
+                                    items: ticket.items.map((line) =>
+                                      line.id === item.id
+                                        ? {
+                                            ...line,
+                                            packageCost: event.target.value,
+                                          }
+                                        : line,
+                                    ),
+                                  }))
+                                }
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => removePurchaseTicketItem(item.id)}
+                              className="self-end rounded-xl border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                              title="Quitar línea"
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={addPurchaseTicketItem}
+                          className="rounded-xl border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                        >
+                          + Agregar producto
+                        </button>
+                        <button className="rounded-xl bg-amber-500 px-5 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+                          Guardar ticket
+                        </button>
+                      </div>
                     </form>
                   </div>
 
