@@ -161,6 +161,24 @@ function getWeeklyRange(shift = 0) {
   return { from: toIsoDay(monday), to: toIsoDay(friday) };
 }
 
+function getCurrentWeekRange() {
+  const now = new Date();
+  const mondayOffset = (now.getDay() + 6) % 7;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - mondayOffset);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { from: toIsoDay(monday), to: toIsoDay(sunday) };
+}
+
+function getLast30DaysRange() {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(to.getDate() - 29);
+  return { from: toIsoDay(from), to: toIsoDay(to) };
+}
+
 function getMonthlyRange(shift = 0) {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth() - shift, 1);
@@ -450,7 +468,7 @@ function PublicClientView() {
               {selectedMovement.concept || "Compra"} -{" "}
               {new Date(selectedMovement.created_at).toLocaleString()}
             </div>
-            
+
             <div className="overflow-hidden rounded-2xl border border-amber-100/70 dark:border-slate-800">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-amber-50 text-amber-900 dark:bg-slate-800 dark:text-amber-200">
@@ -584,6 +602,13 @@ export default function App() {
   const [selectedDay, setSelectedDay] = useState("");
   const [selectedDayMoves, setSelectedDayMoves] = useState([]);
   const [selectedDayLoading, setSelectedDayLoading] = useState(false);
+  const [salesChart, setSalesChart] = useState({
+    dailyTotals: [],
+    topClients: [],
+  });
+  const [salesChartLoading, setSalesChartLoading] = useState(false);
+  const [salesChartRange, setSalesChartRange] = useState("week");
+  const [salesChartDates, setSalesChartDates] = useState(getCurrentWeekRange);
 
   const [purchasePlaces, setPurchasePlaces] = useState([]);
   const [packagePurchases, setPackagePurchases] = useState([]);
@@ -830,19 +855,16 @@ export default function App() {
   );
 
   const chartData = useMemo(() => {
-    const rows = [...(stats.dailyTotals || [])]
-      .slice(0, 14)
-      .reverse()
-      .map((row) => ({
-        dayLabel: new Date(row.day).toLocaleDateString("es-MX", {
-          day: "2-digit",
-          month: "2-digit",
-        }),
-        total: Number(row.total || 0),
-      }));
+    const rows = [...(salesChart.dailyTotals || [])].map((row) => ({
+      dayLabel: new Date(row.day).toLocaleDateString("es-MX", {
+        day: "2-digit",
+        month: "2-digit",
+      }),
+      total: Number(row.total || 0),
+    }));
     const max = Math.max(1, ...rows.map((r) => r.total));
     return { rows, max };
-  }, [stats.dailyTotals]);
+  }, [salesChart.dailyTotals]);
 
   async function handleAuthFailure() {
     if (authFailHandledRef.current) return;
@@ -945,6 +967,24 @@ export default function App() {
       console.error("Error loading stats:", error);
     } finally {
       setStatsLoading(false);
+    }
+  }
+
+  async function loadSalesChart() {
+    if (!token) return;
+    const params = new URLSearchParams();
+    if (salesChartRange !== "history") {
+      params.set("from", salesChartDates.from);
+      params.set("to", salesChartDates.to);
+    }
+    setSalesChartLoading(true);
+    try {
+      const response = await authFetch(`${apiBase}/api/stats/sales?${params}`);
+      if (response && response.ok) setSalesChart(await response.json());
+    } catch (error) {
+      console.error("Error loading sales chart:", error);
+    } finally {
+      setSalesChartLoading(false);
     }
   }
 
@@ -1426,6 +1466,9 @@ export default function App() {
       loadWhatsappStatus();
     }
   }, [token]);
+  useEffect(() => {
+    if (token) loadSalesChart();
+  }, [token, salesChartRange, salesChartDates.from, salesChartDates.to]);
 
   useEffect(() => {
     if (!token || location.pathname !== "/whatsapp") return;
@@ -3820,36 +3863,178 @@ export default function App() {
                       </div>
 
                       <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-                        <div className="mb-4 text-lg font-semibold">
-                          Grafica de ventas (ultimos 14 dias)
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                          <div className="text-lg font-semibold">
+                            Ventas por dia
+                          </div>
+                          <select
+                            className="rounded-xl border border-amber-100/70 px-3 py-1.5 text-sm outline-none dark:border-slate-700 dark:bg-slate-900"
+                            value={salesChartRange}
+                            onChange={(event) => {
+                              const range = event.target.value;
+                              setSalesChartRange(range);
+                              if (range === "week") {
+                                setSalesChartDates(getCurrentWeekRange());
+                              } else if (range === "month") {
+                                setSalesChartDates(getLast30DaysRange());
+                              }
+                            }}
+                          >
+                            <option value="week">Semana actual</option>
+                            <option value="month">Ultimo mes</option>
+                            <option value="history">Historico</option>
+                            <option value="custom">Rango personalizado</option>
+                          </select>
                         </div>
-                        {chartData.rows.length ? (
-                          <div className="space-y-2">
-                            {chartData.rows.map((item) => (
+                        {salesChartRange === "custom" && (
+                          <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                            <label className="grid gap-1 text-xs font-semibold uppercase text-slate-500">
+                              Desde
+                              <input
+                                type="date"
+                                value={salesChartDates.from}
+                                onChange={(event) =>
+                                  setSalesChartDates((dates) => ({
+                                    ...dates,
+                                    from: event.target.value,
+                                  }))
+                                }
+                                className="rounded-xl border border-amber-100/70 px-3 py-2 text-sm font-normal normal-case outline-none dark:border-slate-700 dark:bg-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold uppercase text-slate-500">
+                              Hasta
+                              <input
+                                type="date"
+                                value={salesChartDates.to}
+                                onChange={(event) =>
+                                  setSalesChartDates((dates) => ({
+                                    ...dates,
+                                    to: event.target.value,
+                                  }))
+                                }
+                                className="rounded-xl border border-amber-100/70 px-3 py-2 text-sm font-normal normal-case outline-none dark:border-slate-700 dark:bg-slate-900"
+                              />
+                            </label>
+                          </div>
+                        )}
+                        {salesChartLoading ? (
+                          <p className="text-sm text-slate-500">
+                            Cargando ventas...
+                          </p>
+                        ) : chartData.rows.length ? (
+                          <div className="overflow-x-auto">
+                            <svg
+                              viewBox="0 0 760 270"
+                              className="h-72 min-w-[620px] w-full"
+                              role="img"
+                              aria-label="Ventas por dia"
+                            >
+                              <line
+                                x1="48"
+                                y1="220"
+                                x2="730"
+                                y2="220"
+                                stroke="currentColor"
+                                className="text-amber-200 dark:text-slate-700"
+                              />
+                              <polyline
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="text-amber-500 dark:text-amber-400"
+                                points={chartData.rows
+                                  .map((item, index) => {
+                                    const x =
+                                      chartData.rows.length === 1
+                                        ? 390
+                                        : 48 +
+                                          (index * 682) /
+                                            (chartData.rows.length - 1);
+                                    const y =
+                                      220 - (item.total / chartData.max) * 170;
+                                    return `${x},${y}`;
+                                  })
+                                  .join(" ")}
+                              />
+                              {chartData.rows.map((item, index) => {
+                                const x =
+                                  chartData.rows.length === 1
+                                    ? 390
+                                    : 48 +
+                                      (index * 682) /
+                                        (chartData.rows.length - 1);
+                                const y =
+                                  220 - (item.total / chartData.max) * 170;
+                                return (
+                                  <g key={`${item.dayLabel}-${index}`}>
+                                    <circle
+                                      cx={x}
+                                      cy={y}
+                                      r="6"
+                                      className="fill-white stroke-amber-500 dark:fill-slate-900 dark:stroke-amber-400"
+                                      strokeWidth="3"
+                                    />
+                                    <text
+                                      x={x}
+                                      y="245"
+                                      textAnchor="middle"
+                                      className="fill-slate-500 text-[11px]"
+                                    >
+                                      {item.dayLabel}
+                                    </text>
+                                    <text
+                                      x={x}
+                                      y={Math.max(16, y - 12)}
+                                      textAnchor="middle"
+                                      className="fill-slate-700 text-[11px] font-semibold dark:fill-slate-200"
+                                    >
+                                      ${item.total.toFixed(0)}
+                                    </text>
+                                  </g>
+                                );
+                              })}
+                            </svg>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-500">
+                            Sin datos para graficar.
+                          </p>
+                        )}
+                      </div>
+                      <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+                        <div className="mb-4 text-lg font-semibold">
+                          Top 5 mejores clientes
+                        </div>
+                        {salesChart.topClients.length ? (
+                          <div className="space-y-3">
+                            {salesChart.topClients.map((client, index) => (
                               <div
-                                key={item.dayLabel}
-                                className="grid grid-cols-[70px_1fr_90px] items-center gap-2 text-xs"
+                                key={client.id}
+                                className="flex items-center gap-3 rounded-2xl border border-amber-100/70 px-4 py-3 dark:border-slate-800"
                               >
-                                <span className="text-slate-500">
-                                  {item.dayLabel}
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700 dark:bg-slate-800 dark:text-amber-300">
+                                  {index + 1}
                                 </span>
-                                <div className="h-3 rounded-full bg-amber-100 dark:bg-slate-800">
-                                  <div
-                                    className="h-3 rounded-full bg-amber-500 dark:bg-amber-400"
-                                    style={{
-                                      width: `${Math.max(4, (item.total / chartData.max) * 100)}%`,
-                                    }}
-                                  />
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate font-semibold">
+                                    {client.name}
+                                  </div>
+                                  <div className="text-xs text-slate-500">
+                                    {client.units} unidades compradas
+                                  </div>
                                 </div>
-                                <span className="text-right font-semibold">
-                                  ${item.total.toFixed(2)}
-                                </span>
+                                <div className="font-semibold text-amber-700 dark:text-amber-300">
+                                  ${Number(client.total).toFixed(2)}
+                                </div>
                               </div>
                             ))}
                           </div>
                         ) : (
                           <p className="text-sm text-slate-500">
-                            Sin datos para graficar.
+                            Sin clientes con compras en este periodo.
                           </p>
                         )}
                       </div>

@@ -304,6 +304,70 @@ app.get("/api/stats", authGuard, async (req, res) => {
   }
 });
 
+app.get("/api/stats/sales", authGuard, async (req, res) => {
+  const { from, to } = req.query;
+  const hasRange = from || to;
+  if (
+    hasRange &&
+    (!from ||
+      !to ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(to))
+  ) {
+    return res
+      .status(400)
+      .json({ message: "Valid from and to dates required" });
+  }
+
+  const rangeParams = hasRange ? [from, to] : [];
+  const rangeMovement = hasRange
+    ? "AND m.created_at::date BETWEEN $1::date AND $2::date"
+    : "";
+  const rangeSale = hasRange
+    ? "AND si.created_at::date BETWEEN $1::date AND $2::date"
+    : "";
+
+  try {
+    const dailyTotals = await query(
+      `SELECT day, SUM(total) AS total
+       FROM (
+         SELECT m.created_at::date AS day, SUM(mi.quantity * mi.unit_price) AS total
+         FROM movements m
+         JOIN movement_items mi ON mi.movement_id = m.id
+         WHERE m.amount > 0 AND m.concept LIKE 'Compra%' ${rangeMovement}
+         GROUP BY m.created_at::date
+         UNION ALL
+         SELECT si.created_at::date AS day, SUM(si.quantity * si.unit_price) AS total
+         FROM sale_items si
+         WHERE 1 = 1 ${rangeSale}
+         GROUP BY si.created_at::date
+       ) AS combined
+       GROUP BY day
+       ORDER BY day ASC`,
+      rangeParams,
+    );
+
+    const topClients = await query(
+      `SELECT c.id, c.name, SUM(mi.quantity * mi.unit_price) AS total, SUM(mi.quantity) AS units
+       FROM movements m
+       JOIN clients c ON c.id = m.client_id
+       JOIN movement_items mi ON mi.movement_id = m.id
+       WHERE m.amount > 0 AND m.concept LIKE 'Compra%' ${rangeMovement}
+       GROUP BY c.id, c.name
+       ORDER BY total DESC, c.name ASC
+       LIMIT 5`,
+      rangeParams,
+    );
+
+    return res.json({
+      dailyTotals: dailyTotals.rows || [],
+      topClients: topClients.rows || [],
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
 app.get("/api/stats/weekly", authGuard, async (req, res) => {
   const { from, to } = req.query;
   if (!from || !to) {
