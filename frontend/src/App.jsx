@@ -2949,7 +2949,7 @@ export default function App() {
             <span className="flex items-center gap-1.5">
               Tiendita
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
-                v1.3.0
+                v1.3.2
               </span>
             </span>
           </button>
@@ -3843,8 +3843,8 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid gap-6 lg:grid-cols-3">
-                    <div className="space-y-6 lg:col-span-2">
+                  <div className="grid gap-6 lg:grid-cols-1">
+                    <div className="space-y-6 min-w-0">
                       <div className="w-full min-w-0 rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
                         <div className="mb-3 flex items-center justify-between gap-2">
                           <div className="text-lg font-semibold">
@@ -4390,12 +4390,12 @@ export default function App() {
                         {purchaseTicket.items.map((item, index) => (
                           <div
                             key={item.id}
-                            className="grid gap-3 rounded-2xl border border-amber-100/70 p-3 dark:border-slate-800 md:grid-cols-[minmax(0,1.5fr)_110px_150px_auto]"
+                            className="grid min-w-0 gap-3 rounded-2xl border border-amber-100/70 p-3 dark:border-slate-800 md:grid-cols-[minmax(0,1fr)_minmax(110px,0.35fr)_minmax(150px,0.5fr)_auto]"
                           >
-                            <label className="grid gap-1 text-xs uppercase text-slate-500">
+                            <label className="grid min-w-0 gap-1 text-xs uppercase text-slate-500">
                               Producto {index + 1}
                               <select
-                                className="rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
+                                className="w-full min-w-0 rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
                                 value={item.sweetId}
                                 onChange={(event) =>
                                   setPurchaseTicket((ticket) => ({
@@ -4423,7 +4423,7 @@ export default function App() {
                               </select>
                               {!item.sweetId && (
                                 <input
-                                  className="mt-1 rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
+                                  className="mt-1 w-full min-w-0 rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
                                   placeholder="Nombre del producto"
                                   value={item.productName}
                                   onChange={(event) =>
@@ -4442,10 +4442,10 @@ export default function App() {
                                 />
                               )}
                             </label>
-                            <label className="grid gap-1 text-xs uppercase text-slate-500">
+                            <label className="grid min-w-0 gap-1 text-xs uppercase text-slate-500">
                               Cantidad
                               <input
-                                className="rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
+                                className="w-full min-w-0 rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
                                 type="number"
                                 min="1"
                                 step="1"
@@ -4465,10 +4465,10 @@ export default function App() {
                                 }
                               />
                             </label>
-                            <label className="grid gap-1 text-xs uppercase text-slate-500">
+                            <label className="grid min-w-0 gap-1 text-xs uppercase text-slate-500">
                               Costo paquete
                               <input
-                                className="rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
+                                className="w-full min-w-0 rounded-xl border border-amber-100/70 px-3 py-2 text-sm normal-case outline-none dark:border-slate-700"
                                 type="number"
                                 min="0"
                                 step="0.01"
@@ -4491,7 +4491,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => removePurchaseTicketItem(item.id)}
-                              className="self-end rounded-xl border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                              className="w-full self-end rounded-xl border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 md:w-auto"
                               title="Quitar línea"
                             >
                               Quitar
