@@ -1,5 +1,25 @@
 export const releases = [
   {
+    version: "1.8.3",
+    date: "12 de Septiembre, 2026",
+    tagline:
+      "Filtro temporal unificado para estadísticas de comportamiento en mostrador",
+    highlights: [
+      "Control de Periodo Unificado en Horarios & Hábitos: Nueva botonera de filtrado temporal (Semana actual por defecto, Quincena actual, Mes actual e Histórico) que sincroniza instantáneamente las 3 gráficas de comportamiento.",
+      "Análisis coordinado de horas pico, días activos y métodos de pago: Permite evaluar la afluencia de clientes y métodos de cobro en ventanas de tiempo precisas para mejor toma de decisiones operativas.",
+    ],
+    sections: [
+      {
+        title: "📈 Estadísticas & Comportamiento",
+        items: [
+          "Endpoint optimizado GET /api/stats/behavior con soporte de parámetros de rango temporal (semana, quincena, mes, historico) en zona horaria local.",
+          "Filtro unificado con selector interactivo y actualización asíncrona en la pestaña de Comportamiento.",
+          "Sincronización simultánea de gráficas: Horas Pico en Mostrador, Días con Mayor Actividad y Métodos de Pago Más Utilizados.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.2",
     date: "12 de Septiembre, 2026",
     tagline:

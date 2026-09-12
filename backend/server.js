@@ -394,11 +394,220 @@ app.get("/api/sweets/stats", authGuard, async (req, res) => {
   }
 });
 
+function getPeriodDateRange(period) {
+  if (!period || period === "historico") return null;
+  const now = new Date();
+  const localStr = now.toLocaleDateString("en-CA", {
+    timeZone: "America/Mexico_City",
+  });
+  const [yearStr, monthStr, dayStr] = localStr.split("-");
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+
+  if (period === "mes") {
+    const startStr = `${year}-${String(month).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endStr = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    return {
+      start: `${startStr} 00:00:00`,
+      end: `${endStr} 23:59:59`,
+    };
+  } else if (period === "quincena") {
+    const mStr = String(month).padStart(2, "0");
+    if (day <= 15) {
+      return {
+        start: `${year}-${mStr}-01 00:00:00`,
+        end: `${year}-${mStr}-15 23:59:59`,
+      };
+    } else {
+      const lastDay = new Date(year, month, 0).getDate();
+      return {
+        start: `${year}-${mStr}-16 00:00:00`,
+        end: `${year}-${mStr}-${String(lastDay).padStart(2, "0")} 23:59:59`,
+      };
+    }
+  } else if (period === "semana") {
+    const localDate = new Date(`${localStr}T12:00:00`);
+    const dayOfWeek = localDate.getDay();
+    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const mon = new Date(localDate);
+    mon.setDate(localDate.getDate() - diffToMonday);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    const monStr = mon.toLocaleDateString("en-CA");
+    const sunStr = sun.toLocaleDateString("en-CA");
+    return {
+      start: `${monStr} 00:00:00`,
+      end: `${sunStr} 23:59:59`,
+    };
+  }
+  return null;
+}
+
+// Helper para obtener estadísticas de comportamiento de mostrador (Horas Pico, Días y Métodos de Pago)
+async function getBehaviorStats(period = "semana") {
+  const range = getPeriodDateRange(period);
+  const dateFilterSales = range
+    ? `WHERE (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') BETWEEN $1::timestamp AND $2::timestamp`
+    : "";
+  const dateFilterMovements = range
+    ? `AND (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') BETWEEN $1::timestamp AND $2::timestamp`
+    : "";
+  const params = range ? [range.start, range.end] : [];
+
+  const [hourlySalesRes, dowSalesRes, paymentMethodsRes] = await Promise.all([
+    // 1. Horas Pico
+    query(
+      `
+      SELECT hour, SUM(total) AS total, COUNT(*) AS tickets
+      FROM (
+        SELECT EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS hour, total_amount AS total
+        FROM sales
+        ${dateFilterSales}
+        UNION ALL
+        SELECT EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS hour,
+               COALESCE(NULLIF(amount, 0), NULLIF(paid_amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
+        FROM movements
+        WHERE ((amount > 0) OR (COALESCE(paid_amount, 0) > 0) OR (amount = 0 AND (concept ILIKE '%contado%' OR EXISTS(SELECT 1 FROM movement_items WHERE movement_id = movements.id))))
+          AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%'
+          ${dateFilterMovements}
+      ) AS hourly
+      GROUP BY hour
+      ORDER BY hour ASC
+    `,
+      params,
+    ),
+
+    // 2. Días de la semana
+    query(
+      `
+      SELECT dow, SUM(total) AS total, COUNT(*) AS tickets
+      FROM (
+        SELECT EXTRACT(DOW FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow, total_amount AS total
+        FROM sales
+        ${dateFilterSales}
+        UNION ALL
+        SELECT EXTRACT(DOW FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow,
+               COALESCE(NULLIF(amount, 0), NULLIF(paid_amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
+        FROM movements
+        WHERE ((amount > 0) OR (COALESCE(paid_amount, 0) > 0) OR (amount = 0 AND (concept ILIKE '%contado%' OR EXISTS(SELECT 1 FROM movement_items WHERE movement_id = movements.id))))
+          AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%'
+          ${dateFilterMovements}
+      ) AS dow_data
+      GROUP BY dow
+      ORDER BY dow ASC
+    `,
+      params,
+    ),
+
+    // 3. Métodos de pago
+    query(
+      `
+      SELECT payment_method, SUM(total) AS total, COUNT(*) AS count
+      FROM (
+        SELECT COALESCE(payment_method, 'cash') AS payment_method, total_amount AS total
+        FROM sales
+        ${dateFilterSales}
+        UNION ALL
+        SELECT 
+          CASE 
+            WHEN payment_method = 'credit' THEN 'credit'
+            ELSE COALESCE(payment_method, 'cash')
+          END AS payment_method,
+          COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
+        FROM movements
+        WHERE ((amount > 0) OR (COALESCE(paid_amount, 0) > 0) OR (amount = 0 AND (concept ILIKE '%contado%' OR EXISTS(SELECT 1 FROM movement_items WHERE movement_id = movements.id))))
+          AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%'
+          ${dateFilterMovements}
+      ) AS pm
+      GROUP BY payment_method
+      ORDER BY total DESC
+    `,
+      params,
+    ),
+  ]);
+
+  // Normalizar horas del día (08:00 a 17:00 en horario local)
+  const hourlyMap = new Map();
+  (hourlySalesRes.rows || []).forEach((r) => {
+    hourlyMap.set(Number(r.hour), {
+      total: Number(r.total || 0),
+      tickets: Number(r.tickets || 0),
+    });
+  });
+  const hourlySales = [];
+  for (let h = 8; h <= 17; h++) {
+    const label = `${h.toString().padStart(2, "0")}:00`;
+    const data = hourlyMap.get(h) || { total: 0, tickets: 0 };
+    hourlySales.push({
+      hour: label,
+      total: Number(data.total.toFixed(2)),
+      tickets: data.tickets,
+    });
+  }
+
+  // Normalizar días de la semana (Lunes a Viernes)
+  const dowNames = [
+    { dow: 1, name: "Lun" },
+    { dow: 2, name: "Mar" },
+    { dow: 3, name: "Mié" },
+    { dow: 4, name: "Jue" },
+    { dow: 5, name: "Vie" },
+  ];
+  const dowMap = new Map();
+  (dowSalesRes.rows || []).forEach((r) => {
+    dowMap.set(Number(r.dow), {
+      total: Number(r.total || 0),
+      tickets: Number(r.tickets || 0),
+    });
+  });
+  const dayOfWeekSales = dowNames.map((d) => {
+    const data = dowMap.get(d.dow) || { total: 0, tickets: 0 };
+    return {
+      dayName: d.name,
+      total: Number(data.total.toFixed(2)),
+      tickets: data.tickets,
+    };
+  });
+
+  // Métodos de pago normalizados
+  const paymentMethodLabels = {
+    cash: "Efectivo",
+    credit: "Fiado (Crédito)",
+    transfer: "Transferencia SPEI",
+    card: "Tarjeta",
+    points: "Puntos",
+  };
+  const paymentMethods = (paymentMethodsRes.rows || []).map((pm) => ({
+    key: pm.payment_method,
+    name: paymentMethodLabels[pm.payment_method] || pm.payment_method,
+    total: Number(Number(pm.total || 0).toFixed(2)),
+    count: Number(pm.count || 0),
+  }));
+
+  return { hourlySales, dayOfWeekSales, paymentMethods, period };
+}
+
+// Estadísticas de Comportamiento Filtrables (Horas Pico, Días y Métodos de Pago)
+app.get("/api/stats/behavior", authGuard, async (req, res) => {
+  const { period = "semana" } = req.query;
+  try {
+    const data = await getBehaviorStats(period);
+    return res.json(data);
+  } catch (error) {
+    console.error("Error generating behavior stats:", error);
+    return res.status(500).json({ message: error.message });
+  }
+});
+
 // Estadísticas Generales e Inteligencia de Negocio
 app.get("/api/stats", authGuard, async (req, res) => {
   try {
     const lowStockThreshold = 10;
     const criticalStockThreshold = 3;
+    const behaviorPeriod =
+      req.query.period || req.query.behaviorPeriod || "semana";
 
     // Ejecución paralela de consultas analíticas
     const [
@@ -409,9 +618,7 @@ app.get("/api/stats", authGuard, async (req, res) => {
       stagnantStockRes,
       productProfitabilityRes,
       cashFlowRes,
-      hourlySalesRes,
-      dowSalesRes,
-      paymentMethodsRes,
+      behaviorData,
       productAffinityRes,
       clientsDebtRes,
       recoveryRes,
@@ -521,61 +728,10 @@ app.get("/api/stats", authGuard, async (req, res) => {
         ORDER BY day ASC
       `),
 
-      // 8. Ventas por hora del día (convertido a horario local de la tiendita America/Mexico_City)
-      query(`
-        SELECT hour, SUM(total) AS total, COUNT(*) AS tickets
-        FROM (
-          SELECT EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS hour, total_amount AS total
-          FROM sales
-          UNION ALL
-          SELECT EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS hour,
-                 COALESCE(NULLIF(amount, 0), NULLIF(paid_amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
-          FROM movements
-          WHERE ((amount > 0) OR (COALESCE(paid_amount, 0) > 0) OR (amount = 0 AND (concept ILIKE '%contado%' OR EXISTS(SELECT 1 FROM movement_items WHERE movement_id = movements.id))))
-            AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%'
-        ) AS hourly
-        GROUP BY hour
-        ORDER BY hour ASC
-      `),
+      // 8. Estadísticas de Comportamiento (Horas Pico, Días y Métodos de Pago)
+      getBehaviorStats(behaviorPeriod),
 
-      // 9. Ventas por día de la semana (Lunes a Viernes en hora local)
-      query(`
-        SELECT dow, SUM(total) AS total, COUNT(*) AS tickets
-        FROM (
-          SELECT EXTRACT(DOW FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow, total_amount AS total
-          FROM sales
-          UNION ALL
-          SELECT EXTRACT(DOW FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow,
-                 COALESCE(NULLIF(amount, 0), NULLIF(paid_amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
-          FROM movements
-          WHERE ((amount > 0) OR (COALESCE(paid_amount, 0) > 0) OR (amount = 0 AND (concept ILIKE '%contado%' OR EXISTS(SELECT 1 FROM movement_items WHERE movement_id = movements.id))))
-            AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%'
-        ) AS dow_data
-        GROUP BY dow
-        ORDER BY dow ASC
-      `),
-
-      // 10. Métodos de pago
-      query(`
-        SELECT payment_method, SUM(total) AS total, COUNT(*) AS count
-        FROM (
-          SELECT COALESCE(payment_method, 'cash') AS payment_method, total_amount AS total
-          FROM sales
-          UNION ALL
-          SELECT 
-            CASE 
-              WHEN payment_method = 'credit' THEN 'credit'
-              ELSE COALESCE(payment_method, 'cash')
-            END AS payment_method,
-            COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
-          FROM movements
-          WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%'
-        ) AS pm
-        GROUP BY payment_method
-        ORDER BY total DESC
-      `),
-
-      // 11. Afinidad de productos / Cross-selling
+      // 9. Afinidad de productos / Cross-selling
       query(`
         WITH items AS (
           SELECT movement_id AS basket_id, sweet_id
@@ -597,10 +753,10 @@ app.get("/api/stats", authGuard, async (req, res) => {
         LIMIT 6
       `),
 
-      // 12. Deuda activa de clientes para cálculo FIFO de antigüedad
+      // 10. Deuda activa de clientes para cálculo FIFO de antigüedad
       query("SELECT id, name, total_debt FROM clients WHERE total_debt > 0"),
 
-      // 13. Tasa de cobranza (últimos 30 días)
+      // 11. Tasa de cobranza (últimos 30 días)
       query(`
         SELECT 
           COALESCE(SUM(CASE WHEN amount > 0 AND payment_method = 'credit' THEN amount ELSE 0 END), 0) AS credit_granted,
@@ -609,7 +765,7 @@ app.get("/api/stats", authGuard, async (req, res) => {
         WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '30 days'
       `),
 
-      // 14. Totales globales de tickets e ingresos
+      // 12. Totales globales de tickets e ingresos
       query(`
         SELECT 
           (SELECT COUNT(*) FROM sales) + (SELECT COUNT(*) FROM movements WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%') AS total_tickets,
@@ -643,64 +799,6 @@ app.get("/api/stats", authGuard, async (req, res) => {
         debtAging[3].count += 1;
       }
     }
-
-    // Normalizar horas del día según jornada real de la tiendita (08:00 a 17:00 en horario local)
-    const hourlyMap = new Map();
-    (hourlySalesRes.rows || []).forEach((r) => {
-      hourlyMap.set(Number(r.hour), {
-        total: Number(r.total || 0),
-        tickets: Number(r.tickets || 0),
-      });
-    });
-    const hourlySales = [];
-    for (let h = 8; h <= 17; h++) {
-      const label = `${h.toString().padStart(2, "0")}:00`;
-      const data = hourlyMap.get(h) || { total: 0, tickets: 0 };
-      hourlySales.push({
-        hour: label,
-        total: Number(data.total.toFixed(2)),
-        tickets: data.tickets,
-      });
-    }
-
-    // Normalizar días de la semana: SOLO Lunes a Viernes (cerrado fines de semana)
-    const dowNames = [
-      { dow: 1, name: "Lun" },
-      { dow: 2, name: "Mar" },
-      { dow: 3, name: "Mié" },
-      { dow: 4, name: "Jue" },
-      { dow: 5, name: "Vie" },
-    ];
-    const dowMap = new Map();
-    (dowSalesRes.rows || []).forEach((r) => {
-      dowMap.set(Number(r.dow), {
-        total: Number(r.total || 0),
-        tickets: Number(r.tickets || 0),
-      });
-    });
-    const dayOfWeekSales = dowNames.map((d) => {
-      const data = dowMap.get(d.dow) || { total: 0, tickets: 0 };
-      return {
-        dayName: d.name,
-        total: Number(data.total.toFixed(2)),
-        tickets: data.tickets,
-      };
-    });
-
-    // Métodos de pago normalizados con etiquetas legibles
-    const paymentMethodLabels = {
-      cash: "Efectivo",
-      credit: "Fiado (Crédito)",
-      transfer: "Transferencia SPEI",
-      card: "Tarjeta",
-      points: "Puntos",
-    };
-    const paymentMethods = (paymentMethodsRes.rows || []).map((pm) => ({
-      key: pm.payment_method,
-      name: paymentMethodLabels[pm.payment_method] || pm.payment_method,
-      total: Number(Number(pm.total || 0).toFixed(2)),
-      count: Number(pm.count || 0),
-    }));
 
     // KPIs calculados
     const totalTickets = Number(totalsRes.rows[0]?.total_tickets || 0);
@@ -750,9 +848,9 @@ app.get("/api/stats", authGuard, async (req, res) => {
         fiado: Number(Number(row.fiado || 0).toFixed(2)),
         abonos: Number(Number(row.abonos || 0).toFixed(2)),
       })),
-      hourlySales,
-      dayOfWeekSales,
-      paymentMethods,
+      hourlySales: behaviorData.hourlySales,
+      dayOfWeekSales: behaviorData.dayOfWeekSales,
+      paymentMethods: behaviorData.paymentMethods,
       productProfitability: (productProfitabilityRes.rows || []).map((p) => ({
         id: p.id,
         name: p.name,
@@ -781,57 +879,6 @@ app.get("/api/stats", authGuard, async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 });
-
-function getPeriodDateRange(period) {
-  if (!period || period === "historico") return null;
-  const now = new Date();
-  const localStr = now.toLocaleDateString("en-CA", {
-    timeZone: "America/Mexico_City",
-  });
-  const [yearStr, monthStr, dayStr] = localStr.split("-");
-  const year = parseInt(yearStr, 10);
-  const month = parseInt(monthStr, 10);
-  const day = parseInt(dayStr, 10);
-
-  if (period === "mes") {
-    const startStr = `${year}-${String(month).padStart(2, "0")}-01`;
-    const lastDay = new Date(year, month, 0).getDate();
-    const endStr = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-    return {
-      start: `${startStr} 00:00:00`,
-      end: `${endStr} 23:59:59`,
-    };
-  } else if (period === "quincena") {
-    const mStr = String(month).padStart(2, "0");
-    if (day <= 15) {
-      return {
-        start: `${year}-${mStr}-01 00:00:00`,
-        end: `${year}-${mStr}-15 23:59:59`,
-      };
-    } else {
-      const lastDay = new Date(year, month, 0).getDate();
-      return {
-        start: `${year}-${mStr}-16 00:00:00`,
-        end: `${year}-${mStr}-${String(lastDay).padStart(2, "0")} 23:59:59`,
-      };
-    }
-  } else if (period === "semana") {
-    const localDate = new Date(`${localStr}T12:00:00`);
-    const dayOfWeek = localDate.getDay();
-    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const mon = new Date(localDate);
-    mon.setDate(localDate.getDate() - diffToMonday);
-    const sun = new Date(mon);
-    sun.setDate(mon.getDate() + 6);
-    const monStr = mon.toLocaleDateString("en-CA");
-    const sunStr = sun.toLocaleDateString("en-CA");
-    return {
-      start: `${monStr} 00:00:00`,
-      end: `${sunStr} 23:59:59`,
-    };
-  }
-  return null;
-}
 
 app.get("/api/stats/clients", authGuard, async (req, res) => {
   const { period = "historico" } = req.query;

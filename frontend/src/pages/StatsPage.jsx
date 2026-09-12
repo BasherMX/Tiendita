@@ -146,6 +146,11 @@ export default function StatsPage({
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [selectedClientDetail, setSelectedClientDetail] = useState(null);
 
+  // Estado para la pestaña de Horarios y Comportamiento
+  const [behaviorPeriod, setBehaviorPeriod] = useState("semana"); // "semana" | "quincena" | "mes" | "historico"
+  const [behaviorData, setBehaviorData] = useState(null);
+  const [loadingBehavior, setLoadingBehavior] = useState(false);
+
   const sortedClientsList = useMemo(() => {
     if (!clientsStats?.clients) return [];
     const list = [...clientsStats.clients];
@@ -195,6 +200,12 @@ export default function StatsPage({
     }
   }, [activeTab, clientPeriod]);
 
+  useEffect(() => {
+    if (activeTab === "comportamiento") {
+      loadBehaviorStatsData(behaviorPeriod);
+    }
+  }, [activeTab, behaviorPeriod]);
+
   async function loadClientsStatsData(period) {
     setLoadingClientsStats(true);
     try {
@@ -218,6 +229,29 @@ export default function StatsPage({
     }
   }
 
+  async function loadBehaviorStatsData(period) {
+    setLoadingBehavior(true);
+    try {
+      const baseUrl = apiBase || defaultApiBase || "";
+      const fetchFn = authFetch || defaultAuthFetch;
+      const res = await fetchFn(
+        `${baseUrl}/api/stats/behavior?period=${period}`,
+        {},
+        handleAuthFail,
+      );
+      if (res && res.ok) {
+        const data = await res.json();
+        setBehaviorData(data);
+      } else {
+        console.error("Error fetching behavior stats, status:", res?.status);
+      }
+    } catch (err) {
+      console.error("Error loading behavior stats:", err);
+    } finally {
+      setLoadingBehavior(false);
+    }
+  }
+
   // Métricas del backend
   const kpis = stats?.kpis || {
     averageTicket: 0,
@@ -238,6 +272,12 @@ export default function StatsPage({
   const stagnantStock = stats?.stagnantStock || [];
   const topSellers = stats?.topSellers || [];
   const lowStock = stats?.lowStock || [];
+
+  const effectiveHourlySales = behaviorData?.hourlySales || hourlySales;
+  const effectiveDayOfWeekSales =
+    behaviorData?.dayOfWeekSales || dayOfWeekSales;
+  const effectivePaymentMethods =
+    behaviorData?.paymentMethods || paymentMethods;
 
   // Filtrado de flujo de caja según periodo seleccionado
   const filteredCashFlow = (() => {
@@ -713,6 +753,47 @@ export default function StatsPage({
       {/* === VISTA: HORARIOS & MÉTODOS DE PAGO === */}
       {activeTab === "comportamiento" && (
         <div className="space-y-6">
+          {/* Barra de Filtro Unificado de Periodo */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-indigo-700 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-300">
+                <Icon path={mdiCalendarSyncOutline} size={0.75} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                  Periodo de Análisis
+                </h3>
+                <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                  Filtra horas pico, días de actividad y métodos de pago
+                  simultáneamente
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-1 dark:border-[#282C32] dark:bg-[#111315] self-start sm:self-auto overflow-x-auto max-w-full">
+              {[
+                { id: "semana", label: "Semana actual" },
+                { id: "quincena", label: "Quincena actual" },
+                { id: "mes", label: "Mes actual" },
+                { id: "historico", label: "Histórico" },
+              ].map((btn) => (
+                <button
+                  key={btn.id}
+                  type="button"
+                  onClick={() => setBehaviorPeriod(btn.id)}
+                  disabled={loadingBehavior}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
+                    behaviorPeriod === btn.id
+                      ? "bg-[#FFFFFF] text-indigo-800 shadow-xs dark:bg-[#181B1E] dark:text-indigo-300"
+                      : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                  } ${loadingBehavior ? "opacity-60 cursor-not-allowed" : ""}`}
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Horas Pico de Venta */}
             <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
@@ -734,7 +815,7 @@ export default function StatsPage({
 
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={hourlySales}>
+                  <BarChart data={effectiveHourlySales}>
                     <CartesianGrid
                       strokeDasharray="2 2"
                       stroke="#E5E2DA"
@@ -787,7 +868,7 @@ export default function StatsPage({
 
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dayOfWeekSales}>
+                  <BarChart data={effectiveDayOfWeekSales}>
                     <CartesianGrid
                       strokeDasharray="2 2"
                       stroke="#E5E2DA"
@@ -844,7 +925,7 @@ export default function StatsPage({
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={paymentMethods}
+                      data={effectivePaymentMethods}
                       dataKey="total"
                       nameKey="name"
                       cx="50%"
@@ -853,7 +934,7 @@ export default function StatsPage({
                       outerRadius={85}
                       paddingAngle={4}
                     >
-                      {paymentMethods.map((entry, index) => (
+                      {effectivePaymentMethods.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
                           fill={PAYMENT_COLOR_MAP[entry.key] || "#78716C"}
@@ -867,8 +948,8 @@ export default function StatsPage({
 
               {/* Lista Desglosada con Montos y Porcentajes */}
               <div className="space-y-2">
-                {paymentMethods.map((pm) => {
-                  const totalSum = paymentMethods.reduce(
+                {effectivePaymentMethods.map((pm) => {
+                  const totalSum = effectivePaymentMethods.reduce(
                     (s, p) => s + p.total,
                     0,
                   );
