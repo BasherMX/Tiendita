@@ -2856,6 +2856,7 @@ app.post(
 app.get("/api/whatsapp/bot/context", async (req, res) => {
   try {
     const rawPhone = String(req.query.phone || "").replace(/\D/g, "");
+    const clientName = String(req.query.name || "").trim();
     const apiKey =
       req.headers["x-api-key"] ||
       (req.headers["authorization"] || "").replace("Bearer ", "").trim();
@@ -2867,27 +2868,33 @@ app.get("/api/whatsapp/bot/context", async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    if (!rawPhone) {
-      return res.status(400).json({ error: "Missing phone parameter" });
+    // Buscar coincidencia por los últimos 10 dígitos del teléfono o por nombre de WhatsApp
+    const last10 = rawPhone.length >= 10 ? rawPhone.slice(-10) : "";
+    let clientRes;
+    if (last10) {
+      clientRes = await query(
+        "SELECT id, name, total_debt, credit_limit, points, phone FROM clients WHERE phone LIKE $1 LIMIT 1",
+        [`%${last10}%`],
+      );
+    }
+    if ((!clientRes || !clientRes.rows.length) && clientName) {
+      clientRes = await query(
+        "SELECT id, name, total_debt, credit_limit, points, phone FROM clients WHERE name ILIKE $1 LIMIT 1",
+        [`%${clientName}%`],
+      );
     }
 
-    // Buscar coincidencia por los últimos 10 dígitos del teléfono
-    const last10 = rawPhone.slice(-10);
-    const clientRes = await query(
-      "SELECT id, name, total_debt, credit_limit, points, phone FROM clients WHERE phone LIKE $1 LIMIT 1",
-      [`%${last10}%`],
-    );
-
-    const client = clientRes.rows[0];
+    const client = clientRes?.rows?.[0];
     const baseUrl =
       process.env.APP_URL || "https://tiendita-ivory-eta.vercel.app";
 
-    // Obtener catálogo destacado
+    // Catálogo completo de dulces y botanas existentes
     const productsRes = await query(
-      "SELECT name, sale_price FROM sweets WHERE is_active IS NOT FALSE AND stock > 0 ORDER BY sold_count DESC, name ASC LIMIT 6",
+      "SELECT name, sale_price, stock FROM sweets WHERE is_active IS NOT FALSE ORDER BY sold_count DESC, name ASC",
     );
-    const topProducts = productsRes.rows.map(
-      (p) => `${p.name} ($${Number(p.sale_price).toFixed(2)})`,
+    const allProducts = productsRes.rows.map(
+      (p) =>
+        `${p.name} ($${Number(p.sale_price).toFixed(2)}${Number(p.stock) <= 0 ? " - Agotado" : ""})`,
     );
 
     return res.json({
@@ -2900,16 +2907,19 @@ app.get("/api/whatsapp/bot/context", async (req, res) => {
             points: Number(client.points || 0),
             account_link: `${baseUrl}/c/${encodeClientId ? encodeClientId(client.id) : client.id}`,
           }
-        : null,
+        : clientName
+          ? { name: clientName, total_debt: 0, points: 0 }
+          : null,
       store: {
         name: "Tiendita",
+        catalog: allProducts,
         top_products:
-          topProducts.length > 0
-            ? topProducts
+          allProducts.length > 0
+            ? allProducts
             : [
                 "Aciduladitos ($1.00)",
                 "Chocolates ($5.00)",
-                "Botanas y Bebidas",
+                "Botanas y Refrescos",
               ],
         payment_methods: ["Efectivo", "Transferencia SPEI (STP)"],
       },
