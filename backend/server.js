@@ -2852,6 +2852,74 @@ app.post(
   },
 );
 
+// Endpoint de Contexto en Tiempo Real para el Bot de WhatsApp
+app.get("/api/whatsapp/bot/context", async (req, res) => {
+  try {
+    const rawPhone = String(req.query.phone || "").replace(/\D/g, "");
+    const apiKey =
+      req.headers["x-api-key"] ||
+      (req.headers["authorization"] || "").replace("Bearer ", "").trim();
+
+    if (
+      apiKey !==
+      (process.env.WHATSAPP_QUEUE_API_KEY || "tiendita_secret_wa_token_2026")
+    ) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!rawPhone) {
+      return res.status(400).json({ error: "Missing phone parameter" });
+    }
+
+    // Buscar coincidencia por los últimos 10 dígitos del teléfono
+    const last10 = rawPhone.slice(-10);
+    const clientRes = await query(
+      "SELECT id, name, total_debt, credit_limit, points, phone FROM clients WHERE phone LIKE $1 LIMIT 1",
+      [`%${last10}%`],
+    );
+
+    const client = clientRes.rows[0];
+    const baseUrl =
+      process.env.APP_URL || "https://tiendita-ivory-eta.vercel.app";
+
+    // Obtener catálogo destacado
+    const productsRes = await query(
+      "SELECT name, sale_price FROM sweets WHERE is_active IS NOT FALSE AND stock > 0 ORDER BY sold_count DESC, name ASC LIMIT 6",
+    );
+    const topProducts = productsRes.rows.map(
+      (p) => `${p.name} ($${Number(p.sale_price).toFixed(2)})`,
+    );
+
+    return res.json({
+      client: client
+        ? {
+            id: client.id,
+            name: client.name,
+            total_debt: Number(client.total_debt || 0),
+            credit_limit: Number(client.credit_limit || 50),
+            points: Number(client.points || 0),
+            account_link: `${baseUrl}/c/${encodeClientId ? encodeClientId(client.id) : client.id}`,
+          }
+        : null,
+      store: {
+        name: "Tiendita",
+        top_products:
+          topProducts.length > 0
+            ? topProducts
+            : [
+                "Aciduladitos ($1.00)",
+                "Chocolates ($5.00)",
+                "Botanas y Bebidas",
+              ],
+        payment_methods: ["Efectivo", "Transferencia SPEI (STP)"],
+      },
+    });
+  } catch (error) {
+    console.error("Error in /api/whatsapp/bot/context:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // Helper para saber si el worker externo de OpenWA está activo (ping en los últimos 60 segundos)
 async function isWhatsAppWorkerActive() {
   try {
