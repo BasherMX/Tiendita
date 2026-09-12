@@ -26,6 +26,8 @@ export default function PublicClientView() {
   const [error, setError] = useState("");
   const [copiedClabe, setCopiedClabe] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState(null);
+  const [dismissedLimitAlert, setDismissedLimitAlert] = useState(false);
+  const [dismissedDebtDaysAlert, setDismissedDebtDaysAlert] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -142,62 +144,107 @@ export default function PublicClientView() {
           </a>
         </div>
 
-        {/* Alerta de Límite de Crédito Sobrepasado */}
-        {isOverCreditLimit && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30 text-xs text-red-900 dark:text-red-200 flex items-start gap-3 shadow-xs">
-            <span className="text-2xl shrink-0 leading-none">⚠️</span>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-red-900 dark:text-red-100">
-                  Límite de Crédito Sobrepasado
-                </h3>
-                <span className="rounded-md bg-red-200/80 dark:bg-red-900/60 px-2 py-0.5 text-[10px] font-mono font-black text-red-950 dark:text-red-100">
-                  Límite: ${creditLimit.toFixed(2)}
-                </span>
+        {/* Alertas informativas con opción para cerrar */}
+        <AnimatePresence>
+          {isOverCreditLimit && !dismissedLimitAlert && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{
+                opacity: 0,
+                height: 0,
+                marginBottom: 0,
+                overflow: "hidden",
+              }}
+              transition={{ duration: 0.2 }}
+              className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30 text-xs text-red-900 dark:text-red-200 flex items-start justify-between gap-3 shadow-xs"
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-2xl shrink-0 leading-none">⚠️</span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-sm text-red-900 dark:text-red-100">
+                      Límite de Crédito Sobrepasado
+                    </h3>
+                    <span className="rounded-md bg-red-200/80 dark:bg-red-900/60 px-2 py-0.5 text-[10px] font-mono font-black text-red-950 dark:text-red-100">
+                      Límite: ${creditLimit.toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-red-800 dark:text-red-300">
+                    Has sobrepasado el límite máximo de crédito permitido. Tu
+                    saldo pendiente actual es de{" "}
+                    <strong className="font-tabular font-extrabold text-red-950 dark:text-red-100">
+                      ${debtVal.toFixed(2)}
+                    </strong>
+                    .
+                  </p>
+                  <p className="text-[11px] text-red-700/80 dark:text-red-400">
+                    Te sugerimos realizar un abono a la brevedad para
+                    regularizar tu libreta.
+                  </p>
+                </div>
               </div>
-              <p className="text-red-800 dark:text-red-300">
-                Has sobrepasado el límite máximo de crédito permitido. Tu saldo
-                pendiente actual es de{" "}
-                <strong className="font-tabular font-extrabold text-red-950 dark:text-red-100">
-                  ${debtVal.toFixed(2)}
-                </strong>
-                .
-              </p>
-              <p className="text-[11px] text-red-700/80 dark:text-red-400">
-                Te sugerimos realizar un abono a la brevedad para regularizar tu
-                libreta.
-              </p>
-            </div>
-          </div>
-        )}
+              <button
+                type="button"
+                onClick={() => setDismissedLimitAlert(true)}
+                className="shrink-0 rounded-lg p-1 text-red-600/70 hover:bg-red-200/60 hover:text-red-950 dark:text-red-400 dark:hover:bg-red-900/50 dark:hover:text-red-100 transition"
+                title="Cerrar aviso"
+                aria-label="Cerrar aviso"
+              >
+                <Icon path={mdiClose} size={0.65} />
+              </button>
+            </motion.div>
+          )}
 
-        {/* Contador / Alerta de Días Totales con Adeudo (más de 15 días) */}
-        {daysWithDebt > 15 && debtVal > 0 && (
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-950/30 text-xs text-amber-950 dark:text-amber-200 flex items-start gap-3 shadow-xs">
-            <span className="text-2xl shrink-0 leading-none">⏰</span>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-amber-900 dark:text-amber-200">
-                  Adeudo Pendiente Prolongado
-                </h3>
-                <span className="rounded-md bg-amber-200/90 dark:bg-amber-900/60 px-2 py-0.5 text-[10px] font-mono font-black text-amber-950 dark:text-amber-200">
-                  {daysWithDebt} días acumulados
-                </span>
+          {daysWithDebt > 15 && debtVal > 0 && !dismissedDebtDaysAlert && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{
+                opacity: 0,
+                height: 0,
+                marginBottom: 0,
+                overflow: "hidden",
+              }}
+              transition={{ duration: 0.2 }}
+              className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-950/30 text-xs text-amber-950 dark:text-amber-200 flex items-start justify-between gap-3 shadow-xs"
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-2xl shrink-0 leading-none">⏰</span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-sm text-amber-900 dark:text-amber-200">
+                      Adeudo Pendiente Prolongado
+                    </h3>
+                    <span className="rounded-md bg-amber-200/90 dark:bg-amber-900/60 px-2 py-0.5 text-[10px] font-mono font-black text-amber-950 dark:text-amber-200">
+                      {daysWithDebt} días acumulados
+                    </span>
+                  </div>
+                  <p className="text-amber-900 dark:text-amber-300">
+                    Llevas un total de{" "}
+                    <strong className="font-tabular font-extrabold text-amber-950 dark:text-amber-100">
+                      {daysWithDebt} días
+                    </strong>{" "}
+                    con este saldo pendiente sin liquidar (más de 15 días).
+                  </p>
+                  <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80">
+                    Agradecemos tu pronto apoyo realizando un abono en mostrador
+                    o vía SPEI a la cuenta CLABE indicada abajo.
+                  </p>
+                </div>
               </div>
-              <p className="text-amber-900 dark:text-amber-300">
-                Llevas un total de{" "}
-                <strong className="font-tabular font-extrabold text-amber-950 dark:text-amber-100">
-                  {daysWithDebt} días
-                </strong>{" "}
-                con este saldo pendiente sin liquidar (más de 15 días).
-              </p>
-              <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80">
-                Agradecemos tu pronto apoyo realizando un abono en mostrador o
-                vía SPEI a la cuenta CLABE indicada abajo.
-              </p>
-            </div>
-          </div>
-        )}
+              <button
+                type="button"
+                onClick={() => setDismissedDebtDaysAlert(true)}
+                className="shrink-0 rounded-lg p-1 text-amber-700/70 hover:bg-amber-200/60 hover:text-amber-950 dark:text-amber-400 dark:hover:bg-amber-900/50 dark:hover:text-amber-100 transition"
+                title="Cerrar aviso"
+                aria-label="Cerrar aviso"
+              >
+                <Icon path={mdiClose} size={0.65} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Resumen de Saldo y Puntos */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

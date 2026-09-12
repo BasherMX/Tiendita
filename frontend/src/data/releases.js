@@ -1,5 +1,42 @@
 export const releases = [
   {
+    version: "1.7.1",
+    date: "11 de Septiembre, 2026",
+    tagline:
+      "Ajustes de Zona Horaria Mostrador, Filtros de Flujo de Caja y Alertas Descartables",
+    highlights: [
+      "Alineación horaria precisa: Corrección de zona horaria (UTC a America/Mexico_City) para reflejar fielmente las ventas de 08:00 a 17:00 en mostrador.",
+      "Días con mayor actividad ajustados exclusivamente de Lunes a Viernes (excluyendo fines de semana cerrados).",
+      "Margen de gracia para stock estancado: Se protegen los productos nuevos (>15 días de antigüedad en catálogo) antes de considerarlos estancados.",
+      "Filtros de periodo dinámicos en Flujo de Caja Real: Selector para Semana actual, Quincena actual (mexicana 1-15 y 16-fin), Mes actual e Histórico completo.",
+      "Control de saturación en histórico: Decimación automática de etiquetas en el eje X para evitar empalmes de fechas.",
+      "Alertas públicas descartables: Las tarjetas de advertencia de límite de crédito y días de adeudo prolongado en /c/:code ahora cuentan con botón para cerrarlas.",
+    ],
+    sections: [
+      {
+        title: "🕒 Horarios & Jornada Comercial",
+        items: [
+          "Conversión SQL directa con AT TIME ZONE a 'America/Mexico_City' para agrupar horas y días en tiempo local real.",
+          "Histograma enfocado en el horario de apertura de la tiendita (08:00 a 17:00) sincronizando el pico de mostrador.",
+          "Exclusión de Sábado y Domingo en la gráfica de días fuertes de la semana.",
+        ],
+      },
+      {
+        title: "💵 Filtros de Flujo de Caja",
+        items: [
+          "Botones interactivos de filtrado por Semana, Quincena, Mes e Histórico sin recargar página.",
+          "Eje horizontal optimizado con intervalo adaptativo para visualización histórica despejada.",
+        ],
+      },
+      {
+        title: "📱 Vista Pública del Cliente",
+        items: [
+          "Botón de cierre suave en alertas de sobregiro de crédito y adeudo acumulado con micro-animaciones.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.7.0",
     date: "11 de Septiembre, 2026",
     tagline:

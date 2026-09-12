@@ -447,12 +447,13 @@ app.get("/api/stats", authGuard, async (req, res) => {
         [lowStockThreshold],
       ),
 
-      // 5. Stock estancado (existencias con bajas ventas y capital detenido)
+      // 5. Stock estancado (existencias con bajas ventas y capital detenido, con margen de gracia > 15 días)
       query(`
         SELECT id, name, stock, purchase_price, sale_price, sold_count,
                (stock * purchase_price) AS frozen_capital
         FROM sweets
         WHERE stock > 0 AND sold_count <= 2 AND is_active = true
+          AND created_at <= CURRENT_TIMESTAMP - INTERVAL '15 days'
         ORDER BY frozen_capital DESC, stock DESC
         LIMIT 8
       `),
@@ -470,44 +471,40 @@ app.get("/api/stats", authGuard, async (req, res) => {
         LIMIT 8
       `),
 
-      // 7. Flujo de caja diario últimos 14 días (Contado vs Fiado vs Abonos)
+      // 7. Flujo de caja diario histórico (Contado vs Fiado vs Abonos en hora local)
       query(`
         SELECT day,
                COALESCE(SUM(contado), 0) AS contado,
                COALESCE(SUM(fiado), 0) AS fiado,
                COALESCE(SUM(abonos), 0) AS abonos
         FROM (
-          SELECT created_at::date AS day, total_amount AS contado, 0 AS fiado, 0 AS abonos
+          SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day, total_amount AS contado, 0 AS fiado, 0 AS abonos
           FROM sales
-          WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'
           UNION ALL
-          SELECT created_at::date AS day, amount AS contado, 0 AS fiado, 0 AS abonos
+          SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day, amount AS contado, 0 AS fiado, 0 AS abonos
           FROM movements
           WHERE amount > 0 AND concept LIKE 'Compra%' AND payment_method != 'credit'
-            AND created_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'
           UNION ALL
-          SELECT created_at::date AS day, 0 AS contado, amount AS fiado, 0 AS abonos
+          SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day, 0 AS contado, amount AS fiado, 0 AS abonos
           FROM movements
           WHERE amount > 0 AND concept LIKE 'Compra%' AND payment_method = 'credit'
-            AND created_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'
           UNION ALL
-          SELECT created_at::date AS day, 0 AS contado, 0 AS fiado, ABS(amount) AS abonos
+          SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day, 0 AS contado, 0 AS fiado, ABS(amount) AS abonos
           FROM movements
           WHERE amount < 0 AND (concept LIKE 'Pago%' OR concept LIKE 'Abono%')
-            AND created_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'
         ) AS flow
         GROUP BY day
         ORDER BY day ASC
       `),
 
-      // 8. Ventas por hora del día
+      // 8. Ventas por hora del día (convertido a horario local de la tiendita America/Mexico_City)
       query(`
         SELECT hour, SUM(total) AS total, COUNT(*) AS tickets
         FROM (
-          SELECT EXTRACT(HOUR FROM created_at)::int AS hour, total_amount AS total
+          SELECT EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS hour, total_amount AS total
           FROM sales
           UNION ALL
-          SELECT EXTRACT(HOUR FROM created_at)::int AS hour, amount AS total
+          SELECT EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS hour, amount AS total
           FROM movements
           WHERE amount > 0 AND concept LIKE 'Compra%'
         ) AS hourly
@@ -515,14 +512,14 @@ app.get("/api/stats", authGuard, async (req, res) => {
         ORDER BY hour ASC
       `),
 
-      // 9. Ventas por día de la semana (0=Dom, 1=Lun, ..., 6=Sáb)
+      // 9. Ventas por día de la semana (Lunes a Viernes en hora local)
       query(`
         SELECT dow, SUM(total) AS total, COUNT(*) AS tickets
         FROM (
-          SELECT EXTRACT(DOW FROM created_at)::int AS dow, total_amount AS total
+          SELECT EXTRACT(DOW FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow, total_amount AS total
           FROM sales
           UNION ALL
-          SELECT EXTRACT(DOW FROM created_at)::int AS dow, amount AS total
+          SELECT EXTRACT(DOW FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow, amount AS total
           FROM movements
           WHERE amount > 0 AND concept LIKE 'Compra%'
         ) AS dow_data
@@ -619,7 +616,7 @@ app.get("/api/stats", authGuard, async (req, res) => {
       }
     }
 
-    // Normalizar horas del día (08:00 a 22:00 por defecto para mostrador)
+    // Normalizar horas del día según jornada real de la tiendita (08:00 a 17:00 en horario local)
     const hourlyMap = new Map();
     (hourlySalesRes.rows || []).forEach((r) => {
       hourlyMap.set(Number(r.hour), {
@@ -628,7 +625,7 @@ app.get("/api/stats", authGuard, async (req, res) => {
       });
     });
     const hourlySales = [];
-    for (let h = 8; h <= 21; h++) {
+    for (let h = 8; h <= 17; h++) {
       const label = `${h.toString().padStart(2, "0")}:00`;
       const data = hourlyMap.get(h) || { total: 0, tickets: 0 };
       hourlySales.push({
@@ -638,15 +635,13 @@ app.get("/api/stats", authGuard, async (req, res) => {
       });
     }
 
-    // Normalizar días de la semana (Lunes a Domingo)
+    // Normalizar días de la semana: SOLO Lunes a Viernes (cerrado fines de semana)
     const dowNames = [
       { dow: 1, name: "Lun" },
       { dow: 2, name: "Mar" },
       { dow: 3, name: "Mié" },
       { dow: 4, name: "Jue" },
       { dow: 5, name: "Vie" },
-      { dow: 6, name: "Sáb" },
-      { dow: 0, name: "Dom" },
     ];
     const dowMap = new Map();
     (dowSalesRes.rows || []).forEach((r) => {

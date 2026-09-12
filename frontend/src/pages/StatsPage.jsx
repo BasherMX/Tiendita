@@ -115,6 +115,7 @@ export default function StatsPage({
   shiftSalesRange,
 }) {
   const [activeTab, setActiveTab] = useState("general");
+  const [cashFlowFilter, setCashFlowFilter] = useState("quincena"); // "semana" | "quincena" | "mes" | "historico"
 
   // Métricas del backend
   const kpis = stats?.kpis || {
@@ -136,6 +137,50 @@ export default function StatsPage({
   const stagnantStock = stats?.stagnantStock || [];
   const topSellers = stats?.topSellers || [];
   const lowStock = stats?.lowStock || [];
+
+  // Filtrado de flujo de caja según periodo seleccionado
+  const filteredCashFlow = (() => {
+    if (!cashFlowDaily || !cashFlowDaily.length) return [];
+    if (cashFlowFilter === "historico") return cashFlowDaily;
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const currentDate = now.getDate();
+    const currentDay = now.getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
+
+    let startStr = "";
+    let endStr = "";
+
+    if (cashFlowFilter === "semana") {
+      const diff = currentDay === 0 ? 6 : currentDay - 1;
+      const monday = new Date(currentYear, currentMonth, currentDate - diff);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      startStr = monday.toISOString().slice(0, 10);
+      endStr = sunday.toISOString().slice(0, 10);
+    } else if (cashFlowFilter === "quincena") {
+      const mStr = String(currentMonth + 1).padStart(2, "0");
+      if (currentDate <= 15) {
+        startStr = `${currentYear}-${mStr}-01`;
+        endStr = `${currentYear}-${mStr}-15`;
+      } else {
+        startStr = `${currentYear}-${mStr}-16`;
+        const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+        endStr = `${currentYear}-${mStr}-${lastDay}`;
+      }
+    } else if (cashFlowFilter === "mes") {
+      const mStr = String(currentMonth + 1).padStart(2, "0");
+      startStr = `${currentYear}-${mStr}-01`;
+      const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+      endStr = `${currentYear}-${mStr}-${lastDay}`;
+    }
+
+    return cashFlowDaily.filter((item) => {
+      const d = String(item.day).slice(0, 10);
+      return d >= startStr && d <= endStr;
+    });
+  })();
 
   const totalSalesWeek = salesChart.reduce(
     (sum, d) => sum + (Number(d.total) || 0),
@@ -380,14 +425,14 @@ export default function StatsPage({
 
           {/* Gráfica de Flujo de Caja: Contado vs Fiado vs Abonos */}
           <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
-            <div className="mb-4 flex items-center justify-between border-b border-[#E5E2DA] pb-3 dark:border-[#282C32]">
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#E5E2DA] pb-3 dark:border-[#282C32]">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-300">
                   <Icon path={mdiSwapHorizontal} size={0.75} />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-[#1C1917] dark:text-[#F3F2EE] leading-tight">
-                    Flujo de Caja Real (Últimos 14 días)
+                    Flujo de Caja Real
                   </h2>
                   <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
                     Comparativa diaria entre ventas de Contado, Créditos
@@ -396,25 +441,48 @@ export default function StatsPage({
                 </div>
               </div>
 
-              <div className="hidden sm:flex items-center gap-4 text-[11px] font-bold">
-                <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />{" "}
-                  Contado
-                </span>
-                <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
-                  <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />{" "}
-                  Abonos
-                </span>
-                <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
-                  <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Fiado
-                </span>
+              {/* Filtros de periodo: Semana, Quincena, Mes, Histórico */}
+              <div className="flex items-center gap-1 rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-1 dark:border-[#282C32] dark:bg-[#111315] self-start sm:self-auto overflow-x-auto max-w-full">
+                {[
+                  { id: "semana", label: "Semana actual" },
+                  { id: "quincena", label: "Quincena actual" },
+                  { id: "mes", label: "Mes actual" },
+                  { id: "historico", label: "Histórico" },
+                ].map((btn) => (
+                  <button
+                    key={btn.id}
+                    type="button"
+                    onClick={() => setCashFlowFilter(btn.id)}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition whitespace-nowrap ${
+                      cashFlowFilter === btn.id
+                        ? "bg-[#FFFFFF] text-emerald-800 shadow-xs dark:bg-[#181B1E] dark:text-emerald-300"
+                        : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                    }`}
+                  >
+                    {btn.label}
+                  </button>
+                ))}
               </div>
             </div>
 
+            {/* Leyenda de colores */}
+            <div className="mb-3 flex items-center justify-end gap-4 text-[11px] font-bold">
+              <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />{" "}
+                Contado
+              </span>
+              <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
+                <span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Abonos
+              </span>
+              <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Fiado
+              </span>
+            </div>
+
             <div className="h-64 w-full">
-              {cashFlowDaily.length > 0 ? (
+              {filteredCashFlow.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={cashFlowDaily}>
+                  <AreaChart data={filteredCashFlow}>
                     <defs>
                       <linearGradient
                         id="colorContado"
@@ -481,6 +549,11 @@ export default function StatsPage({
                       tick={{ fontSize: 11, fill: "#78716C" }}
                       tickFormatter={formatDayLabel}
                       stroke="#E5E2DA"
+                      interval={
+                        cashFlowFilter === "historico"
+                          ? Math.max(1, Math.floor(filteredCashFlow.length / 6))
+                          : 0
+                      }
                     />
                     <YAxis
                       tick={{ fontSize: 11, fill: "#78716C" }}
@@ -518,7 +591,7 @@ export default function StatsPage({
                 </ResponsiveContainer>
               ) : (
                 <div className="flex h-full items-center justify-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
-                  No hay movimientos registrados en las últimas 2 semanas
+                  No hay movimientos registrados en el periodo seleccionado
                 </div>
               )}
             </div>
@@ -542,7 +615,7 @@ export default function StatsPage({
                       Horas Pico en Mostrador
                     </h3>
                     <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
-                      Ventas acumuladas por franja horaria
+                      Ventas por franja horaria en mostrador (08:00 a 17:00)
                     </p>
                   </div>
                 </div>
@@ -595,7 +668,7 @@ export default function StatsPage({
                       Días con Mayor Actividad
                     </h3>
                     <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
-                      Ingresos de Lunes a Domingo
+                      Ingresos de Lunes a Viernes (cerrado fines de semana)
                     </p>
                   </div>
                 </div>
@@ -997,7 +1070,8 @@ export default function StatsPage({
                       Stock Estancado (Baja Rotación)
                     </h3>
                     <p className="text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
-                      Productos con existencias y ≤2 ventas
+                      Productos con existencias y ≤2 ventas (margen de gracia:
+                      &gt;15 días de antigüedad)
                     </p>
                   </div>
                 </div>
