@@ -1,11 +1,13 @@
 export const releases = [
   {
-    version: "1.7.7",
+    version: "1.7.9",
     date: "11 de Septiembre, 2026",
     tagline:
-      "Corrección de Ranking de Clientes (Total Gastado) y Cross-Selling con Nombres de Productos",
+      "Distintivos mensuales para los tres mejores clientes y corrección del despliegue",
     highlights: [
-      "Ranking de Compradores por Total Gastado ($): El ordenamiento y podio ahora priorizan el volumen total de dinero comprado. Angy Lemus y la Señora Lupita se posicionan en los primeros lugares de honor.",
+      "La vista personalizada de cada cliente muestra medalla, lugar y total acumulado cuando está entre los tres primeros del mes.",
+      "El ranking mensual reutiliza el criterio de monto gastado y respeta la zona horaria de México.",
+      "Validación del build frontend para evitar dejar incompleta la publicación en Vercel.",
       "Selector de Criterio de Ranking: Posibilidad de alternar el orden entre Total Gastado ($), Más Visitas (Tickets) y Más Piezas (Unidades), además de clic directo en las columnas de la tabla.",
       "Tolerancia SQL en Compras: Cláusula WHERE ampliada para capturar todas las compras a crédito y de contado sin depender exclusivamente de palabras clave rígidas.",
       "Cross-Selling con Nombres de Productos: En el podio, tabla y detalle de cliente se muestran los combos específicos de productos que compran juntos (ej. 'Churros Soles + Chicle Trident') y las veces que se han combinado.",

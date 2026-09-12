@@ -1436,6 +1436,52 @@ app.get("/api/public/clients/:code", async (req, res) => {
     const limit = Number(client.credit_limit || 0);
     const effectiveLimit = limit > 0 ? limit : defaultCreditLimit;
     const daysWithDebt = debt > 0 ? await getClientDebtDays(clientId, debt) : 0;
+    const monthlyRankingRes = await query(
+      `WITH purchase_totals AS (
+         SELECT
+           m.id,
+           m.client_id,
+           CASE
+             WHEN m.amount > 0 THEN m.amount
+             ELSE COALESCE(SUM(mi.quantity * mi.unit_price), 0)
+           END AS total
+         FROM movements m
+         LEFT JOIN movement_items mi ON mi.movement_id = m.id
+         WHERE (
+           m.amount > 0
+           OR (m.amount = 0 AND (m.concept ILIKE '%contado%' OR mi.sweet_id IS NOT NULL))
+         )
+           AND m.concept NOT ILIKE '%pago%'
+           AND m.concept NOT ILIKE '%abono%'
+           AND (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')
+             BETWEEN date_trunc('month', NOW() AT TIME ZONE 'America/Mexico_City')
+             AND (date_trunc('month', NOW() AT TIME ZONE 'America/Mexico_City') + INTERVAL '1 month - 1 second')
+         GROUP BY m.id, m.client_id, m.amount
+       )
+       SELECT c.id, c.name, COALESCE(SUM(pt.total), 0) AS total_spent
+       FROM clients c
+       LEFT JOIN purchase_totals pt ON pt.client_id = c.id
+       GROUP BY c.id, c.name
+       HAVING COALESCE(SUM(pt.total), 0) > 0
+       ORDER BY total_spent DESC, c.name ASC`,
+    );
+    const monthlyRank = monthlyRankingRes.rows.findIndex(
+      (row) => Number(row.id) === Number(clientId),
+    );
+    const monthlyRanking =
+      monthlyRank >= 0 && monthlyRank < 3
+        ? {
+            rank: monthlyRank + 1,
+            total_spent: Number(
+              monthlyRankingRes.rows[monthlyRank].total_spent || 0,
+            ),
+            month_label: new Intl.DateTimeFormat("es-MX", {
+              month: "long",
+              year: "numeric",
+              timeZone: "America/Mexico_City",
+            }).format(new Date()),
+          }
+        : null;
     return res.json({
       ...client,
       credit_limit: limit,
@@ -1443,6 +1489,7 @@ app.get("/api/public/clients/:code", async (req, res) => {
       days_with_debt: daysWithDebt,
       is_over_credit_limit: debt > effectiveLimit,
       public_code: code,
+      monthly_ranking: monthlyRanking,
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });

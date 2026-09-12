@@ -9,6 +9,7 @@ import {
   mdiCheck,
   mdiStore,
   mdiClose,
+  mdiMedal,
 } from "@mdi/js";
 import brandLogo from "../assets/logo.png";
 import { apiBase } from "../services/api.js";
@@ -143,6 +144,44 @@ export default function PublicClientView() {
             <span className="hidden sm:inline">WhatsApp</span>
           </a>
         </div>
+
+        {client.monthly_ranking && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className={`rounded-2xl border p-4 shadow-xs ${
+              client.monthly_ranking.rank === 1
+                ? "border-amber-300 bg-amber-50 dark:border-amber-700/60 dark:bg-amber-950/30"
+                : client.monthly_ranking.rank === 2
+                  ? "border-slate-300 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/60"
+                  : "border-orange-300 bg-orange-50 dark:border-orange-800/60 dark:bg-orange-950/30"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/80 text-amber-600 shadow-xs dark:bg-slate-900/70 dark:text-amber-300">
+                <Icon path={mdiMedal} size={1.05} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C] dark:text-[#9CA3AF]">
+                  Ranking de {client.monthly_ranking.month_label}
+                </p>
+                <h2 className="text-sm font-black text-[#1C1917] dark:text-[#F3F2EE]">
+                  {client.monthly_ranking.rank === 1
+                    ? "Eres el mejor cliente de este mes"
+                    : client.monthly_ranking.rank === 2
+                      ? "Eres el segundo mejor cliente de este mes"
+                      : "Eres el tercer mejor cliente de este mes"}
+                </h2>
+                <p className="mt-0.5 text-[11px] text-[#78716C] dark:text-[#A8A29E]">
+                  Lugar {client.monthly_ranking.rank} · $
+                  {Number(client.monthly_ranking.total_spent || 0).toFixed(2)}{" "}
+                  acumulados
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Alertas informativas con opción para cerrar */}
         <AnimatePresence>

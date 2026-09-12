@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { useState, useEffect, useMemo } from "react";
 import Icon from "@mdi/react";
 import {
@@ -1335,6 +1334,7 @@ export default function StatsPage({
               >
                 Semana Actual
               </button>
+            </div>
             <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
               {/* Selector de Criterio de Ordenamiento */}
               <div className="flex items-center gap-1 rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-1 text-xs font-semibold dark:border-[#282C32] dark:bg-[#111315]">
@@ -1448,7 +1448,6 @@ export default function StatsPage({
           ) : (
             <>
               {/* Podio Destacado Top 3 */}
-              {clientsStats?.podium && clientsStats.podium.length > 0 && (
               {podiumList && podiumList.length > 0 && (
                 <div>
                   <div className="mb-3 flex items-center gap-2">
@@ -1463,7 +1462,6 @@ export default function StatsPage({
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {clientsStats.podium.map((c, idx) => {
                     {podiumList.map((c, idx) => {
                       const isGold = idx === 0;
                       const isSilver = idx === 1;
@@ -1578,21 +1576,18 @@ export default function StatsPage({
                                 </span>
                               </div>
 
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span className="flex items-center gap-1">
-                              <div className="flex items-center justify-between text-[11px] gap-2">
+                              <div className="flex items-center justify-between gap-2 text-[11px]">
                                 <span className="flex items-center gap-1 shrink-0">
                                   <Icon
                                     path={mdiCartOutline}
                                     size={0.55}
-                                    className="text-blue-600"
                                     className="text-blue-600 shrink-0"
                                   />
                                   Cross-Selling:
-                                  Suele combinar:
                                 </span>
                                 <span className="font-bold font-tabular text-[#1C1917] dark:text-[#F3F2EE]">
                                   {c.cross_selling_percent}%
+                                </span>
                                 <span
                                   className="font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate max-w-[150px] text-right"
                                   title={
@@ -1659,7 +1654,6 @@ export default function StatsPage({
                   <span className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
                     Mostrando{" "}
                     {
-                      (clientsStats?.clients || []).filter((c) => {
                       (sortedClientsList || []).filter((c) => {
                         if (!clientSearchQuery.trim()) return true;
                         const q = clientSearchQuery.toLowerCase().trim();
@@ -1672,7 +1666,6 @@ export default function StatsPage({
                         );
                       }).length
                     }{" "}
-                    de {clientsStats?.clients?.length || 0} compradores
                     de {sortedClientsList?.length || 0} compradores
                   </span>
                 </div>
@@ -1713,6 +1706,7 @@ export default function StatsPage({
                         <th className="px-3 py-2.5 font-semibold">Comprador</th>
                         <th className="px-3 py-2.5 text-center font-semibold">
                           Compras
+                        </th>
                         <th
                           onClick={() => setClientSortCriteria("tickets")}
                           className={`px-3 py-2.5 text-center font-semibold cursor-pointer select-none transition ${
@@ -1726,6 +1720,7 @@ export default function StatsPage({
                         </th>
                         <th className="px-3 py-2.5 text-right font-semibold">
                           Total Gastado
+                        </th>
                         <th
                           onClick={() => setClientSortCriteria("spent")}
                           className={`px-3 py-2.5 text-right font-semibold cursor-pointer select-none transition ${
@@ -1745,6 +1740,7 @@ export default function StatsPage({
                         </th>
                         <th className="px-3 py-2.5 text-center font-semibold">
                           Cross-Selling
+                        </th>
                         <th className="px-3 py-2.5 font-semibold">
                           Qué Compra Junto
                         </th>
@@ -1761,7 +1757,6 @@ export default function StatsPage({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#E5E2DA] dark:divide-[#282C32] font-tabular">
-                      {(clientsStats?.clients || [])
                       {(sortedClientsList || [])
                         .filter((c) => {
                           if (!clientSearchQuery.trim()) return true;
@@ -1870,7 +1865,7 @@ export default function StatsPage({
                               )}
                             </td>
 
-                            {/* Cross-Selling */}
+                            {/* Porcentaje de Cross-Selling */}
                             <td className="px-3 py-2.5 text-center whitespace-nowrap font-bold">
                               {c.total_tickets > 0 ? (
                                 <span
@@ -1881,6 +1876,14 @@ export default function StatsPage({
                                   }`}
                                 >
                                   {c.cross_selling_percent}%
+                                </span>
+                              ) : (
+                                <span className="text-[#78716C] dark:text-[#9CA3AF]">
+                                  —
+                                </span>
+                              )}
+                            </td>
+
                             {/* Qué compra junto / Cross-Selling */}
                             <td className="px-3 py-2.5 whitespace-nowrap">
                               {c.top_cross_selling_pair ? (
@@ -1954,8 +1957,8 @@ export default function StatsPage({
                           </tr>
                         ))}
 
-                      {(!clientsStats?.clients ||
-                        clientsStats.clients.length === 0) && (
+                      {(!sortedClientsList ||
+                        sortedClientsList.length === 0) && (
                         <tr>
                           <td
                             colSpan={11}
@@ -2043,10 +2046,10 @@ export default function StatsPage({
                   <div className="rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-3 dark:border-[#282C32] dark:bg-[#111315]">
                     <span className="block text-[10px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
                       CROSS-SELLING
-                      QUÉ COMPRA JUNTO
                     </span>
                     <span className="text-lg font-black text-[#1C1917] dark:text-[#F3F2EE]">
                       {selectedClientDetail.cross_selling_percent}%
+                    </span>
                     <span
                       className="text-xs font-black text-[#1C1917] dark:text-[#F3F2EE] line-clamp-2 leading-tight mt-0.5"
                       title={
@@ -2059,6 +2062,7 @@ export default function StatsPage({
                     </span>
                     <span className="block text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
                       {selectedClientDetail.cross_selling_count} carritos mixtos
+                    </span>
                     <span className="block text-[10px] text-[#78716C] dark:text-[#9CA3AF] mt-1">
                       {selectedClientDetail.cross_selling_pairs?.length > 0
                         ? `${selectedClientDetail.cross_selling_pairs[0].count} veces juntos`
@@ -2095,45 +2099,50 @@ export default function StatsPage({
                         Qué Suele Comprar Junto (Combos Cross-Selling)
                       </span>
                       <span className="text-[11px] font-normal text-[#78716C] dark:text-[#9CA3AF]">
-                        {selectedClientDetail.cross_selling_pairs?.length || 0} combos
+                        {selectedClientDetail.cross_selling_pairs?.length || 0}{" "}
+                        combos
                       </span>
                     </div>
 
                     {selectedClientDetail.cross_selling_pairs &&
                     selectedClientDetail.cross_selling_pairs.length > 0 ? (
                       <div className="space-y-2">
-                        {selectedClientDetail.cross_selling_pairs.map((combo, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between gap-2 rounded-xl border border-[#E5E2DA]/80 bg-[#F7F6F2]/70 p-2.5 text-xs dark:border-[#282C32] dark:bg-[#181B1E]"
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-black text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-                                {idx + 1}
-                              </span>
-                              <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                                <span className="font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate">
-                                  {combo.item_a}
+                        {selectedClientDetail.cross_selling_pairs.map(
+                          (combo, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between gap-2 rounded-xl border border-[#E5E2DA]/80 bg-[#F7F6F2]/70 p-2.5 text-xs dark:border-[#282C32] dark:bg-[#181B1E]"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-black text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                                  {idx + 1}
                                 </span>
-                                <span className="text-[11px] font-black text-amber-600 dark:text-amber-400 shrink-0">
-                                  +
-                                </span>
-                                <span className="font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate">
-                                  {combo.item_b}
+                                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                                  <span className="font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate">
+                                    {combo.item_a}
+                                  </span>
+                                  <span className="text-[11px] font-black text-amber-600 dark:text-amber-400 shrink-0">
+                                    +
+                                  </span>
+                                  <span className="font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate">
+                                    {combo.item_b}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="shrink-0 font-tabular text-right">
+                                <span className="rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                                  {combo.count}{" "}
+                                  {combo.count === 1 ? "vez" : "veces"} juntos
                                 </span>
                               </div>
                             </div>
-                            <div className="shrink-0 font-tabular text-right">
-                              <span className="rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                                {combo.count} {combo.count === 1 ? "vez" : "veces"} juntos
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                          ),
+                        )}
                       </div>
                     ) : (
                       <p className="py-4 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
-                        Este cliente suele comprar artículos individuales (no suele combinar productos en el mismo ticket).
+                        Este cliente suele comprar artículos individuales (no
+                        suele combinar productos en el mismo ticket).
                       </p>
                     )}
                   </div>
