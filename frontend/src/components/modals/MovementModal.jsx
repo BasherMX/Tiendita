@@ -301,7 +301,7 @@ export default function MovementModal({
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     <input
                       type="number"
-                      step="0.1"
+                      step="0.01"
                       min="0"
                       max={Math.min(clientPoints, computedTotal)}
                       className="w-28 sm:w-32 rounded-lg border border-[#E5E2DA] bg-white px-2.5 py-1.5 text-xs font-tabular outline-none focus:border-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"

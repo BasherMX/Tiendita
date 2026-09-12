@@ -126,7 +126,7 @@ export default function ClientModal({
                 </label>
                 <input
                   type="number"
-                  step="0.1"
+                  step="0.01"
                   min="0"
                   className="w-full rounded-xl border border-[#E5E2DA] bg-white px-3.5 py-2 text-sm font-bold font-tabular text-[#D97706] outline-none focus:border-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F59E0B] transition"
                   value={clientForm.points}

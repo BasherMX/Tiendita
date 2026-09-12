@@ -1,5 +1,31 @@
 export const releases = [
   {
+    version: "1.8.1",
+    date: "12 de Septiembre, 2026",
+    tagline:
+      "Corrección de registro de compras y soporte de centavos en puntos de recompensa",
+    highlights: [
+      "Corrección crítica en registro de compras: Eliminación de error en backend al registrar compras a crédito o de contado que impedía guardar transacciones.",
+      "Soporte de decimales/centavos en puntos de recompensa: Se amplió el selector numérico a dos decimales (step='0.01'), permitiendo capturar y editar saldos fraccionarios de puntos (ej. 8.55 pts) sin bloqueos del navegador.",
+      "Depuración de consultas contables: Saneamiento de bloques duplicados en estadísticas de flujo de caja y ventas.",
+    ],
+    sections: [
+      {
+        title: "🛒 Compras & Puntos",
+        items: [
+          "Resolución de error 400 'callback is not a function' en POST /api/clients/:id/purchase.",
+          "Campos de puntos de recompensa y redención ahora aceptan centavos con precisión de 0.01 en modales de Cliente y Movimientos.",
+        ],
+      },
+      {
+        title: "📊 Estabilidad Contable",
+        items: [
+          "Limpieza de cláusulas SQL redundantes en flujo de caja y horas de venta.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.0",
     date: "12 de Septiembre, 2026",
     tagline:
