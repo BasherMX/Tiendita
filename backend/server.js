@@ -175,19 +175,15 @@ app.post("/api/login", async (req, res) => {
 app.post("/api/auth/change-password", authGuard, async (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
   if (!currentPassword || !newPassword) {
-    return res
-      .status(400)
-      .json({
-        message: "Debes ingresar la contraseña actual y la nueva contraseña",
-      });
+    return res.status(400).json({
+      message: "Debes ingresar la contraseña actual y la nueva contraseña",
+    });
   }
 
   if (newPassword.length < 4) {
-    return res
-      .status(400)
-      .json({
-        message: "La nueva contraseña debe tener al menos 4 caracteres",
-      });
+    return res.status(400).json({
+      message: "La nueva contraseña debe tener al menos 4 caracteres",
+    });
   }
 
   try {
@@ -204,6 +200,27 @@ app.post("/api/auth/change-password", authGuard, async (req, res) => {
     );
 
     return res.json({ message: "Contraseña actualizada exitosamente" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+// Verificar Contraseña Admin (requiere login)
+app.post("/api/auth/verify-password", authGuard, async (req, res) => {
+  const { password } = req.body || {};
+  if (!password) {
+    return res
+      .status(400)
+      .json({ message: "Contraseña requerida", valid: false });
+  }
+  try {
+    const effectivePass = await getEffectiveAdminPass();
+    if (password === effectivePass) {
+      return res.json({ valid: true, message: "Contraseña verificada" });
+    }
+    return res
+      .status(401)
+      .json({ valid: false, message: "Contraseña incorrecta" });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

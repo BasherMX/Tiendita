@@ -35,7 +35,8 @@ import InventoryPage from "./pages/InventoryPage.jsx";
 import PurchasesPage from "./pages/PurchasesPage.jsx";
 import RewardsPage from "./pages/RewardsPage.jsx";
 import StatsPage from "./pages/StatsPage.jsx";
-import WhatsappPage from "./pages/WhatsappPage.jsx";
+import ConfigPage from "./pages/ConfigPage.jsx";
+import ReleasesPage from "./pages/ReleasesPage.jsx";
 import PublicClientView from "./pages/PublicClientView.jsx";
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
   // Estado de Autenticación y Tema
   const [token, setToken] = useState(getAuthToken());
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
+  const [isConfigUnlocked, setIsConfigUnlocked] = useState(false);
 
   // Estado Principal
   const [sweets, setSweets] = useState([]);
@@ -109,7 +111,7 @@ export default function App() {
   // Redirigir a inicio si ya hay token y está en login
   useEffect(() => {
     if (token && location.pathname === "/login") {
-      navigate("/", { replace: true });
+      navigate("/clientes", { replace: true });
     }
   }, [token, location.pathname, navigate]);
 
@@ -295,7 +297,7 @@ export default function App() {
 
       setToken(data.token);
       setAuthToken(data.token);
-      navigate("/precios");
+      navigate("/clientes");
     } catch (err) {
       Swal.fire("Error de acceso", err.message, "error");
     }
@@ -305,7 +307,52 @@ export default function App() {
     setToken("");
     setAuthToken("");
     setSelectedClient(null);
+    setIsConfigUnlocked(false);
     navigate("/login");
+  }
+
+  async function handleRequestConfigAccess() {
+    if (isConfigUnlocked) {
+      navigate("/configuracion");
+      return;
+    }
+    const { value: password } = await Swal.fire({
+      title: "Acceso a Configuración",
+      text: "Ingresa tu contraseña de administrador para entrar:",
+      input: "password",
+      inputPlaceholder: "Contraseña de admin",
+      showCancelButton: true,
+      confirmButtonColor: "#f59e0b",
+      confirmButtonText: "Entrar",
+      cancelButtonText: "Cancelar",
+    });
+
+    if (password) {
+      try {
+        const res = await authFetch(
+          `${apiBase}/api/auth/verify-password`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password }),
+          },
+          handleAuthFail,
+        );
+        const data = await res.json();
+        if (res && res.ok && data.valid) {
+          setIsConfigUnlocked(true);
+          navigate("/configuracion");
+        } else {
+          Swal.fire(
+            "Acceso Denegado",
+            data?.message || "Contraseña incorrecta",
+            "error",
+          );
+        }
+      } catch (err) {
+        Swal.fire("Error", "No se pudo verificar la contraseña", "error");
+      }
+    }
   }
 
   // Operaciones de Ventas en Mostrador
@@ -876,7 +923,14 @@ export default function App() {
         theme={theme}
         setTheme={setTheme}
         onLogout={handleLogout}
-        systemVersion="1.4.0"
+        onNavigate={(path) => {
+          if (path === "/configuracion" && !isConfigUnlocked) {
+            handleRequestConfigAccess();
+            return true;
+          }
+          return false;
+        }}
+        systemVersion="1.5.0"
       />
 
       <main className="mx-auto max-w-6xl px-4 py-8">
@@ -897,30 +951,7 @@ export default function App() {
             path="/"
             element={
               token ? (
-                <PosPage
-                  sweets={sweets}
-                  prices={prices}
-                  pricesQuery={pricesQuery}
-                  setPricesQuery={setPricesQuery}
-                  onRegisterSale={handleRegisterSale}
-                />
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
-
-          <Route
-            path="/precios"
-            element={
-              token ? (
-                <PosPage
-                  sweets={sweets}
-                  prices={prices}
-                  pricesQuery={pricesQuery}
-                  setPricesQuery={setPricesQuery}
-                  onRegisterSale={handleRegisterSale}
-                />
+                <Navigate to="/clientes" replace />
               ) : (
                 <Navigate to="/login" replace />
               )
@@ -952,6 +983,23 @@ export default function App() {
                   onSendWhatsappStatement={handleSendWhatsappStatement}
                   onDeleteMovement={handleDeleteMovement}
                   onViewDebtBreakdown={handleViewDebtBreakdown}
+                />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/precios"
+            element={
+              token ? (
+                <PosPage
+                  sweets={sweets}
+                  prices={prices}
+                  pricesQuery={pricesQuery}
+                  setPricesQuery={setPricesQuery}
+                  onRegisterSale={handleRegisterSale}
                 />
               ) : (
                 <Navigate to="/login" replace />
@@ -1028,24 +1076,68 @@ export default function App() {
           />
 
           <Route
-            path="/whatsapp"
+            path="/configuracion"
             element={
               token ? (
-                <WhatsappPage
-                  settings={settings}
-                  whatsappStatus={whatsappStatus}
-                  onSaveSettings={handleSaveSettings}
-                  onChangePassword={handleChangePassword}
-                />
+                isConfigUnlocked ? (
+                  <ConfigPage
+                    settings={settings}
+                    whatsappStatus={whatsappStatus}
+                    onSaveSettings={handleSaveSettings}
+                    onChangePassword={handleChangePassword}
+                    onLockConfig={() => {
+                      setIsConfigUnlocked(false);
+                      navigate("/clientes");
+                    }}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center rounded-3xl border border-amber-200 bg-white/80 p-12 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+                    <div className="rounded-2xl bg-amber-100 p-4 text-amber-600 dark:bg-slate-800 dark:text-amber-400 mb-4">
+                      <svg
+                        className="w-10 h-10"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        />
+                      </svg>
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
+                      Configuración Bloqueada
+                    </h2>
+                    <p className="text-xs text-slate-500 max-w-sm mb-6">
+                      Esta sección contiene parámetros sensibles del sistema y
+                      requiere confirmación de contraseña.
+                    </p>
+                    <button
+                      onClick={handleRequestConfigAccess}
+                      className="rounded-2xl bg-amber-500 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-600 transition"
+                    >
+                      Ingresar Contraseña
+                    </button>
+                  </div>
+                )
               ) : (
                 <Navigate to="/login" replace />
               )
             }
           />
 
+          <Route path="/releases" element={<ReleasesPage />} />
+
+          <Route
+            path="/whatsapp"
+            element={<Navigate to="/configuracion" replace />}
+          />
+
           <Route
             path="*"
-            element={<Navigate to={token ? "/precios" : "/login"} replace />}
+            element={<Navigate to={token ? "/clientes" : "/login"} replace />}
           />
         </Routes>
       </main>

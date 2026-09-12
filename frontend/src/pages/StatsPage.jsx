@@ -19,6 +19,24 @@ import {
 } from "recharts";
 import { formatRangeLabel } from "../utils/dateUtils.js";
 
+function formatDayLabel(dayStr) {
+  if (!dayStr) return "";
+  const match = String(dayStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [, y, m, dNum] = match;
+    return `${parseInt(dNum, 10)}/${m}/${y}`;
+  }
+  const d = new Date(dayStr);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleDateString("es-MX", {
+      day: "numeric",
+      month: "2-digit",
+      year: "numeric",
+    });
+  }
+  return String(dayStr);
+}
+
 export default function StatsPage({
   stats = null,
   salesChart = [],
@@ -79,9 +97,14 @@ export default function StatsPage({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={salesChart}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-              <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+              <XAxis
+                dataKey="day"
+                tick={{ fontSize: 11 }}
+                tickFormatter={formatDayLabel}
+              />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip
+                labelFormatter={formatDayLabel}
                 formatter={(val) => [`$${Number(val).toFixed(2)}`, "Ventas"]}
                 contentStyle={{
                   backgroundColor: "rgba(15, 23, 42, 0.9)",

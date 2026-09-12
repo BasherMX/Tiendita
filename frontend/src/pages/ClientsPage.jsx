@@ -184,13 +184,6 @@ export default function ClientsPage({
 
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => onShareLink(client)}
-                      title="Copiar enlace de estado de cuenta"
-                      className="rounded-xl p-1.5 text-slate-500 hover:bg-amber-100 hover:text-amber-800 dark:hover:bg-slate-700"
-                    >
-                      <Icon path={mdiShareVariant} size={0.75} />
-                    </button>
-                    <button
                       onClick={() => onEditClient(client)}
                       title="Editar cliente"
                       className="rounded-xl p-1.5 text-slate-500 hover:bg-amber-100 hover:text-amber-800 dark:hover:bg-slate-700"

@@ -14,7 +14,7 @@ import {
   mdiChartBar,
   mdiStore,
   mdiGift,
-  mdiWhatsapp,
+  mdiCog,
 } from "@mdi/js";
 import brandLogo from "../assets/logo.png";
 
@@ -23,23 +23,33 @@ export default function Navbar({
   theme,
   setTheme,
   onLogout,
-  systemVersion = "1.4.0",
+  onNavigate,
+  systemVersion = "1.4.1",
+  systemVersion = "1.5.0",
 }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const navLinks = [
+    { path: "/clientes", icon: mdiAccountGroup, label: "Clientes" },
     { path: "/precios", icon: mdiClipboardList, label: "Precios" },
     { path: "/inventario", icon: mdiCandycane, label: "Inventario" },
     { path: "/clientes", icon: mdiAccountGroup, label: "Clientes" },
     { path: "/recompensas", icon: mdiGift, label: "Recompensas" },
-    { path: "/whatsapp", icon: mdiWhatsapp, label: "WhatsApp" },
     { path: "/compras", icon: mdiStore, label: "Compras" },
     { path: "/estadisticas", icon: mdiChartBar, label: "Estadísticas" },
+    { path: "/configuracion", icon: mdiCog, label: "Configuración" },
   ];
 
   function navigateTo(path) {
+    if (onNavigate) {
+      const handled = onNavigate(path);
+      if (handled) {
+        setMenuOpen(false);
+        return;
+      }
+    }
     navigate(path);
     setMenuOpen(false);
   }
@@ -61,9 +71,33 @@ export default function Navbar({
             Tiendita
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
               v{systemVersion}
+        {/* Brand & Version Badge */}
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => navigateTo(token ? "/clientes" : "/login")}
+            className="flex items-center gap-2.5 text-left transition hover:opacity-85"
+            title="Ir al inicio (Clientes)"
+          >
+            <img
+              src={brandLogo}
+              alt="Logo Tiendita"
+              className="h-10 w-10 rounded-2xl border border-amber-200 object-cover shadow-sm dark:border-slate-700"
+            />
+            <span className="text-lg font-bold tracking-tight text-amber-950 dark:text-amber-100">
+              Tiendita
             </span>
           </span>
         </button>
+          </button>
+
+          <button
+            onClick={() => navigateTo(token ? "/releases" : "/releases")}
+            title="Ver historial de versiones (Releases)"
+            className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 transition hover:bg-amber-200 hover:scale-105 active:scale-95 dark:bg-slate-800 dark:text-amber-300 dark:hover:bg-slate-700 shadow-xs cursor-pointer"
+          >
+            v{systemVersion}
+          </button>
+        </div>
 
         {/* Desktop Nav */}
         {token && (
@@ -72,6 +106,7 @@ export default function Navbar({
               const active =
                 location.pathname === path ||
                 (path === "/precios" && location.pathname === "/");
+                (path === "/clientes" && location.pathname === "/");
               return (
                 <button
                   key={path}
@@ -150,6 +185,7 @@ export default function Navbar({
                 const active =
                   location.pathname === path ||
                   (path === "/precios" && location.pathname === "/");
+                  (path === "/clientes" && location.pathname === "/");
                 return (
                   <button
                     key={path}
