@@ -1,5 +1,24 @@
 export const releases = [
   {
+    version: "1.8.5",
+    date: "12 de Septiembre, 2026",
+    tagline:
+      "Reorganización de filtros de clientes dentro de la tarjeta Directorio",
+    highlights: [
+      "Filtros de estado integrados en Directorio: El selector de filtros ('Todos', 'Con Deuda', 'Al Día') se reubicó en la esquina superior derecha dentro de la tarjeta de Directorio de clientes.",
+      "Interfaz más limpia y compacta: Optimización de espacio en la vista de clientes y mejor jerarquía visual.",
+    ],
+    sections: [
+      {
+        title: "👥 Clientes & Directorio",
+        items: [
+          "Reubicación del filtro de clientes dentro de la cabecera de la tarjeta Directorio.",
+          "Diseño adaptativo y compacto con conteo simultáneo de clientes filtrados.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.4",
     date: "12 de Septiembre, 2026",
     tagline:

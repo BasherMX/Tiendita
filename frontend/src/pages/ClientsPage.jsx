@@ -87,65 +87,29 @@ export default function ClientsPage({
         }`}
       >
         {/* Acciones superiores del directorio */}
-        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <button
-              type="button"
-              onClick={onNewClient}
-              className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 sm:px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
-            >
-              <Icon path={mdiPlus} size={0.7} />
-              <span>Nuevo Cliente</span>
-            </button>
-            <button
-              type="button"
-              onClick={onOpenQuickSale}
-              className="flex items-center gap-1.5 rounded-xl border border-emerald-600/30 bg-emerald-500/10 px-3 sm:px-3.5 py-2 text-xs font-bold text-emerald-800 shadow-xs hover:bg-emerald-600 hover:text-white dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-600 dark:hover:text-white active:scale-[0.98] transition"
-              title="Registrar venta rápida de mostrador a público general"
-            >
-              <Icon path={mdiCashRegister} size={0.7} />
-              <span>Venta Rápida</span>
-            </button>
-          </div>
-
-          {/* Filtros rápidos por estado de cuenta */}
-          <div className="flex overflow-x-auto rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-1 text-[11px] font-semibold dark:border-[#282C32] dark:bg-[#181B1E]">
-            <button
-              onClick={() => setFilterDebt("all")}
-              className={`rounded-lg px-2.5 py-1 transition whitespace-nowrap ${
-                filterDebt === "all"
-                  ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
-                  : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
-              }`}
-            >
-              Todos ({clients.length})
-            </button>
-            <button
-              onClick={() => setFilterDebt("debt")}
-              className={`rounded-lg px-2.5 py-1 transition whitespace-nowrap ${
-                filterDebt === "debt"
-                  ? "bg-red-500/15 text-red-700 dark:bg-red-950/60 dark:text-red-300 font-bold"
-                  : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
-              }`}
-            >
-              Con Deuda
-            </button>
-            <button
-              onClick={() => setFilterDebt("clean")}
-              className={`rounded-lg px-2.5 py-1 transition whitespace-nowrap ${
-                filterDebt === "clean"
-                  ? "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold"
-                  : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
-              }`}
-            >
-              Al Día
-            </button>
-          </div>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            onClick={onNewClient}
+            className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 sm:px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
+          >
+            <Icon path={mdiPlus} size={0.7} />
+            <span>Nuevo Cliente</span>
+          </button>
+          <button
+            type="button"
+            onClick={onOpenQuickSale}
+            className="flex items-center gap-1.5 rounded-xl border border-emerald-600/30 bg-emerald-500/10 px-3 sm:px-3.5 py-2 text-xs font-bold text-emerald-800 shadow-xs hover:bg-emerald-600 hover:text-white dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-600 dark:hover:text-white active:scale-[0.98] transition"
+            title="Registrar venta rápida de mostrador a público general"
+          >
+            <Icon path={mdiCashRegister} size={0.7} />
+            <span>Venta Rápida</span>
+          </button>
         </div>
 
         {/* Directorio Card */}
         <div className="flex flex-1 flex-col rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-3 sm:p-4 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E] lg:min-h-0">
-          <div className="mb-2.5 flex items-center justify-between">
+          <div className="mb-2.5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
               <Icon
                 path={mdiAccountGroup}
@@ -153,10 +117,44 @@ export default function ClientsPage({
                 className="text-amber-600"
               />
               <span>Directorio</span>
+              <span className="text-[11px] font-normal text-[#78716C] dark:text-[#9CA3AF]">
+                ({filteredClients.length}/{clients.length})
+              </span>
             </div>
-            <span className="text-[11px] font-medium text-[#78716C] dark:text-[#9CA3AF]">
-              {filteredClients.length} de {clients.length}
-            </span>
+
+            {/* Filtros rápidos por estado de cuenta en la esquina superior derecha */}
+            <div className="flex overflow-x-auto rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-0.5 text-[10px] sm:text-[11px] font-semibold dark:border-[#282C32] dark:bg-[#111315]">
+              <button
+                onClick={() => setFilterDebt("all")}
+                className={`rounded-lg px-2 sm:px-2.5 py-1 transition whitespace-nowrap ${
+                  filterDebt === "all"
+                    ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                }`}
+              >
+                Todos ({clients.length})
+              </button>
+              <button
+                onClick={() => setFilterDebt("debt")}
+                className={`rounded-lg px-2 sm:px-2.5 py-1 transition whitespace-nowrap ${
+                  filterDebt === "debt"
+                    ? "bg-red-500/15 text-red-700 dark:bg-red-950/60 dark:text-red-300 font-bold"
+                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                }`}
+              >
+                Con Deuda
+              </button>
+              <button
+                onClick={() => setFilterDebt("clean")}
+                className={`rounded-lg px-2 sm:px-2.5 py-1 transition whitespace-nowrap ${
+                  filterDebt === "clean"
+                    ? "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold"
+                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                }`}
+              >
+                Al Día
+              </button>
+            </div>
           </div>
 
           {/* Campo de búsqueda */}

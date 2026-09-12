@@ -24,7 +24,7 @@ export default function Navbar({
   setTheme,
   onLogout,
   onNavigate,
-  systemVersion = "1.8.4",
+  systemVersion = "1.8.5",
 }) {
   const location = useLocation();
   const navigate = useNavigate();
