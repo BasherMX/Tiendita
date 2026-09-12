@@ -7,6 +7,12 @@ import pg from "pg";
 import dotenv from "dotenv";
 
 dotenv.config();
+if (fs.existsSync(path.join(process.cwd(), "backend", ".env"))) {
+  dotenv.config({ path: path.join(process.cwd(), "backend", ".env") });
+}
+if (fs.existsSync(path.join(process.cwd(), ".env"))) {
+  dotenv.config({ path: path.join(process.cwd(), ".env") });
+}
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -2880,7 +2886,13 @@ async function sendWhatsAppTicketAutomatically(
     }
 
     const ticketCode = encodeClientId(client.id);
-    const baseUrl = process.env.APP_URL || "https://tiendita-mx.vercel.app";
+    const envBaseUrl =
+      process.env.APP_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : null) ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+    const baseUrl = settings.app_url || envBaseUrl || "http://localhost:1416";
     if (ticketCode) {
       lines.push(``);
       lines.push(`🔗 *Consulta tu estado de cuenta completo aquí:*`);
@@ -2984,7 +2996,14 @@ app.post("/api/clients/:id/whatsapp-statement", authGuard, async (req, res) => {
         .status(400)
         .json({ message: "El cliente no tiene teléfono registrado" });
 
-    const baseUrl = process.env.APP_URL || "https://tiendita-mx.vercel.app";
+    const settings = await getSettings();
+    const envBaseUrl =
+      process.env.APP_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : null) ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+    const baseUrl = settings.app_url || envBaseUrl || "http://localhost:1416";
     const stmtCode = encodeClientId(client.id);
     let linkStr = "";
     if (stmtCode) {
