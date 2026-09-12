@@ -136,14 +136,29 @@ async function getSettings() {
   }
 }
 
+// Helper para obtener contraseña administrativa dinámica desde BD o ENV
+async function getEffectiveAdminPass() {
+  try {
+    const res = await query(
+      "SELECT value FROM settings WHERE key = 'admin_password'",
+    );
+    if (res.rows.length && res.rows[0].value) {
+      return res.rows[0].value;
+    }
+  } catch (e) {
+    // fallback si la tabla no está lista
+  }
+  return process.env.ADMIN_PASS || "Tiendita321";
+}
+
 // Authentication
-app.post("/api/login", (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { username, password } = req.body || {};
   const adminUser = process.env.ADMIN_USER || "admin";
-  const adminPass = process.env.ADMIN_PASS || "Tiendita321";
+  const adminPass = await getEffectiveAdminPass();
 
   if (username !== adminUser || password !== adminPass) {
-    return res.status(401).json({ message: "Invalid credentials" });
+    return res.status(401).json({ message: "Credenciales incorrectas" });
   }
 
   const token = jwt.sign(
@@ -154,6 +169,44 @@ app.post("/api/login", (req, res) => {
     },
   );
   return res.json({ token });
+});
+
+// Cambiar Contraseña (requiere login)
+app.post("/api/auth/change-password", authGuard, async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    return res
+      .status(400)
+      .json({
+        message: "Debes ingresar la contraseña actual y la nueva contraseña",
+      });
+  }
+
+  if (newPassword.length < 4) {
+    return res
+      .status(400)
+      .json({
+        message: "La nueva contraseña debe tener al menos 4 caracteres",
+      });
+  }
+
+  try {
+    const effectivePass = await getEffectiveAdminPass();
+    if (currentPassword !== effectivePass) {
+      return res
+        .status(401)
+        .json({ message: "La contraseña actual es incorrecta" });
+    }
+
+    await query(
+      "INSERT INTO settings (key, value) VALUES ('admin_password', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+      [String(newPassword)],
+    );
+
+    return res.json({ message: "Contraseña actualizada exitosamente" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
 });
 
 // Precios Públicos
@@ -521,10 +574,11 @@ function decodeClientCode(code) {
 app.get("/api/clients", authGuard, async (req, res) => {
   try {
     const result = await query(
-      "SELECT id, name, total_debt, points, phone FROM clients ORDER BY total_debt DESC",
+      "SELECT id, name, total_debt, points, phone, COALESCE(credit_limit, 0) AS credit_limit FROM clients ORDER BY total_debt DESC",
     );
     const rows = result.rows.map((c) => ({
       ...c,
+      credit_limit: Number(c.credit_limit || 0),
       public_code: encodeClientId(c.id),
     }));
     return res.json(rows);
@@ -535,15 +589,22 @@ app.get("/api/clients", authGuard, async (req, res) => {
 
 app.post("/api/clients", authGuard, async (req, res) => {
   const { name, phone } = req.body || {};
+  const creditLimit =
+    Number(
+      req.body.credit_limit !== undefined
+        ? req.body.credit_limit
+        : req.body.creditLimit,
+    ) || 0;
   if (!name) return res.status(400).json({ message: "Name is required" });
   try {
     const result = await query(
-      "INSERT INTO clients (name, phone) VALUES ($1, $2) RETURNING *",
-      [name, phone || null],
+      "INSERT INTO clients (name, phone, credit_limit) VALUES ($1, $2, $3) RETURNING *",
+      [name, phone || null, creditLimit],
     );
     const newClient = result.rows[0];
     return res.json({
       ...newClient,
+      credit_limit: Number(newClient.credit_limit || 0),
       public_code: encodeClientId(newClient.id),
     });
   } catch (error) {
@@ -562,7 +623,7 @@ app.get("/api/public/clients/:code", async (req, res) => {
   }
   try {
     const clientRes = await query(
-      "SELECT name, total_debt, points FROM clients WHERE id = $1",
+      "SELECT name, total_debt, points, COALESCE(credit_limit, 0) AS credit_limit FROM clients WHERE id = $1",
       [clientId],
     );
     if (!clientRes.rows.length) {
@@ -587,7 +648,7 @@ app.get("/api/public/clients/:code/movements", async (req, res) => {
   }
   try {
     const movementsRes = await query(
-      `SELECT m.id AS movement_id, m.concept, m.amount, m.points, m.created_at,
+      `SELECT m.id AS movement_id, m.concept, m.amount, m.points, m.payment_method, m.created_at,
               mi.quantity, mi.unit_price, s.name AS sweet_name
        FROM movements m
        LEFT JOIN movement_items mi ON mi.movement_id = m.id
@@ -605,6 +666,7 @@ app.get("/api/public/clients/:code/movements", async (req, res) => {
           concept: row.concept,
           amount: Number(row.amount),
           points: Number(row.points || 0),
+          payment_method: row.payment_method || "cash",
           created_at: row.created_at,
           items: [],
         };
@@ -632,6 +694,12 @@ app.get("/api/public/clients/:code/movements", async (req, res) => {
 app.put("/api/clients/:id", authGuard, async (req, res) => {
   const { id } = req.params;
   const { name, totalDebt, points, phone } = req.body || {};
+  const creditLimit =
+    Number(
+      req.body.credit_limit !== undefined
+        ? req.body.credit_limit
+        : req.body.creditLimit,
+    ) || 0;
   if (!name) return res.status(400).json({ message: "Missing name" });
 
   const dbPool = getPool();
@@ -641,7 +709,7 @@ app.put("/api/clients/:id", authGuard, async (req, res) => {
     await clientConn.query("BEGIN");
 
     const currentClient = await clientConn.query(
-      "SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1",
+      "SELECT id, name, total_debt, points, phone, credit_limit FROM clients WHERE id = $1",
       [id],
     );
     if (!currentClient.rows.length) {
@@ -658,16 +726,16 @@ app.put("/api/clients/:id", authGuard, async (req, res) => {
       : 0;
 
     await clientConn.query(
-      "UPDATE clients SET name = $1, total_debt = $2, points = $3, phone = $4 WHERE id = $5",
-      [name, normalizedDebt, normalizedPoints, phone || null, id],
+      "UPDATE clients SET name = $1, total_debt = $2, points = $3, phone = $4, credit_limit = $5 WHERE id = $6",
+      [name, normalizedDebt, normalizedPoints, phone || null, creditLimit, id],
     );
 
     const delta = Number((normalizedDebt - previousDebt).toFixed(2));
     if (Math.abs(delta) > 0) {
       const concept = `Ajuste por edicion de saldo (${name})`;
       await clientConn.query(
-        "INSERT INTO movements (client_id, concept, amount) VALUES ($1, $2, $3)",
-        [id, concept, delta],
+        "INSERT INTO movements (client_id, concept, amount, payment_method) VALUES ($1, $2, $3, $4)",
+        [id, concept, delta, "adjust"],
       );
     }
 
@@ -771,7 +839,7 @@ app.get("/api/clients/:id/movements", authGuard, async (req, res) => {
   const clientId = Number(req.params.id);
   try {
     const result = await query(
-      "SELECT id, concept, amount, points, created_at FROM movements WHERE client_id = $1 ORDER BY created_at DESC",
+      "SELECT id, concept, amount, points, payment_method, created_at FROM movements WHERE client_id = $1 ORDER BY created_at DESC",
       [clientId],
     );
     return res.json(result.rows);
@@ -802,7 +870,7 @@ app.delete(
     const clientId = Number(req.params.clientId);
     const movementId = Number(req.params.movementId);
     const { password } = req.body || {};
-    const adminPass = process.env.ADMIN_PASS || "Tiendita321";
+    const adminPass = await getEffectiveAdminPass();
 
     if (!clientId || !movementId)
       return res.status(400).json({ message: "Invalid client or movement id" });
@@ -863,7 +931,8 @@ app.delete(
 
 app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
   const clientId = Number(req.params.id);
-  const { amount, concept, items, payImmediately } = req.body || {};
+  const { amount, concept, items, payImmediately, paymentMethod } =
+    req.body || {};
   const pointsUsed = Number(req.body.pointsUsed) || 0;
 
   if (pointsUsed < 0)
@@ -880,6 +949,21 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
     let totalAmount = 0;
     let normalizedItems = [];
     const settings = await getSettings();
+
+    // Check client details & credit limit
+    const clientRes = await clientConn.query(
+      "SELECT id, name, total_debt, points, phone, COALESCE(credit_limit, 0) AS credit_limit FROM clients WHERE id = $1",
+      [clientId],
+    );
+    if (!clientRes.rows.length) {
+      await clientConn.query("ROLLBACK");
+      return res.status(404).json({ message: "Client not found" });
+    }
+    const clientData = clientRes.rows[0];
+    const currentDebt = Number(clientData.total_debt || 0);
+    const creditLimit = Number(clientData.credit_limit || 0);
+
+    let ticketItems = [];
 
     if (Array.isArray(items) && items.length > 0) {
       normalizedItems = items
@@ -905,7 +989,15 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
           [item.sweetId],
         );
         if (!sweetRes.rows.length) throw new Error("Sweet not found");
-        totalAmount += Number(sweetRes.rows[0].sale_price) * item.quantity;
+        const sweet = sweetRes.rows[0];
+        const unitPrice = Number(sweet.sale_price);
+        totalAmount += unitPrice * item.quantity;
+        ticketItems.push({
+          sweetId: item.sweetId,
+          name: sweet.name,
+          quantity: item.quantity,
+          unitPrice,
+        });
       }
     } else {
       if (!amount) {
@@ -925,12 +1017,7 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
     }
 
     if (pointsUsed > 0) {
-      const clientRes = await clientConn.query(
-        "SELECT points FROM clients WHERE id = $1",
-        [clientId],
-      );
-      if (!clientRes.rows.length) throw new Error("Client not found");
-      const clientPoints = Number(clientRes.rows[0].points || 0);
+      const clientPoints = Number(clientData.points || 0);
       if (clientPoints < pointsUsed) {
         throw new Error(
           `Puntos insuficientes. El cliente tiene ${clientPoints.toFixed(1)} pts.`,
@@ -938,29 +1025,37 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
       }
     }
 
+    const remainingAmount = Number((totalAmount - pointsUsed).toFixed(2));
+    const shouldPay = !!payImmediately;
+
+    // Credit limit validation (if not paid immediately and client has a credit limit)
+    if (!shouldPay && creditLimit > 0) {
+      const resultingDebt = Number((currentDebt + remainingAmount).toFixed(2));
+      if (resultingDebt > creditLimit) {
+        await clientConn.query("ROLLBACK");
+        return res.status(400).json({
+          message: `La compra excede el límite de crédito del cliente ($${creditLimit.toFixed(2)}). Saldo resultante sería $${resultingDebt.toFixed(2)}.`,
+        });
+      }
+    }
+
     const movRes = await clientConn.query(
-      "INSERT INTO movements (client_id, concept, amount, points) VALUES ($1, $2, $3, $4) RETURNING id",
-      [clientId, concept || "Compra", totalAmount, 0],
+      "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+      [
+        clientId,
+        concept || "Compra",
+        totalAmount,
+        0,
+        shouldPay ? paymentMethod || "cash" : "credit",
+      ],
     );
     const movementId = movRes.rows[0].id;
 
-    let ticketItems = [];
-    if (normalizedItems.length > 0) {
-      for (const item of normalizedItems) {
-        const sweetRes = await clientConn.query(
-          "SELECT name, sale_price FROM sweets WHERE id = $1",
-          [item.sweetId],
-        );
-        const sweet = sweetRes.rows[0];
-        ticketItems.push({
-          name: sweet.name,
-          quantity: item.quantity,
-          unitPrice: Number(sweet.sale_price),
-        });
-
+    if (ticketItems.length > 0) {
+      for (const item of ticketItems) {
         await clientConn.query(
           "INSERT INTO movement_items (movement_id, sweet_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
-          [movementId, item.sweetId, item.quantity, Number(sweet.sale_price)],
+          [movementId, item.sweetId, item.quantity, item.unitPrice],
         );
         await clientConn.query(
           "UPDATE sweets SET stock = stock - $1, sold_count = sold_count + $1 WHERE id = $2",
@@ -969,19 +1064,23 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
       }
     }
 
+    // Purchase adds to total debt (double-entry base)
+    await clientConn.query(
+      "UPDATE clients SET total_debt = total_debt + $1 WHERE id = $2",
+      [totalAmount, clientId],
+    );
+
     if (pointsUsed > 0) {
       await clientConn.query(
-        "UPDATE clients SET points = GREATEST(0, points - $1) WHERE id = $2",
+        "UPDATE clients SET points = GREATEST(0, points - $1), total_debt = total_debt - $1 WHERE id = $2",
         [pointsUsed, clientId],
       );
       await clientConn.query(
-        "INSERT INTO movements (client_id, concept, amount, points) VALUES ($1, $2, $3, $4)",
-        [clientId, "Pago con puntos", -pointsUsed, -pointsUsed],
+        "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5)",
+        [clientId, "Pago con puntos", -pointsUsed, -pointsUsed, "points"],
       );
     }
 
-    const remainingAmount = Number((totalAmount - pointsUsed).toFixed(2));
-    const shouldPay = !!payImmediately;
     const rewardFactor = parseFloat(settings.reward_factor || "0.10");
     const pointsEarned =
       settings.rewards_enabled === "true" || settings.rewards_enabled === true
@@ -990,22 +1089,18 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
 
     if (shouldPay) {
       await clientConn.query(
-        "INSERT INTO movements (client_id, concept, amount, points) VALUES ($1, $2, $3, $4)",
+        "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5)",
         [
           clientId,
           "Pago de compra al instante",
           -remainingAmount,
           pointsEarned,
+          paymentMethod || "cash",
         ],
       );
       await clientConn.query(
-        "UPDATE clients SET points = points + $1 WHERE id = $2",
-        [pointsEarned, clientId],
-      );
-    } else {
-      await clientConn.query(
-        "UPDATE clients SET total_debt = total_debt + $1 WHERE id = $2",
-        [remainingAmount, clientId],
+        "UPDATE clients SET total_debt = total_debt - $1, points = points + $2 WHERE id = $3",
+        [remainingAmount, pointsEarned, clientId],
       );
     }
 
@@ -1035,26 +1130,33 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
 });
 
 app.post("/api/clients/:id/pay", authGuard, async (req, res) => {
+  const clientId = Number(req.params.id);
+  const { amount, concept, paymentMethod } = req.body || {};
+  const parsedAmount = Number(amount);
+
+  if (
+    !Number.isInteger(clientId) ||
+    clientId <= 0 ||
+    !Number.isFinite(parsedAmount) ||
+    parsedAmount <= 0
+  ) {
+    return res.status(400).json({ message: "Invalid client or amount" });
+  }
+
+  const dbPool = getPool();
+  const clientConn = await dbPool.connect();
+
   try {
-    const clientId = Number(req.params.id);
-    const { amount, concept } = req.body || {};
-    const parsedAmount = Number(amount);
+    await clientConn.query("BEGIN");
 
-    if (
-      !Number.isInteger(clientId) ||
-      clientId <= 0 ||
-      !Number.isFinite(parsedAmount) ||
-      parsedAmount <= 0
-    ) {
-      return res.status(400).json({ message: "Invalid client or amount" });
-    }
-
-    const clientRes = await query(
+    const clientRes = await clientConn.query(
       "SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1",
       [clientId],
     );
-    if (!clientRes.rows.length)
+    if (!clientRes.rows.length) {
+      await clientConn.query("ROLLBACK");
       return res.status(404).json({ message: "Client not found" });
+    }
 
     const settings = await getSettings();
     const rewardFactor = parseFloat(settings.reward_factor || "0.10");
@@ -1064,15 +1166,23 @@ app.post("/api/clients/:id/pay", authGuard, async (req, res) => {
         ? Number((Math.abs(parsedAmount) * rewardFactor).toFixed(2))
         : 0;
 
-    await query(
-      "INSERT INTO movements (client_id, concept, amount, points) VALUES ($1, $2, $3, $4)",
-      [clientId, concept || "Pago", normalized, pointsEarned],
+    await clientConn.query(
+      "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5)",
+      [
+        clientId,
+        concept || "Pago",
+        normalized,
+        pointsEarned,
+        paymentMethod || "cash",
+      ],
     );
 
-    await query(
+    await clientConn.query(
       "UPDATE clients SET total_debt = total_debt - $1, points = points + $2 WHERE id = $3",
       [Math.abs(parsedAmount), pointsEarned, clientId],
     );
+
+    await clientConn.query("COMMIT");
 
     const updatedClientRes = await query(
       "SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1",
@@ -1088,12 +1198,15 @@ app.post("/api/clients/:id/pay", authGuard, async (req, res) => {
 
     return res.json({ message: "Payment registered" });
   } catch (error) {
+    await clientConn.query("ROLLBACK");
     return res.status(400).json({ message: error.message });
+  } finally {
+    clientConn.release();
   }
 });
 
 app.post("/api/sales", authGuard, async (req, res) => {
-  const { items } = req.body || {};
+  const { items, paymentMethod } = req.body || {};
   if (!Array.isArray(items) || items.length === 0)
     return res.status(400).json({ message: "Missing items" });
 
@@ -1119,31 +1232,34 @@ app.post("/api/sales", authGuard, async (req, res) => {
     await clientConn.query("BEGIN");
 
     let totalAmount = 0;
+    const itemDetails = [];
+
     for (const item of normalizedItems) {
       const sweetRes = await clientConn.query(
-        "SELECT sale_price FROM sweets WHERE id = $1",
+        "SELECT id, name, sale_price, stock FROM sweets WHERE id = $1",
         [item.sweetId],
       );
       if (!sweetRes.rows.length) throw new Error("Sweet not found");
-      totalAmount += Number(sweetRes.rows[0].sale_price) * item.quantity;
+      const sweet = sweetRes.rows[0];
+      const uPrice = Number(sweet.sale_price);
+      totalAmount += uPrice * item.quantity;
+      itemDetails.push({
+        sweetId: item.sweetId,
+        quantity: item.quantity,
+        unitPrice: uPrice,
+      });
     }
 
     const saleRes = await clientConn.query(
-      "INSERT INTO sales (total_amount) VALUES ($1) RETURNING id",
-      [totalAmount],
+      "INSERT INTO sales (total_amount, payment_method) VALUES ($1, $2) RETURNING id",
+      [totalAmount, paymentMethod || "cash"],
     );
     const saleId = saleRes.rows[0].id;
 
-    for (const item of normalizedItems) {
-      const sweetRes = await clientConn.query(
-        "SELECT sale_price FROM sweets WHERE id = $1",
-        [item.sweetId],
-      );
-      const uPrice = Number(sweetRes.rows[0].sale_price);
-
+    for (const item of itemDetails) {
       await clientConn.query(
         "INSERT INTO sale_items (sale_id, sweet_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
-        [saleId, item.sweetId, item.quantity, uPrice],
+        [saleId, item.sweetId, item.quantity, item.unitPrice],
       );
       await clientConn.query(
         "UPDATE sweets SET stock = stock - $1, sold_count = sold_count + $1 WHERE id = $2",
@@ -1612,10 +1728,11 @@ async function sendWhatsAppTicketAutomatically(
       `⭐ *Puntos Disponibles:* ${Number(client.points || 0).toFixed(1)} pts`,
     );
     const ticketCode = encodeClientId(client.id);
+    const baseUrl = process.env.APP_URL || "https://tiendita-mx.vercel.app";
     if (ticketCode) {
       lines.push(``);
       lines.push(`🔗 *Consulta tu estado de cuenta completo aquí:*`);
-      lines.push(`https://tiendita-mx.vercel.app/c/${ticketCode}`);
+      lines.push(`${baseUrl}/c/${ticketCode}`);
     }
     lines.push(``);
     lines.push(`¡Gracias por tu preferencia! 🙌`);
@@ -1670,6 +1787,24 @@ app.get("/api/whatsapp/status", authGuard, async (req, res) => {
   }
 });
 
+// Endpoint público para obtener ajustes no sensibles (CLABE, teléfono del negocio)
+app.get("/api/public/settings", async (req, res) => {
+  try {
+    const settings = await getSettings();
+    return res.json({
+      bank_clabe: settings.bank_clabe || "646990403801118437",
+      business_phone: settings.business_phone || "523346502871",
+      business_name: settings.business_name || "Tiendita",
+    });
+  } catch (error) {
+    return res.json({
+      bank_clabe: "646990403801118437",
+      business_phone: "523346502871",
+      business_name: "Tiendita",
+    });
+  }
+});
+
 app.post("/api/clients/:id/whatsapp-statement", authGuard, async (req, res) => {
   try {
     const clientId = Number(req.params.id);
@@ -1684,17 +1819,36 @@ app.post("/api/clients/:id/whatsapp-statement", authGuard, async (req, res) => {
     if (!client.phone)
       return res
         .status(400)
-        .json({ message: "Client has no registered phone number" });
+        .json({ message: "El cliente no tiene teléfono registrado" });
 
+    const baseUrl = process.env.APP_URL || "https://tiendita-mx.vercel.app";
     const stmtCode = encodeClientId(client.id);
     let linkStr = "";
     if (stmtCode) {
-      linkStr = `\n\n🔗 *Consulta tu estado de cuenta completo aquí:*\nhttps://tiendita-mx.vercel.app/c/${stmtCode}`;
+      linkStr = `\n\n🔗 *Consulta tu estado de cuenta completo aquí:*\n${baseUrl}/c/${stmtCode}`;
     }
     const message = `Hola ${client.name}, tu saldo total en Tiendita es de $${Number(client.total_debt).toFixed(2)} y cuentas con ${Number(client.points || 0).toFixed(1)} pts.${linkStr}\n\n¡Gracias por tu preferencia! 🙌`;
-    await sendWhatsAppMessage(client.phone, message);
 
-    return res.json({ message: "WhatsApp statement sent successfully" });
+    const cleanPhone = formatWhatsAppNumber(client.phone);
+    const manualWaUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+
+    try {
+      await sendWhatsAppMessage(client.phone, message);
+      return res.json({
+        message: "Estado de cuenta enviado por WhatsApp",
+        waUrl: manualWaUrl,
+      });
+    } catch (sendError) {
+      console.warn(
+        "Could not send via API, providing fallback URL:",
+        sendError.message,
+      );
+      return res.json({
+        message: "No se pudo enviar automáticamente por API de WhatsApp.",
+        warning: sendError.message,
+        waUrl: manualWaUrl,
+      });
+    }
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

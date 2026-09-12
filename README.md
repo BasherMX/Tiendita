@@ -1,17 +1,17 @@
 # Tiendita
 
-Aplicacion de gestion de dulces con frontend React + Vite, backend Node + Express y SQL Server en contenedores Podman.
+Aplicacion de gestion de dulces y punto de venta con frontend React + Vite, backend Node + Express y PostgreSQL en contenedores Podman o Serverless en Vercel.
 
 ## Stack
 
-- Frontend: React, Vite, Tailwind
-- Backend: Node.js, Express, JWT, mssql
-- Base de datos: SQL Server 2022
+- Frontend: React 18, Vite, Tailwind CSS, Framer Motion, Recharts
+- Backend: Node.js, Express, JWT, pg (PostgreSQL)
+- Base de datos: PostgreSQL 16 / Vercel Postgres
 - Orquestacion local: Podman + podman-compose
 
 ## Requisitos
 
-- Podman Desktop instalado
+- Podman Desktop instalado (o Node.js 20+ para ejecución directa)
 - Python 3 con podman-compose (`pip install podman-compose`)
 - PowerShell (Windows)
 
@@ -31,27 +31,16 @@ Servicios esperados:
 
 - Frontend: http://localhost:1416
 - Backend: http://localhost:4000
-- SQL Server: localhost:14330
-
-## Restaurar un backup
-
-Para restaurar un respaldo especifico:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\restaurar-ultimo-respaldo.ps1 -BackupFile "D:\TIENDITA\backups\tiendita_YYYYMMDD_HHMMSS.bak"
-```
+- Postgres: localhost:5432
 
 ## Scripts utiles
 
 - `start.ps1`: inicia stack en contenedores
 - `start-local.ps1`: modo local (sin contenedores)
-- `restaurar-ultimo-respaldo.ps1`: restaura base desde `.bak`
-- `backup-diario.ps1`: genera respaldo de base
 
 ## Seguridad
 
 - No subir `.env` ni archivos con secretos.
-- No subir respaldos `.bak`.
 - Este repositorio incluye `.gitignore` para excluirlos.
 
 ## Estructura
@@ -61,6 +50,5 @@ backend/
 frontend/
 podman-compose.yaml
 start.ps1
-restaurar-ultimo-respaldo.ps1
 README.md
 ```

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS clients (
   total_debt DECIMAL(10,2) NOT NULL DEFAULT 0,
   points DECIMAL(10,2) NOT NULL DEFAULT 0,
   phone VARCHAR(20) NULL,
+  credit_limit DECIMAL(10,2) NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS movements (
   concept VARCHAR(200) NOT NULL,
   amount DECIMAL(10,2) NOT NULL,
   points DECIMAL(10,2) NOT NULL DEFAULT 0,
+  payment_method VARCHAR(30) NOT NULL DEFAULT 'cash',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -40,6 +42,7 @@ CREATE TABLE IF NOT EXISTS movement_items (
 CREATE TABLE IF NOT EXISTS sales (
   id SERIAL PRIMARY KEY,
   total_amount DECIMAL(10,2) NOT NULL,
+  payment_method VARCHAR(30) NOT NULL DEFAULT 'cash',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -90,8 +93,21 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
+-- Migraciones automáticas idempotentes para bases de datos existentes
 ALTER TABLE settings ALTER COLUMN value TYPE TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS credit_limit DECIMAL(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE movements ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30) NOT NULL DEFAULT 'cash';
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30) NOT NULL DEFAULT 'cash';
 
+-- Índices de Rendimiento
+CREATE INDEX IF NOT EXISTS idx_movements_client ON movements(client_id);
+CREATE INDEX IF NOT EXISTS idx_movements_created ON movements(created_at);
+CREATE INDEX IF NOT EXISTS idx_movement_items_mov ON movement_items(movement_id);
+CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);
+CREATE INDEX IF NOT EXISTS idx_package_purchases_place ON package_purchases(place_id);
+
+-- Valores por defecto en Settings
 INSERT INTO settings (key, value) VALUES ('reward_factor', '0.10') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('rewards_enabled', 'true') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('whatsapp_enabled', 'true') ON CONFLICT (key) DO NOTHING;
@@ -102,3 +118,4 @@ INSERT INTO settings (key, value) VALUES ('whatsapp_session_id', 'tiendita') ON 
 INSERT INTO settings (key, value) VALUES ('whatsapp_default_country', '52') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('meta_whatsapp_token', '') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('meta_phone_number_id', '') ON CONFLICT (key) DO NOTHING;
+

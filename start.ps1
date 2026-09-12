@@ -172,7 +172,7 @@ if ($ready) {
     Write-Host ""
     Write-Host "  Frontend   -> http://localhost:1416" -ForegroundColor Cyan
     Write-Host "  Backend    -> http://localhost:4000" -ForegroundColor Cyan
-    Write-Host "  SQL Server -> localhost:14330" -ForegroundColor Cyan
+    Write-Host "  Postgres   -> localhost:5432" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  Usuario: admin   Contrasena: Tiendita321" -ForegroundColor White
     Write-Host ""
