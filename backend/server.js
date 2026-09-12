@@ -503,22 +503,18 @@ app.get("/api/stats", authGuard, async (req, res) => {
           FROM sales
           UNION ALL
           SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day,
-                 COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS contado,
                  COALESCE(NULLIF(amount, 0), NULLIF(paid_amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS contado,
                  0 AS fiado, 0 AS abonos
           FROM movements
-          WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%' AND payment_method != 'credit'
           WHERE ((amount > 0) OR (COALESCE(paid_amount, 0) > 0) OR (amount = 0 AND (concept ILIKE '%contado%' OR EXISTS(SELECT 1 FROM movement_items WHERE movement_id = movements.id))))
             AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%' AND payment_method != 'credit'
           UNION ALL
           SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day, 0 AS contado, amount AS fiado, 0 AS abonos
           FROM movements
-          WHERE amount > 0 AND concept LIKE 'Compra%' AND payment_method = 'credit'
           WHERE amount > 0 AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%' AND payment_method = 'credit'
           UNION ALL
           SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day, 0 AS contado, 0 AS fiado, ABS(amount) AS abonos
           FROM movements
-          WHERE amount < 0 AND (concept LIKE 'Pago%' OR concept LIKE 'Abono%')
           WHERE amount < 0 AND (concept ILIKE '%pago%' OR concept ILIKE '%abono%')
         ) AS flow
         GROUP BY day
@@ -533,10 +529,8 @@ app.get("/api/stats", authGuard, async (req, res) => {
           FROM sales
           UNION ALL
           SELECT EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS hour,
-                 COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
                  COALESCE(NULLIF(amount, 0), NULLIF(paid_amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
           FROM movements
-          WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%'
           WHERE ((amount > 0) OR (COALESCE(paid_amount, 0) > 0) OR (amount = 0 AND (concept ILIKE '%contado%' OR EXISTS(SELECT 1 FROM movement_items WHERE movement_id = movements.id))))
             AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%'
         ) AS hourly
@@ -552,10 +546,8 @@ app.get("/api/stats", authGuard, async (req, res) => {
           FROM sales
           UNION ALL
           SELECT EXTRACT(DOW FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow,
-                 COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
                  COALESCE(NULLIF(amount, 0), NULLIF(paid_amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
           FROM movements
-          WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%'
           WHERE ((amount > 0) OR (COALESCE(paid_amount, 0) > 0) OR (amount = 0 AND (concept ILIKE '%contado%' OR EXISTS(SELECT 1 FROM movement_items WHERE movement_id = movements.id))))
             AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%'
         ) AS dow_data
@@ -2006,10 +1998,8 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
     let movementId;
 
     if (shouldPay) {
-      // Compra al instante (al contado): UN SOLO movimiento con impacto neto en deuda $0.00
       // Compra al instante (al contado): UN SOLO movimiento con impacto neto en deuda $0.00 y paid_amount guardado
       const movRes = await clientConn.query(
-        "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5) RETURNING id",
         "INSERT INTO movements (client_id, concept, amount, points, payment_method, paid_amount) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
         [
           clientId,
@@ -2043,8 +2033,6 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
     } else {
       // Compra a crédito (fiado): Se registra la deuda y los puntos
       const movRes = await clientConn.query(
-        "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-        [clientId, concept || "Compra", totalAmount, 0, "credit"],
         "INSERT INTO movements (client_id, concept, amount, points, payment_method, paid_amount) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
         [clientId, concept || "Compra", totalAmount, 0, "credit", 0],
       );
