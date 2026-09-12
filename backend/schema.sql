@@ -99,14 +99,19 @@ ALTER TABLE settings ALTER COLUMN value TYPE TEXT;
 ALTER TABLE sweets ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS credit_limit DECIMAL(10,2) NOT NULL DEFAULT 0;
 ALTER TABLE movements ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30) NOT NULL DEFAULT 'cash';
+ALTER TABLE movements ADD COLUMN IF NOT EXISTS paid_amount DECIMAL(10,2) DEFAULT 0;
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30) NOT NULL DEFAULT 'cash';
 
 -- Índices de Rendimiento
 CREATE INDEX IF NOT EXISTS idx_movements_client ON movements(client_id);
 CREATE INDEX IF NOT EXISTS idx_movements_created ON movements(created_at);
 CREATE INDEX IF NOT EXISTS idx_movement_items_mov ON movement_items(movement_id);
+CREATE INDEX IF NOT EXISTS idx_movement_items_sweet ON movement_items(sweet_id);
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sale_items_sweet ON sale_items(sweet_id);
 CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);
+CREATE INDEX IF NOT EXISTS idx_sweets_stock ON sweets(stock);
+CREATE INDEX IF NOT EXISTS idx_sweets_active_stock ON sweets(is_active, stock);
 CREATE INDEX IF NOT EXISTS idx_package_purchases_place ON package_purchases(place_id);
 
 -- Valores por defecto en Settings

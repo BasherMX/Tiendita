@@ -1,5 +1,37 @@
 export const releases = [
   {
+    version: "1.8.0",
+    date: "12 de Septiembre, 2026",
+    tagline:
+      "Skeletons de carga, optimización de rendimiento y registro de compras de contado",
+    highlights: [
+      "Skeletons animados de carga: Efecto visual moderno tanto en el directorio de clientes como en el libro contable de movimientos mientras se cargan los datos del servidor.",
+      "Registro fiel de compras de contado: Se almacena y visualiza el importe real pagado (paid_amount) en compras al contado de clientes, corrigiendo el valor de $0.00 en ventas del día y portales públicos.",
+      "Sincronización horaria precisa: Reportes de ventas, flujo de efectivo y estadísticas sincronizados con la zona horaria America/Mexico_City.",
+      "Code-Splitting y carga ultrarrápida en móviles: Lazy loading dinámico de Compras y Estadísticas (ahorrando ~480 kB en el bundle inicial).",
+      "Buscador ágil con botón de limpieza: Botón de 1 toque ('X') en el punto de venta y catálogo de inventario.",
+      "Optimización de Base de Datos: Índices creados para acelerar consultas complejas de movimientos, ventas y stock.",
+    ],
+    sections: [
+      {
+        title: "⚡ Rendimiento & Experiencia Móvil",
+        items: [
+          "Skeletons fluidos en la pestaña de Clientes eliminando saltos de diseño durante la carga.",
+          "Carga bajo demanda (React.lazy) para Compras y el paquete pesado de gráficas de Estadísticas.",
+          "Botones rápidos para limpiar el campo de búsqueda sin tener que borrar manualmente.",
+        ],
+      },
+      {
+        title: "📊 Precisión Contable & Datos",
+        items: [
+          "Columna paid_amount para registrar pagos de contado dentro del historial de cada cliente.",
+          "Cálculo de fechas y agrupaciones por hora y día respetando el horario local mexicano.",
+          "Índices optimizados en Postgres (Neon) para agilizar búsquedas de inventario y tickets.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.7.9",
     date: "11 de Septiembre, 2026",
     tagline:

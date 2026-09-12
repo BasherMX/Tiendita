@@ -1884,6 +1884,7 @@ export default function StatsPage({
                               )}
                             </td>
 
+
                             {/* Qué compra junto / Cross-Selling */}
                             <td className="px-3 py-2.5 whitespace-nowrap">
                               {c.top_cross_selling_pair ? (

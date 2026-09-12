@@ -6,6 +6,7 @@ import {
   mdiPencil,
   mdiDelete,
   mdiMagnify,
+  mdiClose,
 } from "@mdi/js";
 
 export default function InventoryPage({
@@ -120,15 +121,25 @@ export default function InventoryPage({
             <Icon
               path={mdiMagnify}
               size={0.7}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#78716C] dark:text-[#9CA3AF]"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#78716C] dark:text-[#9CA3AF] pointer-events-none"
             />
             <input
-              type="search"
-              className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] py-2 pl-9 pr-3 text-xs outline-none transition focus:bg-[#FFFFFF] dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
+              type="text"
+              className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] py-2 pl-9 pr-8 text-xs outline-none transition focus:bg-[#FFFFFF] dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
               placeholder="Buscar producto por nombre..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-[#78716C] hover:bg-[#E5E2DA]/60 hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:bg-[#282C32] dark:hover:text-[#F3F2EE] transition"
+                title="Limpiar búsqueda"
+              >
+                <Icon path={mdiClose} size={0.6} />
+              </button>
+            )}
           </div>
 
           <div className="flex rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-1 text-[11px] font-semibold dark:border-[#282C32] dark:bg-[#181B1E]">

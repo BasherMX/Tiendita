@@ -71,7 +71,17 @@ async function ensureMigrations() {
       ALTER TABLE sweets ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
       ALTER TABLE clients ADD COLUMN IF NOT EXISTS credit_limit DECIMAL(10,2) NOT NULL DEFAULT 0;
       ALTER TABLE movements ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30) NOT NULL DEFAULT 'cash';
+      ALTER TABLE movements ADD COLUMN IF NOT EXISTS paid_amount DECIMAL(10,2) DEFAULT 0;
       ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30) NOT NULL DEFAULT 'cash';
+      CREATE INDEX IF NOT EXISTS idx_movements_client ON movements(client_id);
+      CREATE INDEX IF NOT EXISTS idx_movements_created ON movements(created_at);
+      CREATE INDEX IF NOT EXISTS idx_movement_items_mov ON movement_items(movement_id);
+      CREATE INDEX IF NOT EXISTS idx_movement_items_sweet ON movement_items(sweet_id);
+      CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+      CREATE INDEX IF NOT EXISTS idx_sale_items_sweet ON sale_items(sweet_id);
+      CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);
+      CREATE INDEX IF NOT EXISTS idx_sweets_stock ON sweets(stock);
+      CREATE INDEX IF NOT EXISTS idx_sweets_active_stock ON sweets(is_active, stock);
     `);
     schemaEnsured = true;
   } catch (error) {
@@ -408,10 +418,12 @@ app.get("/api/stats", authGuard, async (req, res) => {
       totalsRes,
     ] = await Promise.all([
       // 1. Totales diarios históricos
+      // 1. Totales diarios históricos (convertidos a horario local America/Mexico_City)
       query(`
         SELECT day, SUM(total) AS total, SUM(profit) AS profit
         FROM (
           SELECT m.created_at::date AS day,
+          SELECT (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day,
                  SUM(mi.quantity * mi.unit_price) AS total,
                  SUM(mi.quantity * (mi.unit_price - s.purchase_price)) AS profit
           FROM movements m
@@ -419,13 +431,27 @@ app.get("/api/stats", authGuard, async (req, res) => {
           JOIN sweets s ON s.id = mi.sweet_id
           WHERE ((m.amount > 0) OR (m.amount = 0 AND m.concept LIKE '%al contado%')) AND m.concept LIKE 'Compra%'
           GROUP BY m.created_at::date
+          WHERE ((m.amount > 0) OR (m.amount = 0 AND (m.concept ILIKE '%contado%' OR mi.sweet_id IS NOT NULL)))
+            AND m.concept NOT ILIKE '%pago%'
+            AND m.concept NOT ILIKE '%abono%'
+          GROUP BY (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date
           UNION ALL
           SELECT si.created_at::date AS day,
+          SELECT (m2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day,
+                 COALESCE(m2.paid_amount, 0) AS total,
+                 0 AS profit
+          FROM movements m2
+          LEFT JOIN movement_items mi2 ON mi2.movement_id = m2.id
+          WHERE mi2.id IS NULL AND COALESCE(m2.paid_amount, 0) > 0
+            AND m2.concept NOT ILIKE '%pago%' AND m2.concept NOT ILIKE '%abono%'
+          UNION ALL
+          SELECT (si.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day,
                  SUM(si.quantity * si.unit_price) AS total,
                  SUM(si.quantity * (si.unit_price - s.purchase_price)) AS profit
           FROM sale_items si
           JOIN sweets s ON s.id = si.sweet_id
           GROUP BY si.created_at::date
+          GROUP BY (si.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date
         ) AS combined
         GROUP BY day
         ORDER BY day DESC
@@ -483,17 +509,22 @@ app.get("/api/stats", authGuard, async (req, res) => {
           UNION ALL
           SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day,
                  COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS contado,
+                 COALESCE(NULLIF(amount, 0), NULLIF(paid_amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS contado,
                  0 AS fiado, 0 AS abonos
           FROM movements
           WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%' AND payment_method != 'credit'
+          WHERE ((amount > 0) OR (COALESCE(paid_amount, 0) > 0) OR (amount = 0 AND (concept ILIKE '%contado%' OR EXISTS(SELECT 1 FROM movement_items WHERE movement_id = movements.id))))
+            AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%' AND payment_method != 'credit'
           UNION ALL
           SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day, 0 AS contado, amount AS fiado, 0 AS abonos
           FROM movements
           WHERE amount > 0 AND concept LIKE 'Compra%' AND payment_method = 'credit'
+          WHERE amount > 0 AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%' AND payment_method = 'credit'
           UNION ALL
           SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day, 0 AS contado, 0 AS fiado, ABS(amount) AS abonos
           FROM movements
           WHERE amount < 0 AND (concept LIKE 'Pago%' OR concept LIKE 'Abono%')
+          WHERE amount < 0 AND (concept ILIKE '%pago%' OR concept ILIKE '%abono%')
         ) AS flow
         GROUP BY day
         ORDER BY day ASC
@@ -508,8 +539,11 @@ app.get("/api/stats", authGuard, async (req, res) => {
           UNION ALL
           SELECT EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS hour,
                  COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
+                 COALESCE(NULLIF(amount, 0), NULLIF(paid_amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
           FROM movements
           WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%'
+          WHERE ((amount > 0) OR (COALESCE(paid_amount, 0) > 0) OR (amount = 0 AND (concept ILIKE '%contado%' OR EXISTS(SELECT 1 FROM movement_items WHERE movement_id = movements.id))))
+            AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%'
         ) AS hourly
         GROUP BY hour
         ORDER BY hour ASC
@@ -524,8 +558,11 @@ app.get("/api/stats", authGuard, async (req, res) => {
           UNION ALL
           SELECT EXTRACT(DOW FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow,
                  COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
+                 COALESCE(NULLIF(amount, 0), NULLIF(paid_amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
           FROM movements
           WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%'
+          WHERE ((amount > 0) OR (COALESCE(paid_amount, 0) > 0) OR (amount = 0 AND (concept ILIKE '%contado%' OR EXISTS(SELECT 1 FROM movement_items WHERE movement_id = movements.id))))
+            AND concept NOT ILIKE '%pago%' AND concept NOT ILIKE '%abono%'
         ) AS dow_data
         GROUP BY dow
         ORDER BY dow ASC
@@ -826,6 +863,7 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
         m.id AS movement_id,
         m.client_id,
         m.amount,
+        COALESCE(m.paid_amount, 0) AS paid_amount,
         m.concept,
         m.payment_method,
         m.created_at,
@@ -839,6 +877,7 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
       LEFT JOIN sweets s ON s.id = mi.sweet_id
       WHERE (
         (m.amount > 0) 
+        OR (COALESCE(m.paid_amount, 0) > 0)
         OR (m.amount = 0 AND (m.concept ILIKE '%contado%' OR mi.sweet_id IS NOT NULL))
       )
       AND m.concept NOT ILIKE '%pago%'
@@ -888,6 +927,7 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
             amount: isSale
               ? Number(r.total_amount || 0)
               : Number(r.amount || 0),
+            paid_amount: isSale ? 0 : Number(r.paid_amount || 0),
             created_at: r.created_at,
             payment_method: r.payment_method || "cash",
             dow: r.dow,
@@ -941,6 +981,8 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
             (sum, it) => sum + it.quantity * it.unit_price,
             0,
           );
+        } else if (!isSale && ticketTotal === 0 && t.paid_amount > 0) {
+          ticketTotal = t.paid_amount;
         }
         totalSpent += ticketTotal;
 
@@ -1263,16 +1305,25 @@ app.get("/api/stats/day/:day", authGuard, async (req, res) => {
       `SELECT m.id,
               m.created_at,
               c.name AS buyer,
-              STRING_AGG(CONCAT(s.name, ' x', mi.quantity), ', ') AS items,
-              SUM(mi.quantity * mi.unit_price) AS total
+              COALESCE(STRING_AGG(CONCAT(s.name, ' x', mi.quantity), ', '), 'Compra manual') AS items,
+              CASE
+                WHEN m.amount > 0 THEN m.amount
+                WHEN COALESCE(m.paid_amount, 0) > 0 THEN m.paid_amount
+                ELSE COALESCE(SUM(mi.quantity * mi.unit_price), 0)
+              END AS total
        FROM movements m
        JOIN clients c ON c.id = m.client_id
-       JOIN movement_items mi ON mi.movement_id = m.id
-       JOIN sweets s ON s.id = mi.sweet_id
-       WHERE m.amount > 0
-         AND m.concept LIKE 'Compra%'
-         AND m.created_at::date = $1::date
-       GROUP BY m.id, m.created_at, c.name`,
+       LEFT JOIN movement_items mi ON mi.movement_id = m.id
+       LEFT JOIN sweets s ON s.id = mi.sweet_id
+       WHERE (
+         m.amount > 0
+         OR (COALESCE(m.paid_amount, 0) > 0)
+         OR (m.amount = 0 AND (m.concept ILIKE '%contado%' OR mi.sweet_id IS NOT NULL))
+       )
+         AND m.concept NOT ILIKE '%pago%'
+         AND m.concept NOT ILIKE '%abono%'
+         AND (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date = $1::date
+       GROUP BY m.id, m.created_at, c.name, m.amount, m.paid_amount`,
       [day],
     );
 
@@ -1286,6 +1337,7 @@ app.get("/api/stats/day/:day", authGuard, async (req, res) => {
        JOIN sale_items si ON si.sale_id = sa.id
        JOIN sweets s ON s.id = si.sweet_id
        WHERE sa.created_at::date = $1::date
+       WHERE (sa.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date = $1::date
        GROUP BY sa.id, sa.created_at`,
       [day],
     );
@@ -1443,12 +1495,14 @@ app.get("/api/public/clients/:code", async (req, res) => {
            m.client_id,
            CASE
              WHEN m.amount > 0 THEN m.amount
+             WHEN COALESCE(m.paid_amount, 0) > 0 THEN m.paid_amount
              ELSE COALESCE(SUM(mi.quantity * mi.unit_price), 0)
            END AS total
          FROM movements m
          LEFT JOIN movement_items mi ON mi.movement_id = m.id
          WHERE (
            m.amount > 0
+           OR (COALESCE(m.paid_amount, 0) > 0)
            OR (m.amount = 0 AND (m.concept ILIKE '%contado%' OR mi.sweet_id IS NOT NULL))
          )
            AND m.concept NOT ILIKE '%pago%'
@@ -1457,6 +1511,7 @@ app.get("/api/public/clients/:code", async (req, res) => {
              BETWEEN date_trunc('month', NOW() AT TIME ZONE 'America/Mexico_City')
              AND (date_trunc('month', NOW() AT TIME ZONE 'America/Mexico_City') + INTERVAL '1 month - 1 second')
          GROUP BY m.id, m.client_id, m.amount
+         GROUP BY m.id, m.client_id, m.amount, m.paid_amount
        )
        SELECT c.id, c.name, COALESCE(SUM(pt.total), 0) AS total_spent
        FROM clients c
@@ -1506,7 +1561,7 @@ app.get("/api/public/clients/:code/movements", async (req, res) => {
   }
   try {
     const movementsRes = await query(
-      `SELECT m.id AS movement_id, m.concept, m.amount, m.points, m.payment_method, m.created_at,
+      `SELECT m.id AS movement_id, m.concept, m.amount, COALESCE(m.paid_amount, 0) AS paid_amount, m.points, m.payment_method, m.created_at,
               mi.quantity, mi.unit_price, s.name AS sweet_name
        FROM movements m
        LEFT JOIN movement_items mi ON mi.movement_id = m.id
@@ -1523,6 +1578,7 @@ app.get("/api/public/clients/:code/movements", async (req, res) => {
           id: row.movement_id,
           concept: row.concept,
           amount: Number(row.amount),
+          paid_amount: Number(row.paid_amount || 0),
           points: Number(row.points || 0),
           payment_method: row.payment_method || "cash",
           created_at: row.created_at,
@@ -1957,14 +2013,17 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
 
     if (shouldPay) {
       // Compra al instante (al contado): UN SOLO movimiento con impacto neto en deuda $0.00
+      // Compra al instante (al contado): UN SOLO movimiento con impacto neto en deuda $0.00 y paid_amount guardado
       const movRes = await clientConn.query(
         "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        "INSERT INTO movements (client_id, concept, amount, points, payment_method, paid_amount) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
         [
           clientId,
           concept ? `${concept} (al contado)` : "Compra al contado",
           0,
           pointsEarned,
           paymentMethod || "cash",
+          totalAmount,
         ],
       );
       movementId = movRes.rows[0].id;
@@ -1992,6 +2051,8 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
       const movRes = await clientConn.query(
         "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5) RETURNING id",
         [clientId, concept || "Compra", totalAmount, 0, "credit"],
+        "INSERT INTO movements (client_id, concept, amount, points, payment_method, paid_amount) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+        [clientId, concept || "Compra", totalAmount, 0, "credit", 0],
       );
       movementId = movRes.rows[0].id;
 

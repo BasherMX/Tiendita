@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, lazy, Suspense } from "react";
 import {
   Routes,
   Route,
@@ -25,19 +25,18 @@ import PwaInstallToast from "./PwaInstallToast.jsx";
 import SweetModal from "./components/modals/SweetModal.jsx";
 import ClientModal from "./components/modals/ClientModal.jsx";
 import MovementModal from "./components/modals/MovementModal.jsx";
-import RewardModal from "./components/modals/RewardModal.jsx";
 
-// Páginas
+// Páginas (con Code-Splitting para páginas pesadas)
 import LoginPage from "./pages/LoginPage.jsx";
 import PosPage from "./pages/PosPage.jsx";
 import ClientsPage from "./pages/ClientsPage.jsx";
 import InventoryPage from "./pages/InventoryPage.jsx";
-import PurchasesPage from "./pages/PurchasesPage.jsx";
-import RewardsPage from "./pages/RewardsPage.jsx";
-import StatsPage from "./pages/StatsPage.jsx";
 import ConfigPage from "./pages/ConfigPage.jsx";
 import ReleasesPage from "./pages/ReleasesPage.jsx";
 import PublicClientView from "./pages/PublicClientView.jsx";
+
+const PurchasesPage = lazy(() => import("./pages/PurchasesPage.jsx"));
+const StatsPage = lazy(() => import("./pages/StatsPage.jsx"));
 
 export default function App() {
   const navigate = useNavigate();
@@ -56,6 +55,7 @@ export default function App() {
   const [purchasePlaces, setPurchasePlaces] = useState([]);
   const [packagePurchases, setPackagePurchases] = useState([]);
   const [rewards, setRewards] = useState([]);
+  const [loadingClients, setLoadingClients] = useState(true);
   const [settings, setSettings] = useState({});
   const [whatsappStatus, setWhatsappStatus] = useState(null);
 
@@ -166,6 +166,7 @@ export default function App() {
   }
 
   async function loadClients() {
+    setLoadingClients(true);
     try {
       const res = await authFetch(`${apiBase}/api/clients`, {}, handleAuthFail);
       if (res && res.ok) {
@@ -181,6 +182,8 @@ export default function App() {
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      setLoadingClients(false);
     }
   }
 
@@ -968,7 +971,7 @@ export default function App() {
           }
           return false;
         }}
-        systemVersion="1.7.9"
+        systemVersion="1.8.0"
       />
 
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-6 min-w-0">
@@ -1004,6 +1007,7 @@ export default function App() {
                   clients={clients}
                   selectedClient={selectedClient}
                   movements={movements}
+                  loadingClients={loadingClients}
                   loadingMovements={loadingMovements}
                   settings={settings}
                   onSelectClient={loadMovements}
@@ -1067,31 +1071,21 @@ export default function App() {
             path="/compras"
             element={
               token ? (
-                <PurchasesPage
-                  purchasePlaces={purchasePlaces}
-                  packagePurchases={packagePurchases}
-                  sweets={sweets}
-                  onAddPlace={handleAddPurchasePlace}
-                  onAddPurchaseTicket={handleAddPurchaseTicket}
-                />
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
-
-          <Route
-            path="/recompensas"
-            element={
-              token ? (
-                <RewardsPage
-                  rewards={rewards}
-                  clients={clients}
-                  onNewReward={handleOpenNewReward}
-                  onEditReward={handleOpenEditReward}
-                  onDeleteReward={handleDeleteReward}
-                  onRedeemReward={handleRedeemReward}
-                />
+                <Suspense
+                  fallback={
+                    <div className="p-8 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
+                      Cargando compras...
+                    </div>
+                  }
+                >
+                  <PurchasesPage
+                    purchasePlaces={purchasePlaces}
+                    packagePurchases={packagePurchases}
+                    sweets={sweets}
+                    onAddPlace={handleAddPurchasePlace}
+                    onAddPurchaseTicket={handleAddPurchaseTicket}
+                  />
+                </Suspense>
               ) : (
                 <Navigate to="/login" replace />
               )
@@ -1102,15 +1096,23 @@ export default function App() {
             path="/estadisticas"
             element={
               token ? (
-                <StatsPage
-                  stats={stats}
-                  salesChart={salesChart}
-                  salesRange={salesRange}
-                  shiftSalesRange={shiftSalesRange}
-                  apiBase={apiBase}
-                  authFetch={authFetch}
-                  handleAuthFail={handleAuthFail}
-                />
+                <Suspense
+                  fallback={
+                    <div className="p-8 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
+                      Cargando estadísticas...
+                    </div>
+                  }
+                >
+                  <StatsPage
+                    stats={stats}
+                    salesChart={salesChart}
+                    salesRange={salesRange}
+                    shiftSalesRange={shiftSalesRange}
+                    apiBase={apiBase}
+                    authFetch={authFetch}
+                    handleAuthFail={handleAuthFail}
+                  />
+                </Suspense>
               ) : (
                 <Navigate to="/login" replace />
               )
@@ -1211,16 +1213,6 @@ export default function App() {
         sweets={sweets}
         settings={settings}
         onSubmit={handleMovementSubmit}
-      />
-
-      <RewardModal
-        isOpen={rewardModalOpen}
-        onClose={() => setRewardModalOpen(false)}
-        editingReward={editingReward}
-        rewardForm={rewardForm}
-        setRewardForm={setRewardForm}
-        sweets={sweets}
-        onSubmit={handleSaveReward}
       />
 
       <PwaInstallToast />

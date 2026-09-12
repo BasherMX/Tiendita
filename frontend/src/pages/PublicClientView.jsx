@@ -378,7 +378,12 @@ export default function PublicClientView() {
           ) : (
             <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-0.5">
               {movements.map((mov) => {
-                const isCharge = mov.amount > 0;
+                const isCharge = Number(mov.amount) > 0;
+                const isContado = Number(mov.amount) === 0;
+                const displayAmount =
+                  isContado && Number(mov.paid_amount || 0) > 0
+                    ? Number(mov.paid_amount)
+                    : Math.abs(Number(mov.amount));
                 return (
                   <div
                     key={mov.id}
@@ -392,12 +397,16 @@ export default function PublicClientView() {
                         className={`font-black font-tabular ${
                           isCharge
                             ? "text-red-600 dark:text-red-400"
-                            : "text-emerald-700 dark:text-emerald-400"
+                            : isContado
+                              ? "text-stone-700 dark:text-stone-300"
+                              : "text-emerald-700 dark:text-emerald-400"
                         }`}
                       >
                         {isCharge
                           ? `+$${Number(mov.amount).toFixed(2)}`
-                          : `-$${Math.abs(Number(mov.amount)).toFixed(2)}`}
+                          : isContado
+                            ? `$${Number(displayAmount).toFixed(2)}`
+                            : `-$${Math.abs(Number(mov.amount)).toFixed(2)}`}
                       </span>
                     </div>
 

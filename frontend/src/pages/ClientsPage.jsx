@@ -25,7 +25,7 @@ export default function ClientsPage({
   clients = [],
   selectedClient,
   movements = [],
-  debtBreakdown = null,
+  loadingClients = false,
   loadingMovements = false,
   settings,
   onSelectClient,
@@ -173,97 +173,119 @@ export default function ClientsPage({
 
           {/* Lista de clientes */}
           <div className="flex-1 space-y-1.5 overflow-y-auto pr-0.5 max-h-[60vh] lg:max-h-none lg:min-h-0">
-            {filteredClients.map((client) => {
-              const isSelected = selectedClient?.id === client.id;
-              const debt = Number(client.total_debt || 0);
-              const limit = Number(client.credit_limit || 0);
-
-              return (
-                <div
-                  key={client.id}
-                  className={`group flex items-center justify-between rounded-xl border p-2.5 text-xs transition cursor-pointer ${
-                    isSelected
-                      ? "border-amber-500/50 bg-amber-50/60 dark:border-amber-400/40 dark:bg-amber-950/20 shadow-xs"
-                      : "border-[#E5E2DA] bg-[#FFFFFF] hover:border-amber-500/30 hover:bg-[#F7F6F2] dark:border-[#282C32] dark:bg-[#181B1E] dark:hover:border-amber-400/20 dark:hover:bg-[#202428]"
-                  }`}
-                  onClick={() => handleClientClick(client)}
-                >
-                  <div className="flex-1 min-w-0 pr-2">
-                    <div className="flex items-center gap-1.5 font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate">
-                      <span className="truncate">{client.name}</span>
-                      {Number(client.points || 0) > 0 && (
-                        <span className="shrink-0 inline-flex items-center gap-0.5 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-400/15 dark:text-amber-300">
-                          <Icon path={mdiStar} size={0.35} />
-                          {Number(client.points || 0).toFixed(0)}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mt-1 flex items-center gap-2 font-tabular">
-                      <span
-                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold ${
-                          debt > 0
-                            ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
-                            : debt < 0
-                              ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                              : "bg-stone-100 text-stone-600 dark:bg-[#282C32] dark:text-stone-300"
-                        }`}
-                      >
-                        {debt > 0
-                          ? `Debe $${debt.toFixed(2)}`
-                          : debt < 0
-                            ? `A favor $${Math.abs(debt).toFixed(2)}`
-                            : "Al día ($0.00)"}
-                      </span>
-
-                      {limit > 0 && (
-                        <span className="text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
-                          Límite: ${limit.toFixed(0)}
-                        </span>
-                      )}
-
-                      {client.is_over_credit_limit && (
-                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-800 dark:bg-red-950/60 dark:text-red-300">
-                          Excede Límite
-                        </span>
-                      )}
-
-                      {client.days_with_debt > 15 && (
-                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-900 dark:bg-amber-950/60 dark:text-amber-300">
-                          {client.days_with_debt}d adeudo
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Acciones rápidas en la fila */}
+            {loadingClients ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => (
                   <div
-                    className="flex items-center gap-1"
-                    onClick={(e) => e.stopPropagation()}
+                    key={i}
+                    className="animate-pulse rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-3 dark:border-[#282C32] dark:bg-[#181B1E]"
                   >
-                    <button
-                      onClick={() => onEditClient(client)}
-                      title="Editar cliente"
-                      className="rounded-lg p-1 text-[#78716C] hover:bg-amber-100 hover:text-amber-900 dark:text-[#9CA3AF] dark:hover:bg-[#282C32] dark:hover:text-amber-300 transition"
-                    >
-                      <Icon path={mdiPencil} size={0.65} />
-                    </button>
-                    <button
-                      onClick={() => onDeleteClient(client)}
-                      title="Eliminar cliente"
-                      className="rounded-lg p-1 text-[#78716C] hover:bg-red-50 hover:text-red-600 dark:text-[#9CA3AF] dark:hover:bg-red-950/40 dark:hover:text-red-400 transition"
-                    >
-                      <Icon path={mdiDelete} size={0.65} />
-                    </button>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="h-4 w-32 rounded-md bg-[#E5E2DA] dark:bg-[#282C32]"></div>
+                      <div className="h-4 w-12 rounded-md bg-[#E5E2DA] dark:bg-[#282C32]"></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-20 rounded bg-[#E5E2DA]/70 dark:bg-[#282C32]/70"></div>
+                      <div className="h-3 w-14 rounded bg-[#E5E2DA]/70 dark:bg-[#282C32]/70"></div>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-
-            {filteredClients.length === 0 && (
-              <div className="py-10 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
-                No hay clientes que coincidan con la búsqueda
+                ))}
               </div>
+            ) : (
+              <>
+                {filteredClients.map((client) => {
+                  const isSelected = selectedClient?.id === client.id;
+                  const debt = Number(client.total_debt || 0);
+                  const limit = Number(client.credit_limit || 0);
+
+                  return (
+                    <div
+                      key={client.id}
+                      className={`group flex items-center justify-between rounded-xl border p-2.5 text-xs transition cursor-pointer ${
+                        isSelected
+                          ? "border-amber-500/50 bg-amber-50/60 dark:border-amber-400/40 dark:bg-amber-950/20 shadow-xs"
+                          : "border-[#E5E2DA] bg-[#FFFFFF] hover:border-amber-500/30 hover:bg-[#F7F6F2] dark:border-[#282C32] dark:bg-[#181B1E] dark:hover:border-amber-400/20 dark:hover:bg-[#202428]"
+                      }`}
+                      onClick={() => handleClientClick(client)}
+                    >
+                      <div className="flex-1 min-w-0 pr-2">
+                        <div className="flex items-center gap-1.5 font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate">
+                          <span className="truncate">{client.name}</span>
+                          {Number(client.points || 0) > 0 && (
+                            <span className="shrink-0 inline-flex items-center gap-0.5 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-400/15 dark:text-amber-300">
+                              <Icon path={mdiStar} size={0.35} />
+                              {Number(client.points || 0).toFixed(0)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-1 flex items-center gap-2 font-tabular">
+                          <span
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                              debt > 0
+                                ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+                                : debt < 0
+                                  ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                  : "bg-stone-100 text-stone-600 dark:bg-[#282C32] dark:text-stone-300"
+                            }`}
+                          >
+                            {debt > 0
+                              ? `Debe $${debt.toFixed(2)}`
+                              : debt < 0
+                                ? `A favor $${Math.abs(debt).toFixed(2)}`
+                                : "Al día ($0.00)"}
+                          </span>
+
+                          {limit > 0 && (
+                            <span className="text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
+                              Límite: ${limit.toFixed(0)}
+                            </span>
+                          )}
+
+                          {client.is_over_credit_limit && (
+                            <span className="rounded bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-800 dark:bg-red-950/60 dark:text-red-300">
+                              Excede Límite
+                            </span>
+                          )}
+
+                          {client.days_with_debt > 15 && (
+                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-900 dark:bg-amber-950/60 dark:text-amber-300">
+                              {client.days_with_debt}d adeudo
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Acciones rápidas en la fila */}
+                      <div
+                        className="flex items-center gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => onEditClient(client)}
+                          title="Editar cliente"
+                          className="rounded-lg p-1 text-[#78716C] hover:bg-amber-100 hover:text-amber-900 dark:text-[#9CA3AF] dark:hover:bg-[#282C32] dark:hover:text-amber-300 transition"
+                        >
+                          <Icon path={mdiPencil} size={0.65} />
+                        </button>
+                        <button
+                          onClick={() => onDeleteClient(client)}
+                          title="Eliminar cliente"
+                          className="rounded-lg p-1 text-[#78716C] hover:bg-red-50 hover:text-red-600 dark:text-[#9CA3AF] dark:hover:bg-red-950/40 dark:hover:text-red-400 transition"
+                        >
+                          <Icon path={mdiDelete} size={0.65} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {filteredClients.length === 0 && (
+                  <div className="py-10 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
+                    No hay clientes que coincidan con la búsqueda
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -453,8 +475,19 @@ export default function ClientsPage({
 
               <div className="flex-1 overflow-x-auto overflow-y-auto rounded-xl border border-[#E5E2DA] dark:border-[#282C32] w-full max-w-full">
                 {loadingMovements ? (
-                  <div className="py-12 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
-                    Cargando movimientos...
+                  <div className="p-4 space-y-3">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className="animate-pulse flex items-center justify-between py-2 border-b border-[#E5E2DA]/60 dark:border-[#282C32]/60 last:border-0"
+                      >
+                        <div className="space-y-1.5 flex-1 min-w-0 pr-4">
+                          <div className="h-3.5 w-32 rounded bg-[#E5E2DA] dark:bg-[#282C32]"></div>
+                          <div className="h-2.5 w-20 rounded bg-[#E5E2DA]/70 dark:bg-[#282C32]/70"></div>
+                        </div>
+                        <div className="h-4 w-16 rounded bg-[#E5E2DA] dark:bg-[#282C32]"></div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <table className="w-full min-w-[360px] sm:min-w-[460px] text-left text-xs">
@@ -541,7 +574,9 @@ export default function ClientsPage({
                                     $
                                     {itemsTotal > 0
                                       ? itemsTotal.toFixed(2)
-                                      : "0.00"}
+                                      : Number(m.paid_amount || 0) > 0
+                                        ? Number(m.paid_amount).toFixed(2)
+                                        : "0.00"}
                                   </span>
                                   <span className="inline-block text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1 rounded">
                                     Contado

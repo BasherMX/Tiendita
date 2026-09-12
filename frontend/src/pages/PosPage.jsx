@@ -8,6 +8,7 @@ import {
   mdiCashCheck,
   mdiMagnify,
   mdiMinus,
+  mdiClose,
 } from "@mdi/js";
 import SweetCombobox from "../components/SweetCombobox.jsx";
 import PaymentMethodSelector from "../components/PaymentMethodSelector.jsx";
@@ -250,15 +251,25 @@ export default function PosPage({
             <Icon
               path={mdiMagnify}
               size={0.65}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#78716C] dark:text-[#9CA3AF]"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#78716C] dark:text-[#9CA3AF] pointer-events-none"
             />
             <input
-              type="search"
-              className="w-full rounded-lg border border-[#E5E2DA] bg-[#F7F6F2] py-1.5 pl-8 pr-2.5 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
+              type="text"
+              className="w-full rounded-lg border border-[#E5E2DA] bg-[#F7F6F2] py-1.5 pl-8 pr-7 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
               placeholder="Buscar precio..."
               value={pricesQuery}
               onChange={(e) => setPricesQuery(e.target.value)}
             />
+            {pricesQuery && (
+              <button
+                type="button"
+                onClick={() => setPricesQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[#78716C] hover:bg-[#E5E2DA]/60 hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:bg-[#282C32] dark:hover:text-[#F3F2EE] transition"
+                title="Limpiar búsqueda"
+              >
+                <Icon path={mdiClose} size={0.55} />
+              </button>
+            )}
           </div>
         </div>
 
