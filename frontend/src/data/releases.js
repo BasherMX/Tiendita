@@ -1,5 +1,42 @@
 export const releases = [
   {
+    version: "1.7.2",
+    date: "11 de Septiembre, 2026",
+    tagline:
+      "Arquitectura Mobile-First en Clientes, Detalle de Tickets y Compras al Contado Unificadas",
+    highlights: [
+      "Mobile-First por diseño: Rediseño responsivo en Clientes y Modal de Movimientos optimizado para smartphones (360px+), sin desbordes horizontales.",
+      "Detalle de ticket en cada movimiento: Nuevo botón interactivo para consultar la lista de dulces adquiridos, cantidades, precios unitarios y subtotales.",
+      "Compras al contado unificadas: Las compras pagadas al instante ahora generan 1 solo movimiento contable con impacto neto de $0.00 en la deuda del cliente.",
+      "Desglose de deuda en WhatsApp: Notificaciones automáticas y estados de cuenta ahora incluyen el desglose detallado de compras adeudadas cuando hay saldo pendiente.",
+      "Limpieza de interfaz: Eliminación del botón redundante de 'Desglose' en favor de una botonera simétrica 50/50 de '+ Fiar Producto' y '+ Registrar Abono'.",
+    ],
+    sections: [
+      {
+        title: "📱 Arquitectura Mobile-First",
+        items: [
+          "Diseño 100% Mobile-First: todos los componentes, modales y tablas están concebidos prioritariamente para dispositivos móviles.",
+          "Botonera de acciones principales en grid de 2 columnas al 50% de ancho sin cortes ni saltos incómodos.",
+          "Contenedor del libro de movimientos con scroll horizontal suave y min-width adaptativo para proteger el ancho de pantalla.",
+          "Modal de movimiento con espaciados compactos, campos numéricos adaptados y selector de productos sin desbordamiento.",
+        ],
+      },
+      {
+        title: "🧾 Detalle de Tickets & Movimientos",
+        items: [
+          "Modal emergente de Detalle de Movimiento con fecha, concepto, método de pago, productos desglosados y puntos otorgados.",
+          "Visualización en libro contable con etiqueta distintiva de 'Contado' para compras inmediatas.",
+        ],
+      },
+      {
+        title: "💬 Mensajería WhatsApp Mejorada",
+        items: [
+          "Inclusión automática de la lista de compras pendientes (concepto, fecha y artículos) en tickets y estados de cuenta cuando hay deuda activa.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.7.1",
     date: "11 de Septiembre, 2026",
     tagline:

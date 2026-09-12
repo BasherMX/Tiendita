@@ -16,6 +16,9 @@ import {
   mdiMagnify,
   mdiPhone,
   mdiCheckCircleOutline,
+  mdiEyeOutline,
+  mdiReceiptTextOutline,
+  mdiClose,
 } from "@mdi/js";
 
 export default function ClientsPage({
@@ -34,11 +37,11 @@ export default function ClientsPage({
   onShareLink,
   onSendWhatsappStatement,
   onDeleteMovement,
-  onViewDebtBreakdown,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDebt, setFilterDebt] = useState("all"); // "all" | "debt" | "clean"
   const [mobileView, setMobileView] = useState("list"); // "list" | "detail"
+  const [selectedMovementDetail, setSelectedMovementDetail] = useState(null);
 
   const filteredClients = clients.filter((c) => {
     const matchesSearch =
@@ -76,7 +79,7 @@ export default function ClientsPage({
         }`}
       >
         {/* Acciones superiores del directorio */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
           <button
             type="button"
             onClick={onNewClient}
@@ -87,10 +90,10 @@ export default function ClientsPage({
           </button>
 
           {/* Filtros rápidos por estado de cuenta */}
-          <div className="flex rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-1 text-[11px] font-semibold dark:border-[#282C32] dark:bg-[#181B1E]">
+          <div className="flex overflow-x-auto rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-1 text-[11px] font-semibold dark:border-[#282C32] dark:bg-[#181B1E]">
             <button
               onClick={() => setFilterDebt("all")}
-              className={`rounded-lg px-2.5 py-1 transition ${
+              className={`rounded-lg px-2.5 py-1 transition whitespace-nowrap ${
                 filterDebt === "all"
                   ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
                   : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
@@ -100,7 +103,7 @@ export default function ClientsPage({
             </button>
             <button
               onClick={() => setFilterDebt("debt")}
-              className={`rounded-lg px-2.5 py-1 transition ${
+              className={`rounded-lg px-2.5 py-1 transition whitespace-nowrap ${
                 filterDebt === "debt"
                   ? "bg-red-500/15 text-red-700 dark:bg-red-950/60 dark:text-red-300 font-bold"
                   : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
@@ -110,7 +113,7 @@ export default function ClientsPage({
             </button>
             <button
               onClick={() => setFilterDebt("clean")}
-              className={`rounded-lg px-2.5 py-1 transition ${
+              className={`rounded-lg px-2.5 py-1 transition whitespace-nowrap ${
                 filterDebt === "clean"
                   ? "bg-emerald-500/15 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold"
                   : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
@@ -405,33 +408,25 @@ export default function ClientsPage({
               </div>
             )}
 
-            {/* Barra de Acciones Principales: Fiar / Abonar / Desglose */}
-            <div className="mb-4 flex flex-wrap gap-2">
+            {/* Barra de Acciones Principales: Fiar / Abonar (Mobile-first 2-column grid) */}
+            <div className="mb-4 grid grid-cols-2 gap-2">
               <button
                 onClick={onOpenPurchaseModal}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3 sm:px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
               >
                 <Icon path={mdiCashMinus} size={0.7} />
                 <span>+ Fiar Producto</span>
               </button>
               <button
                 onClick={onOpenPayModal}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 active:scale-[0.98] transition"
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 px-3 sm:px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 active:scale-[0.98] transition"
               >
                 <Icon path={mdiCashPlus} size={0.7} />
                 <span>+ Registrar Abono</span>
               </button>
-              <button
-                onClick={onViewDebtBreakdown}
-                className="flex items-center gap-1.5 rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] px-3.5 py-2.5 text-xs font-semibold text-[#1C1917] hover:bg-[#F7F6F2] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F2EE] dark:hover:bg-[#282C32] transition"
-                title="Ver desglose detallado de lo que debe"
-              >
-                <Icon path={mdiInformationOutline} size={0.7} />
-                <span>Desglose</span>
-              </button>
             </div>
 
-            {/* Libro Contable de Movimientos */}
+            {/* Libro Contable de Movimientos (Mobile-first responsive table) */}
             <div className="flex-1 flex flex-col lg:min-h-0">
               <div className="mb-2 flex items-center justify-between text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
                 <span>Libro de Movimientos</span>
@@ -440,13 +435,13 @@ export default function ClientsPage({
                 </span>
               </div>
 
-              <div className="flex-1 overflow-y-auto rounded-xl border border-[#E5E2DA] dark:border-[#282C32]">
+              <div className="flex-1 overflow-x-auto overflow-y-auto rounded-xl border border-[#E5E2DA] dark:border-[#282C32]">
                 {loadingMovements ? (
                   <div className="py-12 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
                     Cargando movimientos...
                   </div>
                 ) : (
-                  <table className="min-w-full text-left text-xs">
+                  <table className="w-full min-w-[480px] text-left text-xs">
                     <thead className="sticky top-0 bg-[#F7F6F2] text-[#57534E] border-b border-[#E5E2DA] dark:bg-[#111315] dark:text-[#9CA3AF] dark:border-[#282C32] z-10">
                       <tr>
                         <th className="px-3 py-2 font-semibold">Fecha</th>
@@ -455,12 +450,28 @@ export default function ClientsPage({
                         <th className="px-3 py-2 text-right font-semibold">
                           Monto
                         </th>
-                        <th className="px-2 py-2 text-center"></th>
+                        <th className="px-2 py-2 text-center font-semibold">
+                          Acciones
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#E5E2DA] dark:divide-[#282C32] font-tabular">
                       {movements.map((m) => {
+                        const isInstantPurchase =
+                          Number(m.amount) === 0 ||
+                          (m.concept &&
+                            m.concept.toLowerCase().includes("contado"));
                         const isPositive = Number(m.amount) > 0;
+                        const itemsTotal =
+                          Array.isArray(m.items) && m.items.length > 0
+                            ? m.items.reduce(
+                                (acc, it) =>
+                                  acc +
+                                  Number(it.quantity) * Number(it.unit_price),
+                                0,
+                              )
+                            : 0;
+
                         return (
                           <tr
                             key={m.id}
@@ -478,9 +489,17 @@ export default function ClientsPage({
                               )}
                             </td>
                             <td className="px-3 py-2 font-medium text-[#1C1917] dark:text-[#F3F2EE]">
-                              {m.concept}
+                              <div className="flex items-center gap-1.5">
+                                <span>{m.concept}</span>
+                                {Array.isArray(m.items) &&
+                                  m.items.length > 0 && (
+                                    <span className="text-[10px] text-[#78716C] dark:text-[#9CA3AF] bg-[#E5E2DA]/50 dark:bg-[#282C32] px-1 rounded">
+                                      ({m.items.length} art)
+                                    </span>
+                                  )}
+                              </div>
                             </td>
-                            <td className="px-3 py-2 text-[#78716C] dark:text-[#9CA3AF] capitalize">
+                            <td className="px-3 py-2 text-[#78716C] dark:text-[#9CA3AF] capitalize whitespace-nowrap">
                               {m.payment_method === "cash"
                                 ? "Efectivo"
                                 : m.payment_method === "transfer"
@@ -491,25 +510,46 @@ export default function ClientsPage({
                                       ? "Crédito"
                                       : m.payment_method || "—"}
                             </td>
-                            <td
-                              className={`px-3 py-2 text-right font-black ${
-                                isPositive
-                                  ? "text-red-600 dark:text-red-400"
-                                  : "text-emerald-700 dark:text-emerald-400"
-                              }`}
-                            >
-                              {isPositive
-                                ? `+$${Number(m.amount).toFixed(2)}`
-                                : `-$${Math.abs(Number(m.amount)).toFixed(2)}`}
+                            <td className="px-3 py-2 text-right font-black whitespace-nowrap">
+                              {isInstantPurchase ? (
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[#1C1917] dark:text-[#F3F2EE]">
+                                    $
+                                    {itemsTotal > 0
+                                      ? itemsTotal.toFixed(2)
+                                      : "0.00"}
+                                  </span>
+                                  <span className="inline-block text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1 rounded">
+                                    Contado
+                                  </span>
+                                </div>
+                              ) : isPositive ? (
+                                <span className="text-red-600 dark:text-red-400">
+                                  +${Number(m.amount).toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-700 dark:text-emerald-400">
+                                  -${Math.abs(Number(m.amount)).toFixed(2)}
+                                </span>
+                              )}
                             </td>
-                            <td className="px-2 py-2 text-center">
-                              <button
-                                onClick={() => onDeleteMovement(m)}
-                                title="Eliminar movimiento"
-                                className="rounded-md p-1 text-[#78716C] hover:bg-red-50 hover:text-red-600 dark:text-[#9CA3AF] dark:hover:bg-red-950/40 dark:hover:text-red-400 transition"
-                              >
-                                <Icon path={mdiDelete} size={0.6} />
-                              </button>
+                            <td className="px-2 py-2 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => setSelectedMovementDetail(m)}
+                                  title="Ver detalle del movimiento"
+                                  className="rounded-md p-1.5 text-amber-700 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-950/50 transition"
+                                >
+                                  <Icon path={mdiEyeOutline} size={0.65} />
+                                </button>
+                                <button
+                                  onClick={() => onDeleteMovement(m)}
+                                  title="Eliminar movimiento"
+                                  className="rounded-md p-1.5 text-[#78716C] hover:bg-red-50 hover:text-red-600 dark:text-[#9CA3AF] dark:hover:bg-red-950/40 dark:hover:text-red-400 transition"
+                                >
+                                  <Icon path={mdiDelete} size={0.65} />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -547,6 +587,153 @@ export default function ClientsPage({
           </div>
         )}
       </div>
+
+      {/* Modal Detalle de Movimiento */}
+      {selectedMovementDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1C1917]/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-[#E5E2DA] bg-white p-4 sm:p-5 shadow-2xl dark:border-[#282C32] dark:bg-[#181B1E] flex flex-col max-h-[85vh]">
+            <div className="mb-3 flex items-center justify-between border-b border-[#E5E2DA] pb-3 dark:border-[#282C32]">
+              <div className="flex items-center gap-2">
+                <div className="rounded-xl bg-amber-500/15 p-2 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200">
+                  <Icon path={mdiReceiptTextOutline} size={0.8} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                    Detalle del Movimiento
+                  </h3>
+                  <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                    {new Date(selectedMovementDetail.created_at).toLocaleString(
+                      "es-MX",
+                      {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      },
+                    )}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedMovementDetail(null)}
+                className="rounded-lg p-1.5 text-[#78716C] hover:bg-[#F7F6F2] dark:text-[#9CA3AF] dark:hover:bg-[#202428] transition"
+              >
+                <Icon path={mdiClose} size={0.7} />
+              </button>
+            </div>
+
+            {/* Fichas de información rápida */}
+            <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-xl bg-[#F7F6F2] p-2.5 dark:bg-[#111315]">
+                <span className="block text-[10px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                  CONCEPTO
+                </span>
+                <span className="font-semibold text-[#1C1917] dark:text-[#F3F2EE]">
+                  {selectedMovementDetail.concept}
+                </span>
+              </div>
+              <div className="rounded-xl bg-[#F7F6F2] p-2.5 dark:bg-[#111315]">
+                <span className="block text-[10px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                  MÉTODO DE PAGO
+                </span>
+                <span className="font-semibold capitalize text-[#1C1917] dark:text-[#F3F2EE]">
+                  {selectedMovementDetail.payment_method === "cash"
+                    ? "Efectivo"
+                    : selectedMovementDetail.payment_method === "transfer"
+                      ? "Transferencia"
+                      : selectedMovementDetail.payment_method === "card"
+                        ? "Tarjeta"
+                        : selectedMovementDetail.payment_method === "credit"
+                          ? "Crédito (Fiado)"
+                          : selectedMovementDetail.payment_method || "—"}
+                </span>
+              </div>
+            </div>
+
+            {/* Desglose de Productos */}
+            <div className="flex-1 overflow-y-auto pr-1">
+              <div className="text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF] mb-1.5">
+                PRODUCTOS COMPRADOS
+              </div>
+              {Array.isArray(selectedMovementDetail.items) &&
+              selectedMovementDetail.items.length > 0 ? (
+                <div className="divide-y divide-[#E5E2DA] rounded-xl border border-[#E5E2DA] bg-[#F7F6F2]/50 dark:divide-[#282C32] dark:border-[#282C32] dark:bg-[#111315]/50">
+                  {selectedMovementDetail.items.map((it, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2.5 text-xs"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <div className="font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate">
+                          {it.name || "Producto"}
+                        </div>
+                        <div className="text-[11px] text-[#78716C] dark:text-[#9CA3AF] font-tabular">
+                          {it.quantity} x ${Number(it.unit_price).toFixed(2)}{" "}
+                          c/u
+                        </div>
+                      </div>
+                      <div className="font-black font-tabular text-[#1C1917] dark:text-[#F3F2EE] shrink-0">
+                        $
+                        {(Number(it.quantity) * Number(it.unit_price)).toFixed(
+                          2,
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-[#E5E2DA] p-4 text-center text-xs text-[#78716C] dark:border-[#282C32] dark:text-[#9CA3AF]">
+                  Movimiento contable sin desglose de productos individuales.
+                </div>
+              )}
+            </div>
+
+            {/* Resumen Total */}
+            <div className="mt-3 border-t border-[#E5E2DA] pt-3 dark:border-[#282C32] space-y-1 text-xs">
+              {Number(selectedMovementDetail.points || 0) !== 0 && (
+                <div className="flex justify-between text-amber-700 dark:text-amber-400">
+                  <span>Puntos del movimiento:</span>
+                  <span className="font-bold font-tabular">
+                    {Number(selectedMovementDetail.points) > 0
+                      ? `+${Number(selectedMovementDetail.points).toFixed(1)}`
+                      : `${Number(selectedMovementDetail.points).toFixed(1)}`}{" "}
+                    pts
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-black text-[#1C1917] dark:text-[#F3F2EE]">
+                <span>Monto Total:</span>
+                <span className="font-tabular">
+                  $
+                  {(() => {
+                    const itTotal =
+                      Array.isArray(selectedMovementDetail.items) &&
+                      selectedMovementDetail.items.length > 0
+                        ? selectedMovementDetail.items.reduce(
+                            (acc, it) =>
+                              acc + Number(it.quantity) * Number(it.unit_price),
+                            0,
+                          )
+                        : 0;
+                    if (itTotal > 0) return itTotal.toFixed(2);
+                    return Math.abs(
+                      Number(selectedMovementDetail.amount || 0),
+                    ).toFixed(2);
+                  })()}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedMovementDetail(null)}
+              className="mt-4 w-full rounded-xl bg-[#F7F6F2] py-2 text-xs font-bold text-[#1C1917] hover:bg-[#E5E2DA] dark:bg-[#202428] dark:text-[#F3F2EE] dark:hover:bg-[#282C32] transition"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

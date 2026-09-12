@@ -417,7 +417,7 @@ app.get("/api/stats", authGuard, async (req, res) => {
           FROM movements m
           JOIN movement_items mi ON mi.movement_id = m.id
           JOIN sweets s ON s.id = mi.sweet_id
-          WHERE m.amount > 0 AND m.concept LIKE 'Compra%'
+          WHERE ((m.amount > 0) OR (m.amount = 0 AND m.concept LIKE '%al contado%')) AND m.concept LIKE 'Compra%'
           GROUP BY m.created_at::date
           UNION ALL
           SELECT si.created_at::date AS day,
@@ -481,9 +481,11 @@ app.get("/api/stats", authGuard, async (req, res) => {
           SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day, total_amount AS contado, 0 AS fiado, 0 AS abonos
           FROM sales
           UNION ALL
-          SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day, amount AS contado, 0 AS fiado, 0 AS abonos
+          SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day,
+                 COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS contado,
+                 0 AS fiado, 0 AS abonos
           FROM movements
-          WHERE amount > 0 AND concept LIKE 'Compra%' AND payment_method != 'credit'
+          WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%' AND payment_method != 'credit'
           UNION ALL
           SELECT (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day, 0 AS contado, amount AS fiado, 0 AS abonos
           FROM movements
@@ -504,9 +506,10 @@ app.get("/api/stats", authGuard, async (req, res) => {
           SELECT EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS hour, total_amount AS total
           FROM sales
           UNION ALL
-          SELECT EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS hour, amount AS total
+          SELECT EXTRACT(HOUR FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS hour,
+                 COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
           FROM movements
-          WHERE amount > 0 AND concept LIKE 'Compra%'
+          WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%'
         ) AS hourly
         GROUP BY hour
         ORDER BY hour ASC
@@ -519,9 +522,10 @@ app.get("/api/stats", authGuard, async (req, res) => {
           SELECT EXTRACT(DOW FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow, total_amount AS total
           FROM sales
           UNION ALL
-          SELECT EXTRACT(DOW FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow, amount AS total
+          SELECT EXTRACT(DOW FROM (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow,
+                 COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
           FROM movements
-          WHERE amount > 0 AND concept LIKE 'Compra%'
+          WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%'
         ) AS dow_data
         GROUP BY dow
         ORDER BY dow ASC
@@ -539,9 +543,9 @@ app.get("/api/stats", authGuard, async (req, res) => {
               WHEN payment_method = 'credit' THEN 'credit'
               ELSE COALESCE(payment_method, 'cash')
             END AS payment_method,
-            amount AS total
+            COALESCE(NULLIF(amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = movements.id), 0) AS total
           FROM movements
-          WHERE amount > 0 AND concept LIKE 'Compra%'
+          WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%'
         ) AS pm
         GROUP BY payment_method
         ORDER BY total DESC
@@ -584,8 +588,8 @@ app.get("/api/stats", authGuard, async (req, res) => {
       // 14. Totales globales de tickets e ingresos
       query(`
         SELECT 
-          (SELECT COUNT(*) FROM sales) + (SELECT COUNT(*) FROM movements WHERE amount > 0 AND concept LIKE 'Compra%') AS total_tickets,
-          COALESCE((SELECT SUM(total_amount) FROM sales), 0) + COALESCE((SELECT SUM(amount) FROM movements WHERE amount > 0 AND concept LIKE 'Compra%'), 0) AS total_revenue
+          (SELECT COUNT(*) FROM sales) + (SELECT COUNT(*) FROM movements WHERE ((amount > 0) OR (amount = 0 AND concept LIKE '%al contado%')) AND concept LIKE 'Compra%') AS total_tickets,
+          COALESCE((SELECT SUM(total_amount) FROM sales), 0) + COALESCE((SELECT SUM(COALESCE(NULLIF(m.amount, 0), (SELECT SUM(quantity * unit_price) FROM movement_items WHERE movement_id = m.id), 0)) FROM movements m WHERE ((m.amount > 0) OR (m.amount = 0 AND m.concept LIKE '%al contado%')) AND m.concept LIKE 'Compra%'), 0) AS total_revenue
       `),
     ]);
 
@@ -1177,21 +1181,10 @@ app.delete("/api/clients/:id", authGuard, async (req, res) => {
   }
 });
 
-app.get("/api/clients/:id/debt-breakdown", authGuard, async (req, res) => {
-  const clientId = Number(req.params.id);
-  if (!Number.isInteger(clientId) || clientId <= 0) {
-    return res.status(400).json({ message: "Invalid client id" });
-  }
+async function getClientDebtBreakdown(clientId, totalDebt) {
+  const debt = Number(totalDebt || 0);
+  if (debt <= 0) return [];
   try {
-    const clientRes = await query(
-      "SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1",
-      [clientId],
-    );
-    if (!clientRes.rows.length)
-      return res.status(404).json({ message: "Client not found" });
-
-    const client = clientRes.rows[0];
-
     const movementsRes = await query(
       `SELECT m.id AS movement_id, m.concept, m.amount, m.created_at,
               mi.quantity, mi.unit_price, s.name AS sweet_name
@@ -1228,24 +1221,67 @@ app.get("/api/clients/:id/debt-breakdown", authGuard, async (req, res) => {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
 
-    let remainingDebt = Number(client.total_debt || 0);
-    const movements = [];
+    let remainingDebt = debt;
+    const breakdown = [];
 
     for (const mov of sortedMovements) {
       if (remainingDebt <= 0) break;
       const movAmt = Number(mov.amount);
       if (movAmt >= remainingDebt) {
-        movements.push({
+        breakdown.push({
           ...mov,
           owed_amount: Number(remainingDebt.toFixed(2)),
         });
         remainingDebt = 0;
       } else {
-        movements.push({ ...mov, owed_amount: movAmt });
+        breakdown.push({ ...mov, owed_amount: movAmt });
         remainingDebt = Number((remainingDebt - movAmt).toFixed(2));
       }
     }
 
+    return breakdown;
+  } catch (err) {
+    console.error("Error calculating debt breakdown:", err.message);
+    return [];
+  }
+}
+
+function formatDebtBreakdownText(breakdown) {
+  if (!breakdown || breakdown.length === 0) return "";
+  const lines = ["📋 *Desglose de compras pendientes:*"];
+  breakdown.forEach((item) => {
+    const d = new Date(item.created_at);
+    const dateStr = d.toLocaleDateString("es-MX", {
+      timeZone: "America/Mexico_City",
+      day: "2-digit",
+      month: "short",
+    });
+    const itemsSummary =
+      item.items && item.items.length > 0
+        ? ` (${item.items.map((it) => `${it.quantity}x ${it.name}`).join(", ")})`
+        : "";
+    lines.push(
+      `• ${dateStr}: $${Number(item.owed_amount).toFixed(2)}${itemsSummary}`,
+    );
+  });
+  return lines.join("\n");
+}
+
+app.get("/api/clients/:id/debt-breakdown", authGuard, async (req, res) => {
+  const clientId = Number(req.params.id);
+  if (!Number.isInteger(clientId) || clientId <= 0) {
+    return res.status(400).json({ message: "Invalid client id" });
+  }
+  try {
+    const clientRes = await query(
+      "SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1",
+      [clientId],
+    );
+    if (!clientRes.rows.length)
+      return res.status(404).json({ message: "Client not found" });
+
+    const client = clientRes.rows[0];
+    const movements = await getClientDebtBreakdown(clientId, client.total_debt);
     return res.json({ client, movements });
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -1256,7 +1292,25 @@ app.get("/api/clients/:id/movements", authGuard, async (req, res) => {
   const clientId = Number(req.params.id);
   try {
     const result = await query(
-      "SELECT id, concept, amount, points, payment_method, created_at FROM movements WHERE client_id = $1 ORDER BY created_at DESC",
+      `SELECT m.id, m.concept, m.amount, m.points, m.payment_method, m.created_at,
+              COALESCE(
+                json_agg(
+                  json_build_object(
+                    'id', mi.id,
+                    'sweet_id', mi.sweet_id,
+                    'name', s.name,
+                    'quantity', mi.quantity,
+                    'unit_price', mi.unit_price
+                  ) ORDER BY mi.id
+                ) FILTER (WHERE mi.id IS NOT NULL),
+                '[]'
+              ) AS items
+       FROM movements m
+       LEFT JOIN movement_items mi ON mi.movement_id = m.id
+       LEFT JOIN sweets s ON s.id = mi.sweet_id
+       WHERE m.client_id = $1
+       GROUP BY m.id
+       ORDER BY m.created_at DESC`,
       [clientId],
     );
     return res.json(result.rows);
@@ -1456,69 +1510,83 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
     const isOverCreditLimit =
       !shouldPay && resultingDebt > effectiveCreditLimit;
 
-    const movRes = await clientConn.query(
-      "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-      [
-        clientId,
-        concept || "Compra",
-        totalAmount,
-        0,
-        shouldPay ? paymentMethod || "cash" : "credit",
-      ],
-    );
-    const movementId = movRes.rows[0].id;
-
-    if (ticketItems.length > 0) {
-      for (const item of ticketItems) {
-        await clientConn.query(
-          "INSERT INTO movement_items (movement_id, sweet_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
-          [movementId, item.sweetId, item.quantity, item.unitPrice],
-        );
-        await clientConn.query(
-          "UPDATE sweets SET stock = stock - $1, sold_count = sold_count + $1 WHERE id = $2",
-          [item.quantity, item.sweetId],
-        );
-      }
-    }
-
-    // Purchase adds to total debt (double-entry base)
-    await clientConn.query(
-      "UPDATE clients SET total_debt = total_debt + $1 WHERE id = $2",
-      [totalAmount, clientId],
-    );
-
-    if (pointsUsed > 0) {
-      await clientConn.query(
-        "UPDATE clients SET points = GREATEST(0, points - $1), total_debt = total_debt - $1 WHERE id = $2",
-        [pointsUsed, clientId],
-      );
-      await clientConn.query(
-        "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5)",
-        [clientId, "Pago con puntos", -pointsUsed, -pointsUsed, "points"],
-      );
-    }
-
     const rewardFactor = parseFloat(settings.reward_factor || "0.10");
     const pointsEarned =
       settings.rewards_enabled === "true" || settings.rewards_enabled === true
         ? Number((remainingAmount * rewardFactor).toFixed(2))
         : 0;
 
+    let movementId;
+
     if (shouldPay) {
-      await clientConn.query(
-        "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5)",
+      // Compra al instante (al contado): UN SOLO movimiento con impacto neto en deuda $0.00
+      const movRes = await clientConn.query(
+        "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5) RETURNING id",
         [
           clientId,
-          "Pago de compra al instante",
-          -remainingAmount,
+          concept ? `${concept} (al contado)` : "Compra al contado",
+          0,
           pointsEarned,
           paymentMethod || "cash",
         ],
       );
+      movementId = movRes.rows[0].id;
+
+      if (ticketItems.length > 0) {
+        for (const item of ticketItems) {
+          await clientConn.query(
+            "INSERT INTO movement_items (movement_id, sweet_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
+            [movementId, item.sweetId, item.quantity, item.unitPrice],
+          );
+          await clientConn.query(
+            "UPDATE sweets SET stock = stock - $1, sold_count = sold_count + $1 WHERE id = $2",
+            [item.quantity, item.sweetId],
+          );
+        }
+      }
+
+      // Descontar puntos usados si los hubo y abonar puntos ganados (la deuda no cambia)
       await clientConn.query(
-        "UPDATE clients SET total_debt = total_debt - $1, points = points + $2 WHERE id = $3",
-        [remainingAmount, pointsEarned, clientId],
+        "UPDATE clients SET points = GREATEST(0, points - $1) + $2 WHERE id = $3",
+        [pointsUsed, pointsEarned, clientId],
       );
+    } else {
+      // Compra a crédito (fiado): Se registra la deuda y los puntos
+      const movRes = await clientConn.query(
+        "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        [clientId, concept || "Compra", totalAmount, 0, "credit"],
+      );
+      movementId = movRes.rows[0].id;
+
+      if (ticketItems.length > 0) {
+        for (const item of ticketItems) {
+          await clientConn.query(
+            "INSERT INTO movement_items (movement_id, sweet_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
+            [movementId, item.sweetId, item.quantity, item.unitPrice],
+          );
+          await clientConn.query(
+            "UPDATE sweets SET stock = stock - $1, sold_count = sold_count + $1 WHERE id = $2",
+            [item.quantity, item.sweetId],
+          );
+        }
+      }
+
+      // Incrementa deuda
+      await clientConn.query(
+        "UPDATE clients SET total_debt = total_debt + $1 WHERE id = $2",
+        [totalAmount, clientId],
+      );
+
+      if (pointsUsed > 0) {
+        await clientConn.query(
+          "UPDATE clients SET points = GREATEST(0, points - $1), total_debt = total_debt - $1 WHERE id = $2",
+          [pointsUsed, clientId],
+        );
+        await clientConn.query(
+          "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5)",
+          [clientId, "Pago con puntos", -pointsUsed, -pointsUsed, "points"],
+        );
+      }
     }
 
     await clientConn.query("COMMIT");
@@ -1530,7 +1598,11 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
     if (clientFinal.rows.length) {
       sendWhatsAppTicketAutomatically(
         clientFinal.rows[0],
-        concept || "Compra",
+        shouldPay
+          ? concept
+            ? `${concept} (al contado)`
+            : "Compra al contado"
+          : concept || "Compra",
         totalAmount,
         pointsUsed,
         ticketItems,
@@ -2166,6 +2238,15 @@ async function sendWhatsAppTicketAutomatically(
     lines.push(
       `⭐ *Puntos Disponibles:* ${Number(client.points || 0).toFixed(1)} pts`,
     );
+
+    if (debtValue > 0) {
+      const breakdown = await getClientDebtBreakdown(client.id, debtValue);
+      if (breakdown.length > 0) {
+        lines.push(``);
+        lines.push(formatDebtBreakdownText(breakdown));
+      }
+    }
+
     const ticketCode = encodeClientId(client.id);
     const baseUrl = process.env.APP_URL || "https://tiendita-mx.vercel.app";
     if (ticketCode) {
@@ -2268,7 +2349,19 @@ app.post("/api/clients/:id/whatsapp-statement", authGuard, async (req, res) => {
     if (stmtCode) {
       linkStr = `\n\n🔗 *Consulta tu estado de cuenta completo aquí:*\n${baseUrl}/c/${stmtCode}`;
     }
-    const message = `Hola ${client.name}, tu saldo total en Tiendita es de $${Number(client.total_debt).toFixed(2)} y cuentas con ${Number(client.points || 0).toFixed(1)} pts.${linkStr}\n\n¡Gracias por tu preferencia! 🙌`;
+
+    let breakdownStr = "";
+    if (Number(client.total_debt) > 0) {
+      const breakdown = await getClientDebtBreakdown(
+        client.id,
+        client.total_debt,
+      );
+      if (breakdown.length > 0) {
+        breakdownStr = `\n\n${formatDebtBreakdownText(breakdown)}`;
+      }
+    }
+
+    const message = `Hola ${client.name}, tu saldo total en Tiendita es de $${Number(client.total_debt).toFixed(2)} y cuentas con ${Number(client.points || 0).toFixed(1)} pts.${breakdownStr}${linkStr}\n\n¡Gracias por tu preferencia! 🙌`;
 
     const cleanPhone = formatWhatsAppNumber(client.phone);
     const manualWaUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;

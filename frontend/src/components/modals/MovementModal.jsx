@@ -103,10 +103,10 @@ export default function MovementModal({
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}
-        className="w-full max-w-lg rounded-2xl border border-[#E5E2DA] bg-white p-6 shadow-2xl dark:border-[#282C32] dark:bg-[#181B1E] max-h-[90vh] flex flex-col"
+        className="w-full max-w-lg rounded-2xl border border-[#E5E2DA] bg-white p-4 sm:p-6 shadow-2xl dark:border-[#282C32] dark:bg-[#181B1E] max-h-[92vh] flex flex-col"
       >
         {/* Header */}
-        <div className="mb-4 flex items-center justify-between shrink-0">
+        <div className="mb-3 sm:mb-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 text-base font-bold text-[#1C1917] dark:text-[#F3F4F6]">
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-lg ${
@@ -140,7 +140,7 @@ export default function MovementModal({
         </div>
 
         {/* Client summary badge */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#E5E2DA] bg-[#FAF7F0] px-3.5 py-2 text-xs text-[#57534E] dark:border-[#282C32] dark:bg-[#121417] dark:text-[#9CA3AF] shrink-0">
+        <div className="mb-3 sm:mb-4 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 rounded-xl border border-[#E5E2DA] bg-[#FAF7F0] px-3 py-2 text-[11px] sm:text-xs text-[#57534E] dark:border-[#282C32] dark:bg-[#121417] dark:text-[#9CA3AF] shrink-0">
           <span>
             Deuda:{" "}
             <strong className="font-tabular text-[#1C1917] dark:text-[#F3F4F6]">
@@ -165,7 +165,7 @@ export default function MovementModal({
 
         <form
           onSubmit={handleSubmit}
-          className="flex-1 overflow-y-auto space-y-4 pr-1"
+          className="flex-1 overflow-y-auto space-y-3 sm:space-y-4 pr-1"
         >
           {/* Purchase: Mode Selector (Items vs Manual) */}
           {movementKind === "purchase" && (
@@ -197,7 +197,7 @@ export default function MovementModal({
 
           {/* Items Section */}
           {movementKind === "purchase" && mode === "items" && (
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               <div className="flex items-center justify-between text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
                 <span>PRODUCTOS</span>
                 <span>SUBTOTAL</span>
@@ -208,8 +208,11 @@ export default function MovementModal({
                   ? Number(sweet.sale_price) * (Number(item.quantity) || 0)
                   : 0;
                 return (
-                  <div key={item.id} className="flex items-center gap-2">
-                    <div className="flex-1">
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-1.5 sm:gap-2"
+                  >
+                    <div className="flex-1 min-w-0">
                       <SweetCombobox
                         sweets={sweets}
                         value={item.sweetId}
@@ -219,22 +222,22 @@ export default function MovementModal({
                     <input
                       type="number"
                       min="1"
-                      className="w-16 rounded-xl border border-[#E5E2DA] bg-white px-2 py-2 text-center text-sm font-tabular outline-none focus:border-[#D97706] focus:ring-1 focus:ring-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
+                      className="w-13 sm:w-16 rounded-xl border border-[#E5E2DA] bg-white px-1.5 py-2 text-center text-xs sm:text-sm font-tabular outline-none focus:border-[#D97706] focus:ring-1 focus:ring-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
                       value={item.quantity}
                       onChange={(e) =>
                         updateItem(item.id, "quantity", e.target.value)
                       }
                     />
-                    <div className="w-16 text-right text-xs font-bold font-tabular text-[#1C1917] dark:text-[#F3F4F6]">
+                    <div className="w-13 sm:w-16 text-right text-[11px] sm:text-xs font-bold font-tabular text-[#1C1917] dark:text-[#F3F4F6] shrink-0">
                       ${sub.toFixed(2)}
                     </div>
                     {items.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeItem(item.id)}
-                        className="rounded-lg p-1.5 text-[#DC2626] hover:bg-[#FEF2F2] dark:hover:bg-[#450A0A]/40 transition"
+                        className="rounded-lg p-1 sm:p-1.5 text-[#DC2626] hover:bg-[#FEF2F2] dark:hover:bg-[#450A0A]/40 transition shrink-0"
                       >
-                        <Icon path={mdiDelete} size={0.75} />
+                        <Icon path={mdiDelete} size={0.7} />
                       </button>
                     )}
                   </div>
