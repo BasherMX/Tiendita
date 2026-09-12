@@ -384,59 +384,377 @@ app.get("/api/sweets/stats", authGuard, async (req, res) => {
   }
 });
 
-// Estadísticas Generales
+// Estadísticas Generales e Inteligencia de Negocio
 app.get("/api/stats", authGuard, async (req, res) => {
   try {
     const lowStockThreshold = 10;
     const criticalStockThreshold = 3;
 
-    const dailyTotals = await query(`
-      SELECT day, SUM(total) AS total, SUM(profit) AS profit
-      FROM (
-        SELECT m.created_at::date AS day,
-               SUM(mi.quantity * mi.unit_price) AS total,
-               SUM(mi.quantity * (mi.unit_price - s.purchase_price)) AS profit
-        FROM movements m
-        JOIN movement_items mi ON mi.movement_id = m.id
-        JOIN sweets s ON s.id = mi.sweet_id
-        WHERE m.amount > 0 AND m.concept LIKE 'Compra%'
-        GROUP BY m.created_at::date
-        UNION ALL
-        SELECT si.created_at::date AS day,
-               SUM(si.quantity * si.unit_price) AS total,
-               SUM(si.quantity * (si.unit_price - s.purchase_price)) AS profit
-        FROM sale_items si
-        JOIN sweets s ON s.id = si.sweet_id
-        GROUP BY si.created_at::date
-      ) AS combined
-      GROUP BY day
-      ORDER BY day DESC
-    `);
+    // Ejecución paralela de consultas analíticas
+    const [
+      dailyTotalsRes,
+      topSellersRes,
+      lowSellersRes,
+      lowStockRes,
+      stagnantStockRes,
+      productProfitabilityRes,
+      cashFlowRes,
+      hourlySalesRes,
+      dowSalesRes,
+      paymentMethodsRes,
+      productAffinityRes,
+      clientsDebtRes,
+      recoveryRes,
+      totalsRes,
+    ] = await Promise.all([
+      // 1. Totales diarios históricos
+      query(`
+        SELECT day, SUM(total) AS total, SUM(profit) AS profit
+        FROM (
+          SELECT m.created_at::date AS day,
+                 SUM(mi.quantity * mi.unit_price) AS total,
+                 SUM(mi.quantity * (mi.unit_price - s.purchase_price)) AS profit
+          FROM movements m
+          JOIN movement_items mi ON mi.movement_id = m.id
+          JOIN sweets s ON s.id = mi.sweet_id
+          WHERE m.amount > 0 AND m.concept LIKE 'Compra%'
+          GROUP BY m.created_at::date
+          UNION ALL
+          SELECT si.created_at::date AS day,
+                 SUM(si.quantity * si.unit_price) AS total,
+                 SUM(si.quantity * (si.unit_price - s.purchase_price)) AS profit
+          FROM sale_items si
+          JOIN sweets s ON s.id = si.sweet_id
+          GROUP BY si.created_at::date
+        ) AS combined
+        GROUP BY day
+        ORDER BY day DESC
+      `),
 
-    const topSellers = await query(
-      "SELECT id, name, sold_count FROM sweets WHERE sold_count > 0 ORDER BY sold_count DESC, name ASC LIMIT 3",
+      // 2. Top vendedores
+      query(
+        "SELECT id, name, sold_count, sale_price FROM sweets WHERE sold_count > 0 ORDER BY sold_count DESC, name ASC LIMIT 5",
+      ),
+
+      // 3. Menos vendidos
+      query(
+        "SELECT id, name, sold_count FROM sweets WHERE created_at <= CURRENT_TIMESTAMP - INTERVAL '30 days' ORDER BY sold_count ASC, name ASC LIMIT 5",
+      ),
+
+      // 4. Stock bajo y crítico
+      query(
+        "SELECT id, name, stock, sale_price, purchase_price FROM sweets WHERE stock <= $1 ORDER BY stock ASC, name ASC",
+        [lowStockThreshold],
+      ),
+
+      // 5. Stock estancado (existencias con bajas ventas y capital detenido)
+      query(`
+        SELECT id, name, stock, purchase_price, sale_price, sold_count,
+               (stock * purchase_price) AS frozen_capital
+        FROM sweets
+        WHERE stock > 0 AND sold_count <= 2 AND is_active = true
+        ORDER BY frozen_capital DESC, stock DESC
+        LIMIT 8
+      `),
+
+      // 6. Rentabilidad y margen por producto
+      query(`
+        SELECT id, name, purchase_price, sale_price, sold_count,
+               (sale_price - purchase_price) AS unit_margin,
+               CASE WHEN sale_price > 0 THEN ROUND(((sale_price - purchase_price) / sale_price) * 100, 1) ELSE 0 END AS margin_percent,
+               ((sale_price - purchase_price) * sold_count) AS total_profit,
+               (sale_price * sold_count) AS total_revenue
+        FROM sweets
+        WHERE sold_count > 0
+        ORDER BY total_profit DESC
+        LIMIT 8
+      `),
+
+      // 7. Flujo de caja diario últimos 14 días (Contado vs Fiado vs Abonos)
+      query(`
+        SELECT day,
+               COALESCE(SUM(contado), 0) AS contado,
+               COALESCE(SUM(fiado), 0) AS fiado,
+               COALESCE(SUM(abonos), 0) AS abonos
+        FROM (
+          SELECT created_at::date AS day, total_amount AS contado, 0 AS fiado, 0 AS abonos
+          FROM sales
+          WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'
+          UNION ALL
+          SELECT created_at::date AS day, amount AS contado, 0 AS fiado, 0 AS abonos
+          FROM movements
+          WHERE amount > 0 AND concept LIKE 'Compra%' AND payment_method != 'credit'
+            AND created_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'
+          UNION ALL
+          SELECT created_at::date AS day, 0 AS contado, amount AS fiado, 0 AS abonos
+          FROM movements
+          WHERE amount > 0 AND concept LIKE 'Compra%' AND payment_method = 'credit'
+            AND created_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'
+          UNION ALL
+          SELECT created_at::date AS day, 0 AS contado, 0 AS fiado, ABS(amount) AS abonos
+          FROM movements
+          WHERE amount < 0 AND (concept LIKE 'Pago%' OR concept LIKE 'Abono%')
+            AND created_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'
+        ) AS flow
+        GROUP BY day
+        ORDER BY day ASC
+      `),
+
+      // 8. Ventas por hora del día
+      query(`
+        SELECT hour, SUM(total) AS total, COUNT(*) AS tickets
+        FROM (
+          SELECT EXTRACT(HOUR FROM created_at)::int AS hour, total_amount AS total
+          FROM sales
+          UNION ALL
+          SELECT EXTRACT(HOUR FROM created_at)::int AS hour, amount AS total
+          FROM movements
+          WHERE amount > 0 AND concept LIKE 'Compra%'
+        ) AS hourly
+        GROUP BY hour
+        ORDER BY hour ASC
+      `),
+
+      // 9. Ventas por día de la semana (0=Dom, 1=Lun, ..., 6=Sáb)
+      query(`
+        SELECT dow, SUM(total) AS total, COUNT(*) AS tickets
+        FROM (
+          SELECT EXTRACT(DOW FROM created_at)::int AS dow, total_amount AS total
+          FROM sales
+          UNION ALL
+          SELECT EXTRACT(DOW FROM created_at)::int AS dow, amount AS total
+          FROM movements
+          WHERE amount > 0 AND concept LIKE 'Compra%'
+        ) AS dow_data
+        GROUP BY dow
+        ORDER BY dow ASC
+      `),
+
+      // 10. Métodos de pago
+      query(`
+        SELECT payment_method, SUM(total) AS total, COUNT(*) AS count
+        FROM (
+          SELECT COALESCE(payment_method, 'cash') AS payment_method, total_amount AS total
+          FROM sales
+          UNION ALL
+          SELECT 
+            CASE 
+              WHEN payment_method = 'credit' THEN 'credit'
+              ELSE COALESCE(payment_method, 'cash')
+            END AS payment_method,
+            amount AS total
+          FROM movements
+          WHERE amount > 0 AND concept LIKE 'Compra%'
+        ) AS pm
+        GROUP BY payment_method
+        ORDER BY total DESC
+      `),
+
+      // 11. Afinidad de productos / Cross-selling
+      query(`
+        WITH items AS (
+          SELECT movement_id AS basket_id, sweet_id
+          FROM movement_items
+          UNION ALL
+          SELECT sale_id AS basket_id, sweet_id
+          FROM sale_items
+        )
+        SELECT 
+          s1.name AS product_a,
+          s2.name AS product_b,
+          COUNT(*) AS pair_count
+        FROM items i1
+        JOIN items i2 ON i1.basket_id = i2.basket_id AND i1.sweet_id < i2.sweet_id
+        JOIN sweets s1 ON s1.id = i1.sweet_id
+        JOIN sweets s2 ON s2.id = i2.sweet_id
+        GROUP BY s1.name, s2.name
+        ORDER BY pair_count DESC
+        LIMIT 6
+      `),
+
+      // 12. Deuda activa de clientes para cálculo FIFO de antigüedad
+      query("SELECT id, name, total_debt FROM clients WHERE total_debt > 0"),
+
+      // 13. Tasa de cobranza (últimos 30 días)
+      query(`
+        SELECT 
+          COALESCE(SUM(CASE WHEN amount > 0 AND payment_method = 'credit' THEN amount ELSE 0 END), 0) AS credit_granted,
+          COALESCE(SUM(CASE WHEN amount < 0 AND (concept LIKE 'Pago%' OR concept LIKE 'Abono%') THEN ABS(amount) ELSE 0 END), 0) AS payments_received
+        FROM movements
+        WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '30 days'
+      `),
+
+      // 14. Totales globales de tickets e ingresos
+      query(`
+        SELECT 
+          (SELECT COUNT(*) FROM sales) + (SELECT COUNT(*) FROM movements WHERE amount > 0 AND concept LIKE 'Compra%') AS total_tickets,
+          COALESCE((SELECT SUM(total_amount) FROM sales), 0) + COALESCE((SELECT SUM(amount) FROM movements WHERE amount > 0 AND concept LIKE 'Compra%'), 0) AS total_revenue
+      `),
+    ]);
+
+    // Procesar distribución de antigüedad de deuda
+    const debtAging = [
+      { range: "1 - 7 días", amount: 0, count: 0 },
+      { range: "8 - 15 días", amount: 0, count: 0 },
+      { range: "16 - 30 días", amount: 0, count: 0 },
+      { range: "+30 días", amount: 0, count: 0 },
+    ];
+
+    for (const c of clientsDebtRes.rows) {
+      const debt = Number(c.total_debt || 0);
+      if (debt <= 0) continue;
+      const days = await getClientDebtDays(c.id, debt);
+      if (days <= 7) {
+        debtAging[0].amount = Number((debtAging[0].amount + debt).toFixed(2));
+        debtAging[0].count += 1;
+      } else if (days <= 15) {
+        debtAging[1].amount = Number((debtAging[1].amount + debt).toFixed(2));
+        debtAging[1].count += 1;
+      } else if (days <= 30) {
+        debtAging[2].amount = Number((debtAging[2].amount + debt).toFixed(2));
+        debtAging[2].count += 1;
+      } else {
+        debtAging[3].amount = Number((debtAging[3].amount + debt).toFixed(2));
+        debtAging[3].count += 1;
+      }
+    }
+
+    // Normalizar horas del día (08:00 a 22:00 por defecto para mostrador)
+    const hourlyMap = new Map();
+    (hourlySalesRes.rows || []).forEach((r) => {
+      hourlyMap.set(Number(r.hour), {
+        total: Number(r.total || 0),
+        tickets: Number(r.tickets || 0),
+      });
+    });
+    const hourlySales = [];
+    for (let h = 8; h <= 21; h++) {
+      const label = `${h.toString().padStart(2, "0")}:00`;
+      const data = hourlyMap.get(h) || { total: 0, tickets: 0 };
+      hourlySales.push({
+        hour: label,
+        total: Number(data.total.toFixed(2)),
+        tickets: data.tickets,
+      });
+    }
+
+    // Normalizar días de la semana (Lunes a Domingo)
+    const dowNames = [
+      { dow: 1, name: "Lun" },
+      { dow: 2, name: "Mar" },
+      { dow: 3, name: "Mié" },
+      { dow: 4, name: "Jue" },
+      { dow: 5, name: "Vie" },
+      { dow: 6, name: "Sáb" },
+      { dow: 0, name: "Dom" },
+    ];
+    const dowMap = new Map();
+    (dowSalesRes.rows || []).forEach((r) => {
+      dowMap.set(Number(r.dow), {
+        total: Number(r.total || 0),
+        tickets: Number(r.tickets || 0),
+      });
+    });
+    const dayOfWeekSales = dowNames.map((d) => {
+      const data = dowMap.get(d.dow) || { total: 0, tickets: 0 };
+      return {
+        dayName: d.name,
+        total: Number(data.total.toFixed(2)),
+        tickets: data.tickets,
+      };
+    });
+
+    // Métodos de pago normalizados con etiquetas legibles
+    const paymentMethodLabels = {
+      cash: "Efectivo",
+      credit: "Fiado (Crédito)",
+      transfer: "Transferencia SPEI",
+      card: "Tarjeta",
+      points: "Puntos",
+    };
+    const paymentMethods = (paymentMethodsRes.rows || []).map((pm) => ({
+      key: pm.payment_method,
+      name: paymentMethodLabels[pm.payment_method] || pm.payment_method,
+      total: Number(Number(pm.total || 0).toFixed(2)),
+      count: Number(pm.count || 0),
+    }));
+
+    // KPIs calculados
+    const totalTickets = Number(totalsRes.rows[0]?.total_tickets || 0);
+    const totalRevenue = Number(totalsRes.rows[0]?.total_revenue || 0);
+    const averageTicket =
+      totalTickets > 0 ? Number((totalRevenue / totalTickets).toFixed(2)) : 0;
+
+    const creditGranted = Number(recoveryRes.rows[0]?.credit_granted || 0);
+    const paymentsReceived = Number(
+      recoveryRes.rows[0]?.payments_received || 0,
     );
-    const lowSellers = await query(
-      "SELECT id, name, sold_count FROM sweets WHERE created_at <= CURRENT_TIMESTAMP - INTERVAL '30 days' ORDER BY sold_count ASC, name ASC LIMIT 3",
-    );
-    const lowStock = await query(
-      "SELECT id, name, stock FROM sweets WHERE stock <= $1 ORDER BY stock ASC, name ASC",
-      [lowStockThreshold],
+    const recoveryRate =
+      creditGranted > 0
+        ? Math.min(100, Math.round((paymentsReceived / creditGranted) * 100))
+        : 100;
+
+    const stagnantCapital = (stagnantStockRes.rows || []).reduce(
+      (sum, item) => sum + Number(item.frozen_capital || 0),
+      0,
     );
 
     return res.json({
-      dailyTotals: dailyTotals.rows || [],
-      topSellers: topSellers.rows || [],
-      lowSellers: lowSellers.rows || [],
-      topSeller: topSellers.rows[0] || null,
-      lowSeller: lowSellers.rows[0] || null,
-      lowStock: lowStock.rows || [],
+      // Compatibilidad con campos existentes
+      dailyTotals: dailyTotalsRes.rows || [],
+      topSellers: topSellersRes.rows || [],
+      lowSellers: lowSellersRes.rows || [],
+      topSeller: topSellersRes.rows[0] || null,
+      lowSeller: lowSellersRes.rows[0] || null,
+      lowStock: lowStockRes.rows || [],
       thresholds: {
         low: lowStockThreshold,
         critical: criticalStockThreshold,
       },
+      // 10 Módulos de Inteligencia de Negocio
+      kpis: {
+        averageTicket,
+        totalTickets,
+        totalRevenue: Number(totalRevenue.toFixed(2)),
+        recoveryRate,
+        creditGranted: Number(creditGranted.toFixed(2)),
+        paymentsReceived: Number(paymentsReceived.toFixed(2)),
+        stagnantCapital: Number(stagnantCapital.toFixed(2)),
+      },
+      cashFlowDaily: (cashFlowRes.rows || []).map((row) => ({
+        day: row.day,
+        contado: Number(Number(row.contado || 0).toFixed(2)),
+        fiado: Number(Number(row.fiado || 0).toFixed(2)),
+        abonos: Number(Number(row.abonos || 0).toFixed(2)),
+      })),
+      hourlySales,
+      dayOfWeekSales,
+      paymentMethods,
+      productProfitability: (productProfitabilityRes.rows || []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        sale_price: Number(p.sale_price),
+        purchase_price: Number(p.purchase_price),
+        sold_count: Number(p.sold_count),
+        unit_margin: Number(Number(p.unit_margin || 0).toFixed(2)),
+        margin_percent: Number(p.margin_percent || 0),
+        total_profit: Number(Number(p.total_profit || 0).toFixed(2)),
+        total_revenue: Number(Number(p.total_revenue || 0).toFixed(2)),
+      })),
+      productAffinity: productAffinityRes.rows || [],
+      debtAging,
+      stagnantStock: (stagnantStockRes.rows || []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        stock: Number(s.stock),
+        purchase_price: Number(s.purchase_price),
+        sale_price: Number(s.sale_price),
+        sold_count: Number(s.sold_count),
+        frozen_capital: Number(Number(s.frozen_capital || 0).toFixed(2)),
+      })),
     });
   } catch (error) {
+    console.error("Error generating stats:", error);
     return res.status(500).json({ message: error.message });
   }
 });

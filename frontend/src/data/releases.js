@@ -1,5 +1,49 @@
 export const releases = [
   {
+    version: "1.7.0",
+    date: "11 de Septiembre, 2026",
+    tagline:
+      "Centro de Inteligencia & Estadísticas de Negocio: 10 Módulos Analíticos",
+    highlights: [
+      "Dashboard analítico completo de 10 módulos con Recharts (Area, Bar, Pie y Line) sin alterar el esquema de BD.",
+      "Cinta de KPIs financieros: Ticket Promedio por venta, Tasa de Cobranza mensual (%), Capital Estancado e Ingresos Totales.",
+      "Flujo de caja dinámico (AreaChart): Desglose comparativo de ventas de Contado vs. Fiado otorgado vs. Abonos recuperados.",
+      "Análisis de hábitos de mostrador: Histograma de Horas Pico de venta y distribución de ingresos por Día de la Semana.",
+      "Gráfica de métodos de pago (PieChart tipo dona) con desglose de Efectivo, Fiado, Transferencia SPEI, Tarjeta y Puntos.",
+      "Matriz de rentabilidad real por producto: Cálculo dinámico de ganancia neta en pesos (Venta - Compra) y margen porcentual unitario.",
+      "Detección de productos afines (Cross-Selling): Análisis automático de parejas de dulces comprados juntos en la misma transacción.",
+      "Distribución de deuda por antigüedad (FIFO): Desglose de saldos pendientes en 1-7d, 8-15d, 16-30d y +30d.",
+      "Alertas de stock estancado: Identificación de productos con existencias y baja rotación calculando el capital congelado.",
+    ],
+    sections: [
+      {
+        title: "📊 Analítica & Finanzas",
+        items: [
+          "Cálculo en tiempo real de Ticket Promedio basado en todas las operaciones registradas.",
+          "Monitoreo de recuperación de créditos mensuales y abonos recuperados.",
+          "Flujo de caja diario de los últimos 14 días con áreas apiladas de contado, fiado y abonos.",
+        ],
+      },
+      {
+        title: "🕒 Hábitos de Consumo & Operaciones",
+        items: [
+          "Histograma de 24 horas para identificar las horas pico de mostrador.",
+          "Comparativa de ventas por día de la semana (Lunes a Domingo).",
+          "Distribución porcentual por medios de pago con leyenda interactiva.",
+        ],
+      },
+      {
+        title: "🍬 Productos & Cartera",
+        items: [
+          "Tabla de rentabilidad neta con cálculo de utilidad y porcentaje de margen por producto.",
+          "Detector de afinidad de compra en cesta para optimizar la exhibición en mostrador.",
+          "Gráfica de barras cromática para envejecimiento de deuda según días de atraso.",
+          "Módulo de stock estancado con métrica de capital detenido.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.6.1",
     date: "11 de Septiembre, 2026",
     tagline:
