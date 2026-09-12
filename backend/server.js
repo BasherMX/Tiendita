@@ -417,26 +417,21 @@ app.get("/api/stats", authGuard, async (req, res) => {
       recoveryRes,
       totalsRes,
     ] = await Promise.all([
-      // 1. Totales diarios históricos
       // 1. Totales diarios históricos (convertidos a horario local America/Mexico_City)
       query(`
         SELECT day, SUM(total) AS total, SUM(profit) AS profit
         FROM (
-          SELECT m.created_at::date AS day,
           SELECT (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day,
                  SUM(mi.quantity * mi.unit_price) AS total,
                  SUM(mi.quantity * (mi.unit_price - s.purchase_price)) AS profit
           FROM movements m
           JOIN movement_items mi ON mi.movement_id = m.id
           JOIN sweets s ON s.id = mi.sweet_id
-          WHERE ((m.amount > 0) OR (m.amount = 0 AND m.concept LIKE '%al contado%')) AND m.concept LIKE 'Compra%'
-          GROUP BY m.created_at::date
           WHERE ((m.amount > 0) OR (m.amount = 0 AND (m.concept ILIKE '%contado%' OR mi.sweet_id IS NOT NULL)))
             AND m.concept NOT ILIKE '%pago%'
             AND m.concept NOT ILIKE '%abono%'
           GROUP BY (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date
           UNION ALL
-          SELECT si.created_at::date AS day,
           SELECT (m2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day,
                  COALESCE(m2.paid_amount, 0) AS total,
                  0 AS profit
@@ -444,13 +439,13 @@ app.get("/api/stats", authGuard, async (req, res) => {
           LEFT JOIN movement_items mi2 ON mi2.movement_id = m2.id
           WHERE mi2.id IS NULL AND COALESCE(m2.paid_amount, 0) > 0
             AND m2.concept NOT ILIKE '%pago%' AND m2.concept NOT ILIKE '%abono%'
+          GROUP BY (m2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date
           UNION ALL
           SELECT (si.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day,
                  SUM(si.quantity * si.unit_price) AS total,
                  SUM(si.quantity * (si.unit_price - s.purchase_price)) AS profit
           FROM sale_items si
           JOIN sweets s ON s.id = si.sweet_id
-          GROUP BY si.created_at::date
           GROUP BY (si.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date
         ) AS combined
         GROUP BY day
@@ -1510,7 +1505,6 @@ app.get("/api/public/clients/:code", async (req, res) => {
            AND (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')
              BETWEEN date_trunc('month', NOW() AT TIME ZONE 'America/Mexico_City')
              AND (date_trunc('month', NOW() AT TIME ZONE 'America/Mexico_City') + INTERVAL '1 month - 1 second')
-         GROUP BY m.id, m.client_id, m.amount
          GROUP BY m.id, m.client_id, m.amount, m.paid_amount
        )
        SELECT c.id, c.name, COALESCE(SUM(pt.total), 0) AS total_spent
