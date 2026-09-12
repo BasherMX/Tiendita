@@ -14,7 +14,6 @@ import {
   mdiLogin,
   mdiChartBar,
   mdiStore,
-  mdiGift,
   mdiCog,
 } from "@mdi/js";
 import brandLogo from "../assets/logo.png";
@@ -35,7 +34,6 @@ export default function Navbar({
     { path: "/clientes", icon: mdiAccountGroup, label: "Clientes" },
     { path: "/precios", icon: mdiClipboardList, label: "Punto de Venta" },
     { path: "/inventario", icon: mdiCandycane, label: "Inventario" },
-    { path: "/recompensas", icon: mdiGift, label: "Recompensas" },
     { path: "/compras", icon: mdiStore, label: "Compras" },
     { path: "/estadisticas", icon: mdiChartBar, label: "Estadísticas" },
     { path: "/configuracion", icon: mdiCog, label: "Configuración" },
