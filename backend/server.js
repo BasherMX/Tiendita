@@ -837,9 +837,13 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
       FROM movements m
       LEFT JOIN movement_items mi ON mi.movement_id = m.id
       LEFT JOIN sweets s ON s.id = mi.sweet_id
-      WHERE ((m.amount > 0) OR (m.amount = 0 AND m.concept ILIKE '%contado%'))
-        AND m.concept ILIKE '%compra%'
-        ${range ? "AND (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') BETWEEN $1 AND $2" : ""}
+      WHERE (
+        (m.amount > 0) 
+        OR (m.amount = 0 AND (m.concept ILIKE '%contado%' OR mi.sweet_id IS NOT NULL))
+      )
+      AND m.concept NOT ILIKE '%pago%'
+      AND m.concept NOT ILIKE '%abono%'
+      ${range ? "AND (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') BETWEEN $1 AND $2" : ""}
       ORDER BY m.created_at DESC
     `;
     const movRes = await query(movSql, dateParams);
@@ -906,9 +910,12 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
         return {
           total_tickets: 0,
           total_spent: 0,
+          total_units: 0,
           average_ticket: 0,
           cross_selling_count: 0,
           cross_selling_percent: 0,
+          top_cross_selling_pair: null,
+          cross_selling_pairs: [],
           favorite_product: null,
           top_products: [],
           top_day_name: "—",
@@ -920,8 +927,10 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
       }
 
       let totalSpent = 0;
+      let totalUnits = 0;
       let crossSellingCount = 0;
       const productMap = new Map();
+      const pairMap = new Map();
       const dowCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
       const pmCounts = {};
 
@@ -935,8 +944,33 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
         }
         totalSpent += ticketTotal;
 
+        // Sumar unidades
+        t.items.forEach((it) => {
+          totalUnits += Number(it.quantity || 0);
+        });
+
+        // Cross-selling: qué productos específicos compra juntos en tickets con 2 o más artículos
         if (t.items.length >= 2) {
           crossSellingCount++;
+          const uniqueItems = Array.from(
+            new Set(
+              t.items.map((it) => (it.sweet_name || "").trim()).filter(Boolean),
+            ),
+          ).sort();
+
+          for (let i = 0; i < uniqueItems.length; i++) {
+            for (let j = i + 1; j < uniqueItems.length; j++) {
+              const pairKey = `${uniqueItems[i]} + ${uniqueItems[j]}`;
+              const prev = pairMap.get(pairKey) || {
+                pair: pairKey,
+                item_a: uniqueItems[i],
+                item_b: uniqueItems[j],
+                count: 0,
+              };
+              prev.count += 1;
+              pairMap.set(pairKey, prev);
+            }
+          }
         }
 
         t.items.forEach((it) => {
@@ -957,6 +991,11 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
         const pm = t.payment_method || "cash";
         pmCounts[pm] = (pmCounts[pm] || 0) + 1;
       });
+
+      const sortedPairs = Array.from(pairMap.values()).sort(
+        (a, b) => b.count - a.count,
+      );
+      const topCrossSellingPair = sortedPairs[0]?.pair || null;
 
       const sortedProducts = Array.from(productMap.values()).sort(
         (a, b) => b.quantity - a.quantity || b.total_spent - a.total_spent,
@@ -994,11 +1033,14 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
       return {
         total_tickets: totalTickets,
         total_spent: Number(totalSpent.toFixed(2)),
+        total_units: totalUnits,
         average_ticket: Number((totalSpent / totalTickets).toFixed(2)),
         cross_selling_count: crossSellingCount,
         cross_selling_percent: Math.round(
           (crossSellingCount / totalTickets) * 100,
         ),
+        top_cross_selling_pair: topCrossSellingPair,
+        cross_selling_pairs: sortedPairs.slice(0, 6),
         favorite_product: favoriteProduct,
         top_products: topProducts,
         top_day_name: topDayName,
@@ -1059,12 +1101,12 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
 
     const combinedList = [...clientsList, publicGeneralEntity];
 
-    // Ordenar por total_tickets DESC y total_spent DESC
+    // Ordenar por total_spent DESC (Monto total comprado) y secundariamente total_tickets DESC
     combinedList.sort((a, b) => {
-      if (b.total_tickets !== a.total_tickets) {
-        return b.total_tickets - a.total_tickets;
+      if (b.total_spent !== a.total_spent) {
+        return b.total_spent - a.total_spent;
       }
-      return b.total_spent - a.total_spent;
+      return b.total_tickets - a.total_tickets;
     });
 
     // Asignar rangos y medallas

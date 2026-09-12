@@ -1,5 +1,35 @@
 export const releases = [
   {
+    version: "1.7.7",
+    date: "11 de Septiembre, 2026",
+    tagline:
+      "Corrección de Ranking de Clientes (Total Gastado) y Cross-Selling con Nombres de Productos",
+    highlights: [
+      "Ranking de Compradores por Total Gastado ($): El ordenamiento y podio ahora priorizan el volumen total de dinero comprado. Angy Lemus y la Señora Lupita se posicionan en los primeros lugares de honor.",
+      "Selector de Criterio de Ranking: Posibilidad de alternar el orden entre Total Gastado ($), Más Visitas (Tickets) y Más Piezas (Unidades), además de clic directo en las columnas de la tabla.",
+      "Tolerancia SQL en Compras: Cláusula WHERE ampliada para capturar todas las compras a crédito y de contado sin depender exclusivamente de palabras clave rígidas.",
+      "Cross-Selling con Nombres de Productos: En el podio, tabla y detalle de cliente se muestran los combos específicos de productos que compran juntos (ej. 'Churros Soles + Chicle Trident') y las veces que se han combinado.",
+      "Sección Dedicada de Combos Habituales: Desglose claro de qué suele llevarse junto cada cliente en su expediente de estadísticas.",
+    ],
+    sections: [
+      {
+        title: "🏆 Inteligencia de Clientes & Ranking",
+        items: [
+          "Ordenamiento por defecto por mayor volumen monetario comprado ($ gastado).",
+          "Podio dinámico que se recalcula según el criterio seleccionado (Monto, Frecuencia o Piezas).",
+          "Encabezados de tabla interactivos para ordenar con un solo clic.",
+        ],
+      },
+      {
+        title: "🤝 Análisis de Cross-Selling",
+        items: [
+          "Algoritmo de co-ocurrencia por pares de artículos en carritos de 2 o más productos.",
+          "Visualización de los combos favoritos por cliente con conteo exacto de frecuencia conjunta.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.7.6",
     date: "11 de Septiembre, 2026",
     tagline:

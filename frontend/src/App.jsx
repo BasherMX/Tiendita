@@ -968,7 +968,7 @@ export default function App() {
           }
           return false;
         }}
-        systemVersion="1.7.6"
+        systemVersion="1.7.7"
       />
 
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-6 min-w-0">

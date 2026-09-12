@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Icon from "@mdi/react";
 import {
   mdiChartBar,
@@ -140,10 +141,54 @@ export default function StatsPage({
 
   // Estado para la pestaña de Clientes & Compradores
   const [clientPeriod, setClientPeriod] = useState("historico"); // "historico" | "mes" | "quincena" | "semana"
+  const [clientSortCriteria, setClientSortCriteria] = useState("spent"); // "spent" | "tickets" | "units"
   const [clientsStats, setClientsStats] = useState(null);
   const [loadingClientsStats, setLoadingClientsStats] = useState(false);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [selectedClientDetail, setSelectedClientDetail] = useState(null);
+
+  const sortedClientsList = useMemo(() => {
+    if (!clientsStats?.clients) return [];
+    const list = [...clientsStats.clients];
+    list.sort((a, b) => {
+      if (clientSortCriteria === "spent") {
+        return (
+          b.total_spent - a.total_spent || b.total_tickets - a.total_tickets
+        );
+      } else if (clientSortCriteria === "tickets") {
+        return (
+          b.total_tickets - a.total_tickets || b.total_spent - a.total_spent
+        );
+      } else if (clientSortCriteria === "units") {
+        return (
+          (b.total_units || 0) - (a.total_units || 0) ||
+          b.total_spent - a.total_spent
+        );
+      }
+      return 0;
+    });
+    return list.map((item, index) => {
+      let medal = null;
+      let medal_badge = `#${index + 1}`;
+      if (item.total_tickets > 0) {
+        if (index === 0) {
+          medal = "gold";
+          medal_badge = "🥇 1°";
+        } else if (index === 1) {
+          medal = "silver";
+          medal_badge = "🥈 2°";
+        } else if (index === 2) {
+          medal = "bronze";
+          medal_badge = "🥉 3°";
+        }
+      }
+      return { ...item, rank: index + 1, medal, medal_badge };
+    });
+  }, [clientsStats, clientSortCriteria]);
+
+  const podiumList = useMemo(() => {
+    return sortedClientsList.slice(0, 3).filter((c) => c.total_tickets > 0);
+  }, [sortedClientsList]);
 
   useEffect(() => {
     if (activeTab === "clientes") {
@@ -1290,6 +1335,109 @@ export default function StatsPage({
               >
                 Semana Actual
               </button>
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              {/* Selector de Criterio de Ordenamiento */}
+              <div className="flex items-center gap-1 rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-1 text-xs font-semibold dark:border-[#282C32] dark:bg-[#111315]">
+                <button
+                  type="button"
+                  onClick={() => setClientSortCriteria("spent")}
+                  title="Ordenar por mayor dinero comprado ($)"
+                  className={`rounded-lg px-2.5 py-1.5 transition whitespace-nowrap flex items-center gap-1 ${
+                    clientSortCriteria === "spent"
+                      ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                      : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                  }`}
+                >
+                  <Icon
+                    path={mdiCurrencyUsd}
+                    size={0.55}
+                    className="text-emerald-600"
+                  />
+                  <span>Total Gastado</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClientSortCriteria("tickets")}
+                  title="Ordenar por mayor número de compras / visitas"
+                  className={`rounded-lg px-2.5 py-1.5 transition whitespace-nowrap flex items-center gap-1 ${
+                    clientSortCriteria === "tickets"
+                      ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                      : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                  }`}
+                >
+                  <Icon
+                    path={mdiShoppingOutline}
+                    size={0.55}
+                    className="text-amber-600"
+                  />
+                  <span>Más Visitas</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClientSortCriteria("units")}
+                  title="Ordenar por mayor cantidad de piezas compradas"
+                  className={`rounded-lg px-2.5 py-1.5 transition whitespace-nowrap flex items-center gap-1 ${
+                    clientSortCriteria === "units"
+                      ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                      : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                  }`}
+                >
+                  <Icon
+                    path={mdiCandycane}
+                    size={0.55}
+                    className="text-pink-600"
+                  />
+                  <span>Piezas</span>
+                </button>
+              </div>
+
+              {/* Selector de Periodo */}
+              <div className="flex items-center gap-1 rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-1 text-xs font-semibold dark:border-[#282C32] dark:bg-[#111315] overflow-x-auto max-w-full">
+                <button
+                  type="button"
+                  onClick={() => setClientPeriod("historico")}
+                  className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
+                    clientPeriod === "historico"
+                      ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                      : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                  }`}
+                >
+                  Histórico
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClientPeriod("mes")}
+                  className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
+                    clientPeriod === "mes"
+                      ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                      : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                  }`}
+                >
+                  Mes Actual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClientPeriod("quincena")}
+                  className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
+                    clientPeriod === "quincena"
+                      ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                      : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                  }`}
+                >
+                  Quincena Actual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClientPeriod("semana")}
+                  className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
+                    clientPeriod === "semana"
+                      ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                      : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                  }`}
+                >
+                  Semana Actual
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1301,6 +1449,7 @@ export default function StatsPage({
             <>
               {/* Podio Destacado Top 3 */}
               {clientsStats?.podium && clientsStats.podium.length > 0 && (
+              {podiumList && podiumList.length > 0 && (
                 <div>
                   <div className="mb-3 flex items-center gap-2">
                     <Icon
@@ -1315,6 +1464,7 @@ export default function StatsPage({
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     {clientsStats.podium.map((c, idx) => {
+                    {podiumList.map((c, idx) => {
                       const isGold = idx === 0;
                       const isSilver = idx === 1;
                       const isBronze = idx === 2;
@@ -1430,15 +1580,28 @@ export default function StatsPage({
 
                               <div className="flex items-center justify-between text-[11px]">
                                 <span className="flex items-center gap-1">
+                              <div className="flex items-center justify-between text-[11px] gap-2">
+                                <span className="flex items-center gap-1 shrink-0">
                                   <Icon
                                     path={mdiCartOutline}
                                     size={0.55}
                                     className="text-blue-600"
+                                    className="text-blue-600 shrink-0"
                                   />
                                   Cross-Selling:
+                                  Suele combinar:
                                 </span>
                                 <span className="font-bold font-tabular text-[#1C1917] dark:text-[#F3F2EE]">
                                   {c.cross_selling_percent}%
+                                <span
+                                  className="font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate max-w-[150px] text-right"
+                                  title={
+                                    c.top_cross_selling_pair
+                                      ? `${c.top_cross_selling_pair} (${c.cross_selling_pairs?.[0]?.count || c.cross_selling_count} veces juntos)`
+                                      : "Sin compras combinadas"
+                                  }
+                                >
+                                  {c.top_cross_selling_pair || "Sin combos"}
                                 </span>
                               </div>
 
@@ -1497,6 +1660,7 @@ export default function StatsPage({
                     Mostrando{" "}
                     {
                       (clientsStats?.clients || []).filter((c) => {
+                      (sortedClientsList || []).filter((c) => {
                         if (!clientSearchQuery.trim()) return true;
                         const q = clientSearchQuery.toLowerCase().trim();
                         return (
@@ -1509,6 +1673,7 @@ export default function StatsPage({
                       }).length
                     }{" "}
                     de {clientsStats?.clients?.length || 0} compradores
+                    de {sortedClientsList?.length || 0} compradores
                   </span>
                 </div>
 
@@ -1548,9 +1713,29 @@ export default function StatsPage({
                         <th className="px-3 py-2.5 font-semibold">Comprador</th>
                         <th className="px-3 py-2.5 text-center font-semibold">
                           Compras
+                        <th
+                          onClick={() => setClientSortCriteria("tickets")}
+                          className={`px-3 py-2.5 text-center font-semibold cursor-pointer select-none transition ${
+                            clientSortCriteria === "tickets"
+                              ? "text-amber-600 dark:text-amber-400 font-black"
+                              : "hover:text-amber-600"
+                          }`}
+                          title="Clic para ordenar por número de compras / visitas"
+                        >
+                          Compras {clientSortCriteria === "tickets" && "▼"}
                         </th>
                         <th className="px-3 py-2.5 text-right font-semibold">
                           Total Gastado
+                        <th
+                          onClick={() => setClientSortCriteria("spent")}
+                          className={`px-3 py-2.5 text-right font-semibold cursor-pointer select-none transition ${
+                            clientSortCriteria === "spent"
+                              ? "text-amber-600 dark:text-amber-400 font-black"
+                              : "hover:text-amber-600"
+                          }`}
+                          title="Clic para ordenar por monto total gastado ($)"
+                        >
+                          Total Gastado {clientSortCriteria === "spent" && "▼"}
                         </th>
                         <th className="px-3 py-2.5 text-right font-semibold">
                           Ticket Prom.
@@ -1560,6 +1745,8 @@ export default function StatsPage({
                         </th>
                         <th className="px-3 py-2.5 text-center font-semibold">
                           Cross-Selling
+                        <th className="px-3 py-2.5 font-semibold">
+                          Qué Compra Junto
                         </th>
                         <th className="px-3 py-2.5 font-semibold">
                           Día Fuerte
@@ -1575,6 +1762,7 @@ export default function StatsPage({
                     </thead>
                     <tbody className="divide-y divide-[#E5E2DA] dark:divide-[#282C32] font-tabular">
                       {(clientsStats?.clients || [])
+                      {(sortedClientsList || [])
                         .filter((c) => {
                           if (!clientSearchQuery.trim()) return true;
                           const q = clientSearchQuery.toLowerCase().trim();
@@ -1693,6 +1881,25 @@ export default function StatsPage({
                                   }`}
                                 >
                                   {c.cross_selling_percent}%
+                            {/* Qué compra junto / Cross-Selling */}
+                            <td className="px-3 py-2.5 whitespace-nowrap">
+                              {c.top_cross_selling_pair ? (
+                                <div className="flex flex-col">
+                                  <span
+                                    className="font-bold text-xs text-[#1C1917] dark:text-[#F3F2EE] truncate max-w-[210px]"
+                                    title={`${c.top_cross_selling_pair} (${c.cross_selling_pairs?.[0]?.count || c.cross_selling_count} veces juntos)`}
+                                  >
+                                    {c.top_cross_selling_pair}
+                                  </span>
+                                  <span className="text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
+                                    {c.cross_selling_pairs?.[0]?.count
+                                      ? `${c.cross_selling_pairs[0].count}x juntos`
+                                      : `${c.cross_selling_percent}% mixto`}
+                                  </span>
+                                </div>
+                              ) : c.total_tickets > 0 ? (
+                                <span className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                                  Sin combos
                                 </span>
                               ) : (
                                 <span className="text-[#78716C] dark:text-[#9CA3AF]">
@@ -1836,12 +2043,26 @@ export default function StatsPage({
                   <div className="rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-3 dark:border-[#282C32] dark:bg-[#111315]">
                     <span className="block text-[10px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
                       CROSS-SELLING
+                      QUÉ COMPRA JUNTO
                     </span>
                     <span className="text-lg font-black text-[#1C1917] dark:text-[#F3F2EE]">
                       {selectedClientDetail.cross_selling_percent}%
+                    <span
+                      className="text-xs font-black text-[#1C1917] dark:text-[#F3F2EE] line-clamp-2 leading-tight mt-0.5"
+                      title={
+                        selectedClientDetail.top_cross_selling_pair ||
+                        "Sin compras combinadas"
+                      }
+                    >
+                      {selectedClientDetail.top_cross_selling_pair ||
+                        "Sin combos"}
                     </span>
                     <span className="block text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
                       {selectedClientDetail.cross_selling_count} carritos mixtos
+                    <span className="block text-[10px] text-[#78716C] dark:text-[#9CA3AF] mt-1">
+                      {selectedClientDetail.cross_selling_pairs?.length > 0
+                        ? `${selectedClientDetail.cross_selling_pairs[0].count} veces juntos`
+                        : "Solo compra individual"}
                     </span>
                   </div>
 
@@ -1862,6 +2083,60 @@ export default function StatsPage({
 
                 {/* Contenido Desglosado: Top Dulces y Métodos de Pago */}
                 <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                  {/* Sección Dedicada: Qué Suele Comprar Junto (Cross-Selling) */}
+                  <div className="rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 dark:border-[#282C32] dark:bg-[#111315]">
+                    <div className="mb-2.5 flex items-center justify-between text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                      <span className="flex items-center gap-1.5">
+                        <Icon
+                          path={mdiCartOutline}
+                          size={0.65}
+                          className="text-blue-600"
+                        />
+                        Qué Suele Comprar Junto (Combos Cross-Selling)
+                      </span>
+                      <span className="text-[11px] font-normal text-[#78716C] dark:text-[#9CA3AF]">
+                        {selectedClientDetail.cross_selling_pairs?.length || 0} combos
+                      </span>
+                    </div>
+
+                    {selectedClientDetail.cross_selling_pairs &&
+                    selectedClientDetail.cross_selling_pairs.length > 0 ? (
+                      <div className="space-y-2">
+                        {selectedClientDetail.cross_selling_pairs.map((combo, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between gap-2 rounded-xl border border-[#E5E2DA]/80 bg-[#F7F6F2]/70 p-2.5 text-xs dark:border-[#282C32] dark:bg-[#181B1E]"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-black text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                                {idx + 1}
+                              </span>
+                              <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                                <span className="font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate">
+                                  {combo.item_a}
+                                </span>
+                                <span className="text-[11px] font-black text-amber-600 dark:text-amber-400 shrink-0">
+                                  +
+                                </span>
+                                <span className="font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate">
+                                  {combo.item_b}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="shrink-0 font-tabular text-right">
+                              <span className="rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                                {combo.count} {combo.count === 1 ? "vez" : "veces"} juntos
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="py-4 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
+                        Este cliente suele comprar artículos individuales (no suele combinar productos en el mismo ticket).
+                      </p>
+                    )}
+                  </div>
                   {/* Top Dulces Comprados */}
                   <div className="rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 dark:border-[#282C32] dark:bg-[#111315]">
                     <div className="mb-2.5 flex items-center justify-between text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
