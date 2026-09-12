@@ -1292,49 +1292,6 @@ export default function StatsPage({
               </p>
             </div>
 
-            {/* Selector de Periodo */}
-            <div className="flex items-center gap-1 rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-1 text-xs font-semibold dark:border-[#282C32] dark:bg-[#111315] self-start sm:self-auto overflow-x-auto max-w-full">
-              <button
-                onClick={() => setClientPeriod("historico")}
-                className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
-                  clientPeriod === "historico"
-                    ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
-                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
-                }`}
-              >
-                Histórico
-              </button>
-              <button
-                onClick={() => setClientPeriod("mes")}
-                className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
-                  clientPeriod === "mes"
-                    ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
-                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
-                }`}
-              >
-                Mes Actual
-              </button>
-              <button
-                onClick={() => setClientPeriod("quincena")}
-                className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
-                  clientPeriod === "quincena"
-                    ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
-                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
-                }`}
-              >
-                Quincena Actual
-              </button>
-              <button
-                onClick={() => setClientPeriod("semana")}
-                className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
-                  clientPeriod === "semana"
-                    ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
-                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
-                }`}
-              >
-                Semana Actual
-              </button>
-            </div>
             <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
               {/* Selector de Criterio de Ordenamiento */}
               <div className="flex items-center gap-1 rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-1 text-xs font-semibold dark:border-[#282C32] dark:bg-[#111315]">
@@ -1883,7 +1840,6 @@ export default function StatsPage({
                                 </span>
                               )}
                             </td>
-
 
                             {/* Qué compra junto / Cross-Selling */}
                             <td className="px-3 py-2.5 whitespace-nowrap">
