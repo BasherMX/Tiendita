@@ -37,6 +37,7 @@ export default function ConfigPage({
     meta_phone_number_id: settings.meta_phone_number_id || "",
     whatsapp_gateway_url: settings.whatsapp_gateway_url || "http://openwa:2785",
     whatsapp_api_key: settings.whatsapp_api_key || "",
+    whatsapp_session_id: settings.whatsapp_session_id || "tiendita",
     whatsapp_default_country: settings.whatsapp_default_country || "52",
     reward_factor:
       settings.reward_factor !== undefined
@@ -272,10 +273,16 @@ export default function ConfigPage({
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
-                      Estado de Conexión WhatsApp
+                      Estado de Conexión WhatsApp (
+                      {form.whatsapp_provider === "openwa"
+                        ? "OpenWA Gateway"
+                        : "Meta Cloud API"}
+                      )
                     </h2>
                     <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
-                      Envío directo de estados de cuenta vía WhatsApp Cloud API
+                      {form.whatsapp_provider === "openwa"
+                        ? "Envío directo a través de servidor OpenWA autohospedado"
+                        : "Envío directo a través de la infraestructura oficial de Meta Cloud API"}
                     </p>
                   </div>
                 </div>
@@ -297,49 +304,223 @@ export default function ConfigPage({
             </div>
 
             <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E] space-y-4">
-              <div className="border-b border-[#E5E2DA] pb-3 dark:border-[#282C32]">
-                <h3 className="text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
-                  Credenciales de WhatsApp (Meta Cloud API Oficial)
-                </h3>
-              </div>
-
-              <div className="space-y-3">
+              <div className="border-b border-[#E5E2DA] pb-3 dark:border-[#282C32] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
-                    Meta Phone Number ID
-                  </label>
-                  <input
-                    className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
-                    placeholder="ID numérico en Meta Developer"
-                    value={form.meta_phone_number_id}
-                    onChange={(e) =>
-                      setForm({ ...form, meta_phone_number_id: e.target.value })
-                    }
-                  />
+                  <h3 className="text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                    Proveedor y Conectividad de WhatsApp
+                  </h3>
+                  <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                    Selecciona el método de envío de tickets y mensajes
+                    automáticos
+                  </p>
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
-                    Meta WhatsApp Token (Permanente)
-                  </label>
+                <label className="flex items-center gap-2 text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE] cursor-pointer">
                   <input
-                    type="password"
-                    className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
-                    placeholder="EAA..."
-                    value={form.meta_whatsapp_token}
+                    type="checkbox"
+                    checked={form.whatsapp_enabled}
                     onChange={(e) =>
-                      setForm({ ...form, meta_whatsapp_token: e.target.value })
+                      setForm({ ...form, whatsapp_enabled: e.target.checked })
                     }
+                    className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-400"
                   />
+                  <span>Envío Automático de Tickets</span>
+                </label>
+              </div>
+
+              {/* Selector de Proveedor: OpenWA vs Meta */}
+              <div>
+                <label className="mb-2 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                  Proveedor de Servicio
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm({ ...form, whatsapp_provider: "openwa" })
+                    }
+                    className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
+                      form.whatsapp_provider === "openwa"
+                        ? "border-emerald-500 bg-emerald-50/50 dark:border-emerald-500/50 dark:bg-emerald-950/20"
+                        : "border-[#E5E2DA] bg-[#F7F6F2]/60 hover:bg-[#F7F6F2] dark:border-[#282C32] dark:bg-[#111315]"
+                    }`}
+                  >
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 mt-0.5">
+                      <Icon path={mdiWhatsapp} size={0.65} />
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                        OpenWA Gateway (Autohospedado)
+                      </span>
+                      <span className="block text-[11px] text-[#78716C] dark:text-[#9CA3AF] mt-0.5">
+                        Instancia Docker / VPS con sesión QR propia
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm({ ...form, whatsapp_provider: "meta" })
+                    }
+                    className={`flex items-start gap-3 rounded-xl border p-3 text-left transition ${
+                      form.whatsapp_provider === "meta"
+                        ? "border-blue-500 bg-blue-50/50 dark:border-blue-500/50 dark:bg-blue-950/20"
+                        : "border-[#E5E2DA] bg-[#F7F6F2]/60 hover:bg-[#F7F6F2] dark:border-[#282C32] dark:bg-[#111315]"
+                    }`}
+                  >
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400 mt-0.5">
+                      <Icon path={mdiWhatsapp} size={0.65} />
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                        Meta WhatsApp Cloud API (Oficial)
+                      </span>
+                      <span className="block text-[11px] text-[#78716C] dark:text-[#9CA3AF] mt-0.5">
+                        API oficial de Meta Developers sin servidor extra
+                      </span>
+                    </div>
+                  </button>
                 </div>
               </div>
+
+              {/* Formulario según proveedor seleccionado */}
+              {form.whatsapp_provider === "openwa" ? (
+                <div className="space-y-3 pt-2">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                      URL del Gateway OpenWA (ej. https://mi-openwa.railway.app
+                      o http://localhost:2785)
+                    </label>
+                    <input
+                      className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
+                      placeholder="http://openwa:2785"
+                      value={form.whatsapp_gateway_url}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          whatsapp_gateway_url: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                        ID / Nombre de Sesión
+                      </label>
+                      <input
+                        className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
+                        placeholder="tiendita"
+                        value={form.whatsapp_session_id}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            whatsapp_session_id: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                        Lada / Prefijo de País por Defecto (ej. 52)
+                      </label>
+                      <input
+                        className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
+                        placeholder="52"
+                        value={form.whatsapp_default_country}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            whatsapp_default_country: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                      API Key / Token del Gateway (Opcional si tu instancia no
+                      tiene auth)
+                    </label>
+                    <input
+                      type="password"
+                      className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
+                      placeholder="Dejar en blanco si no requiere autenticación"
+                      value={form.whatsapp_api_key}
+                      onChange={(e) =>
+                        setForm({ ...form, whatsapp_api_key: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 pt-2">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                        Meta Phone Number ID
+                      </label>
+                      <input
+                        className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
+                        placeholder="ID numérico en Meta Developer"
+                        value={form.meta_phone_number_id}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            meta_phone_number_id: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                        Lada / Prefijo de País por Defecto (ej. 52)
+                      </label>
+                      <input
+                        className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
+                        placeholder="52"
+                        value={form.whatsapp_default_country}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            whatsapp_default_country: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                      Meta WhatsApp Token (Permanente)
+                    </label>
+                    <input
+                      type="password"
+                      className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
+                      placeholder="EAA..."
+                      value={form.meta_whatsapp_token}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          meta_whatsapp_token: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end pt-3 border-t border-[#E5E2DA] dark:border-[#282C32]">
                 <button
                   type="submit"
                   className="rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
                 >
-                  Guardar Credenciales WhatsApp
+                  Guardar Configuración WhatsApp
                 </button>
               </div>
             </div>

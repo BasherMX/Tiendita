@@ -1,5 +1,25 @@
 export const releases = [
   {
+    version: "1.8.4",
+    date: "12 de Septiembre, 2026",
+    tagline:
+      "Selector interactivo y configuración completa de proveedores WhatsApp (OpenWA / Meta Cloud API)",
+    highlights: [
+      "Soporte completo de OpenWA restaurado en interfaz: Se agregó el selector interactivo de proveedor de WhatsApp en Configuración con todos los campos necesarios para conectar instancias Docker / VPS de OpenWA.",
+      "Conmutación flexible de proveedor: Posibilidad de alternar entre Meta WhatsApp Cloud API Oficial y OpenWA Gateway autohospedado con guardado automático de credenciales.",
+    ],
+    sections: [
+      {
+        title: "💬 Integración de WhatsApp",
+        items: [
+          "Selector de proveedor interactivo con tarjetas visuales entre OpenWA Gateway y Meta WhatsApp Cloud API.",
+          "Campos de configuración para OpenWA: URL del Gateway, ID de Sesión, API Key / Token y Lada por defecto.",
+          "Estado de conexión dinámico según el proveedor activo y compatibilidad total con el backend.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.3",
     date: "12 de Septiembre, 2026",
     tagline:
