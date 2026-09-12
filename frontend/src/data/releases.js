@@ -1,5 +1,42 @@
 export const releases = [
   {
+    version: "1.6.1",
+    date: "11 de Septiembre, 2026",
+    tagline:
+      "Límite de Crédito General $50, Alerta de Antigüedad de Deuda y Stock Negativo en Rojo",
+    highlights: [
+      "Límite máximo de crédito predeterminado para todos los clientes fijado en $50.00, configurable de manera global desde la pestaña de Ajustes.",
+      "Compras fiadas flexibles: si un cliente sobrepasa el límite de crédito se le permite seguir fiando, pero se emite una alerta destacada tras registrar cada movimiento.",
+      "Alerta de límite en Estado de Cuenta público (/c/:code) advirtiendo al cliente cuando su deuda excede el límite permitido.",
+      "Contador y alerta de antigüedad de adeudo continuo: detecta y notifica visualmente saldos pendientes de pago de más de 15 días acumulados.",
+      "Distintivo de stock negativo en rojo (#DC2626) en el catálogo de productos de inventario para advertir discrepancias físicas inmediatas.",
+    ],
+    sections: [
+      {
+        title: "💳 Gestión de Crédito & Finanzas",
+        items: [
+          "Nuevo parámetro default_credit_limit en Ajustes generales del sistema.",
+          "Cálculo de límite efectivo (personalizado o default de $50) en backend y frontend.",
+          "Modal de confirmación interactiva con aviso de rebase de límite en compras y abonos.",
+        ],
+      },
+      {
+        title: "⏰ Antigüedad de Saldos",
+        items: [
+          "Algoritmo FIFO para calcular días exactos de adeudo ininterrumpido a partir de compras pendientes.",
+          "Notificación para saldos con más de 15 días en la libreta y en el enlace público del cliente.",
+        ],
+      },
+      {
+        title: "📦 Inventario",
+        items: [
+          "Distintivo rojo de alta visibilidad para productos con existencias negativas.",
+          "Filtro de productos agotados ajustado para incluir productos con stock menor o igual a cero.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.6.0",
     date: "11 de Septiembre, 2026",
     tagline: "Rediseño Total 'El Mostrador Moderno' & Sistema de Diseño Bodega",

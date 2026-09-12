@@ -24,6 +24,7 @@ export default function ClientsPage({
   movements = [],
   debtBreakdown = null,
   loadingMovements = false,
+  settings,
   onSelectClient,
   onNewClient,
   onEditClient,
@@ -57,9 +58,14 @@ export default function ClientsPage({
 
   const selectedDebt = Number(selectedClient?.total_debt || 0);
   const selectedPoints = Number(selectedClient?.points || 0);
-  const selectedLimit = Number(selectedClient?.credit_limit || 0);
-  const availableCredit =
-    selectedLimit > 0 ? Math.max(0, selectedLimit - selectedDebt) : null;
+  const defaultLimit = Number(settings?.default_credit_limit) || 50;
+  const selectedLimit =
+    Number(selectedClient?.credit_limit) > 0
+      ? Number(selectedClient?.credit_limit)
+      : defaultLimit;
+  const isOverCreditLimit = selectedDebt > selectedLimit;
+  const availableCredit = Math.max(0, selectedLimit - selectedDebt);
+  const daysWithDebt = Number(selectedClient?.days_with_debt || 0);
 
   return (
     <div className="grid gap-5 lg:h-[calc(100vh-6.5rem)] lg:grid-cols-[minmax(320px,420px)_1fr]">
@@ -194,6 +200,18 @@ export default function ClientsPage({
                       {limit > 0 && (
                         <span className="text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
                           Límite: ${limit.toFixed(0)}
+                        </span>
+                      )}
+
+                      {client.is_over_credit_limit && (
+                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-800 dark:bg-red-950/60 dark:text-red-300">
+                          Excede Límite
+                        </span>
+                      )}
+
+                      {client.days_with_debt > 15 && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-900 dark:bg-amber-950/60 dark:text-amber-300">
+                          {client.days_with_debt}d adeudo
                         </span>
                       )}
                     </div>
@@ -350,6 +368,42 @@ export default function ClientsPage({
                 </div>
               </div>
             </div>
+
+            {/* Avisos de Límite de Crédito y Días de Adeudo */}
+            {(isOverCreditLimit || daysWithDebt > 15) && selectedDebt > 0 && (
+              <div className="mb-4 space-y-2">
+                {isOverCreditLimit && (
+                  <div className="flex items-center gap-2.5 rounded-xl border border-red-200 bg-red-50/90 p-3 text-xs text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200 shadow-xs">
+                    <span className="text-xl shrink-0">⚠️</span>
+                    <span className="flex-1 leading-snug">
+                      <strong>Límite de crédito sobrepasado:</strong> La deuda
+                      del cliente (
+                      <strong className="font-tabular font-bold">
+                        ${selectedDebt.toFixed(2)}
+                      </strong>
+                      ) supera el límite de{" "}
+                      <strong className="font-tabular font-bold">
+                        ${selectedLimit.toFixed(2)}
+                      </strong>
+                      . Aún puede fiar dulces, pero saldrá alerta tras cada
+                      movimiento.
+                    </span>
+                  </div>
+                )}
+                {daysWithDebt > 15 && (
+                  <div className="flex items-center gap-2.5 rounded-xl border border-amber-300 bg-amber-50/90 p-3 text-xs text-amber-950 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200 shadow-xs">
+                    <span className="text-xl shrink-0">⏰</span>
+                    <span className="flex-1 leading-snug">
+                      <strong>Antigüedad de adeudo:</strong> Lleva{" "}
+                      <strong className="font-tabular font-bold">
+                        {daysWithDebt} días
+                      </strong>{" "}
+                      continuos con saldo pendiente (más de 15 días).
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Barra de Acciones Principales: Fiar / Abonar / Desglose */}
             <div className="mb-4 flex flex-wrap gap-2">

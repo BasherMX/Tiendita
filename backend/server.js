@@ -131,6 +131,7 @@ async function getSettings() {
   try {
     const result = await query("SELECT key, value FROM settings");
     const settings = {
+      default_credit_limit: 50.0,
       reward_factor: 0.1,
       rewards_enabled: true,
       whatsapp_enabled: true,
@@ -143,7 +144,9 @@ async function getSettings() {
       meta_phone_number_id: defaultPhoneId,
     };
     result.rows.forEach((row) => {
-      if (row.key === "reward_factor")
+      if (row.key === "default_credit_limit")
+        settings.default_credit_limit = parseFloat(row.value) || 50.0;
+      else if (row.key === "reward_factor")
         settings.reward_factor = parseFloat(row.value) || 0;
       else if (row.key === "rewards_enabled")
         settings.rewards_enabled = row.value === "true";
@@ -155,6 +158,7 @@ async function getSettings() {
   } catch (err) {
     console.error("Error reading settings:", err.message);
     return {
+      default_credit_limit: 50.0,
       reward_factor: 0.1,
       rewards_enabled: true,
       whatsapp_enabled: true,
@@ -163,6 +167,33 @@ async function getSettings() {
       meta_phone_number_id: defaultPhoneId,
       whatsapp_default_country: "52",
     };
+  }
+}
+
+// Helper para calcular días de adeudo ininterrumpido (FIFO)
+async function getClientDebtDays(clientId, totalDebt) {
+  const debt = Number(totalDebt || 0);
+  if (debt <= 0) return 0;
+  try {
+    const res = await query(
+      `SELECT amount, created_at FROM movements 
+       WHERE client_id = $1 AND concept LIKE 'Compra%' AND amount > 0 
+       ORDER BY created_at DESC`,
+      [clientId],
+    );
+    let remaining = debt;
+    let oldestDate = null;
+    for (const row of res.rows) {
+      if (remaining <= 0) break;
+      oldestDate = row.created_at;
+      remaining -= Number(row.amount);
+    }
+    if (!oldestDate) return 0;
+    const diffMs = Math.max(0, Date.now() - new Date(oldestDate).getTime());
+    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  } catch (err) {
+    console.error("Error calculating debt days:", err.message);
+    return 0;
   }
 }
 
@@ -620,14 +651,28 @@ function decodeClientCode(code) {
 // CRUD Clients
 app.get("/api/clients", authGuard, async (req, res) => {
   try {
+    const settings = await getSettings();
+    const defaultCreditLimit =
+      parseFloat(settings.default_credit_limit) || 50.0;
     const result = await query(
       "SELECT id, name, total_debt, points, phone, COALESCE(credit_limit, 0) AS credit_limit FROM clients ORDER BY total_debt DESC",
     );
-    const rows = result.rows.map((c) => ({
-      ...c,
-      credit_limit: Number(c.credit_limit || 0),
-      public_code: encodeClientId(c.id),
-    }));
+    const rows = await Promise.all(
+      result.rows.map(async (c) => {
+        const debt = Number(c.total_debt || 0);
+        const limit = Number(c.credit_limit || 0);
+        const effectiveLimit = limit > 0 ? limit : defaultCreditLimit;
+        const daysWithDebt = debt > 0 ? await getClientDebtDays(c.id, debt) : 0;
+        return {
+          ...c,
+          credit_limit: limit,
+          effective_credit_limit: effectiveLimit,
+          days_with_debt: daysWithDebt,
+          is_over_credit_limit: debt > effectiveLimit,
+          public_code: encodeClientId(c.id),
+        };
+      }),
+    );
     return res.json(rows);
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -669,6 +714,9 @@ app.get("/api/public/clients/:code", async (req, res) => {
       .json({ message: "Enlace inválido o cliente no encontrado" });
   }
   try {
+    const settings = await getSettings();
+    const defaultCreditLimit =
+      parseFloat(settings.default_credit_limit) || 50.0;
     const clientRes = await query(
       "SELECT name, total_debt, points, COALESCE(credit_limit, 0) AS credit_limit FROM clients WHERE id = $1",
       [clientId],
@@ -676,8 +724,17 @@ app.get("/api/public/clients/:code", async (req, res) => {
     if (!clientRes.rows.length) {
       return res.status(404).json({ message: "Cliente no encontrado" });
     }
+    const client = clientRes.rows[0];
+    const debt = Number(client.total_debt || 0);
+    const limit = Number(client.credit_limit || 0);
+    const effectiveLimit = limit > 0 ? limit : defaultCreditLimit;
+    const daysWithDebt = debt > 0 ? await getClientDebtDays(clientId, debt) : 0;
     return res.json({
-      ...clientRes.rows[0],
+      ...client,
+      credit_limit: limit,
+      effective_credit_limit: effectiveLimit,
+      days_with_debt: daysWithDebt,
+      is_over_credit_limit: debt > effectiveLimit,
       public_code: code,
     });
   } catch (error) {
@@ -1075,16 +1132,16 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
     const remainingAmount = Number((totalAmount - pointsUsed).toFixed(2));
     const shouldPay = !!payImmediately;
 
-    // Credit limit validation (if not paid immediately and client has a credit limit)
-    if (!shouldPay && creditLimit > 0) {
-      const resultingDebt = Number((currentDebt + remainingAmount).toFixed(2));
-      if (resultingDebt > creditLimit) {
-        await clientConn.query("ROLLBACK");
-        return res.status(400).json({
-          message: `La compra excede el límite de crédito del cliente ($${creditLimit.toFixed(2)}). Saldo resultante sería $${resultingDebt.toFixed(2)}.`,
-        });
-      }
-    }
+    // Credit limit calculation (si se sobrepasa aún se permite fiar, pero se alerta en la respuesta)
+    const defaultCreditLimit =
+      parseFloat(settings.default_credit_limit) || 50.0;
+    const effectiveCreditLimit =
+      creditLimit > 0 ? creditLimit : defaultCreditLimit;
+    const resultingDebt = !shouldPay
+      ? Number((currentDebt + remainingAmount).toFixed(2))
+      : currentDebt;
+    const isOverCreditLimit =
+      !shouldPay && resultingDebt > effectiveCreditLimit;
 
     const movRes = await clientConn.query(
       "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5) RETURNING id",
@@ -1167,7 +1224,14 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
       );
     }
 
-    return res.json({ message: "Purchase added", amount: totalAmount });
+    return res.json({
+      message: "Purchase added",
+      amount: totalAmount,
+      overCreditLimit: isOverCreditLimit,
+      resultingDebt,
+      creditLimit: effectiveCreditLimit,
+      clientName: clientData.name,
+    });
   } catch (error) {
     await clientConn.query("ROLLBACK");
     return res.status(400).json({ message: error.message });
@@ -1243,7 +1307,22 @@ app.post("/api/clients/:id/pay", authGuard, async (req, res) => {
       );
     }
 
-    return res.json({ message: "Payment registered" });
+    const updatedClient = updatedClientRes.rows[0];
+    const defaultCreditLimit =
+      parseFloat(settings.default_credit_limit) || 50.0;
+    const clientLimit = Number(updatedClient?.credit_limit || 0);
+    const effectiveLimit = clientLimit > 0 ? clientLimit : defaultCreditLimit;
+    const resultingDebt = Number(updatedClient?.total_debt || 0);
+    const isOverCreditLimit = resultingDebt > effectiveLimit;
+
+    return res.json({
+      message: "Payment registered",
+      amount: parsedAmount,
+      overCreditLimit: isOverCreditLimit,
+      resultingDebt,
+      creditLimit: effectiveLimit,
+      clientName: updatedClient?.name,
+    });
   } catch (error) {
     await clientConn.query("ROLLBACK");
     return res.status(400).json({ message: error.message });
@@ -1842,12 +1921,14 @@ app.get("/api/public/settings", async (req, res) => {
       bank_clabe: settings.bank_clabe || "646990403801118437",
       business_phone: settings.business_phone || "523346502871",
       business_name: settings.business_name || "Tiendita",
+      default_credit_limit: parseFloat(settings.default_credit_limit) || 50.0,
     });
   } catch (error) {
     return res.json({
       bank_clabe: "646990403801118437",
       business_phone: "523346502871",
       business_name: "Tiendita",
+      default_credit_limit: 50.0,
     });
   }
 });

@@ -18,6 +18,7 @@ export default function MovementModal({
   selectedClient,
   movementKind, // "purchase" | "pay"
   sweets,
+  settings,
   onSubmit,
 }) {
   if (!isOpen || !selectedClient) return null;
@@ -47,7 +48,11 @@ export default function MovementModal({
 
   const clientDebt = Number(selectedClient.total_debt || 0);
   const clientPoints = Number(selectedClient.points || 0);
-  const creditLimit = Number(selectedClient.credit_limit || 0);
+  const defaultCreditLimit = Number(settings?.default_credit_limit) || 50;
+  const creditLimit =
+    Number(selectedClient.credit_limit) > 0
+      ? Number(selectedClient.credit_limit)
+      : defaultCreditLimit;
 
   // Credit limit calculation for purchases
   const ptsDeduction = usePoints
@@ -59,7 +64,6 @@ export default function MovementModal({
       ? clientDebt + netAmount
       : clientDebt;
   const isOverCreditLimit =
-    creditLimit > 0 &&
     resultingDebt > creditLimit &&
     !payImmediately &&
     movementKind === "purchase";
@@ -362,7 +366,7 @@ export default function MovementModal({
                 <strong className="font-tabular">
                   ${creditLimit.toFixed(2)}
                 </strong>
-                .
+                . (Aún se permite fiar; se emitirá alerta tras registrar).
               </span>
             </div>
           )}

@@ -546,16 +546,42 @@ export default function App() {
       loadSweets();
       loadStats();
 
-      Swal.fire({
-        icon: "success",
-        title: "¡Registrado!",
-        text:
-          payload.movementKind === "pay"
-            ? "Abono guardado con éxito"
-            : "Compra registrada",
-        timer: 1800,
-        showConfirmButton: false,
-      });
+      if (data.overCreditLimit) {
+        Swal.fire({
+          icon: "warning",
+          title: "⚠️ Límite de Crédito Sobrepasado",
+          html: `
+            <div class="text-left text-xs space-y-2">
+              <p class="text-emerald-700 dark:text-emerald-400 font-bold">
+                ✓ ${
+                  payload.movementKind === "pay"
+                    ? "Abono guardado correctamente."
+                    : "Compra fiada registrada con éxito."
+                }
+              </p>
+              <div class="rounded-xl border border-red-200 bg-red-50 p-3 text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+                <p class="font-bold text-xs">Atención: Deuda excede el límite permitido</p>
+                <p class="mt-1">
+                  El cliente <strong>${selectedClient.name}</strong> ahora tiene un adeudo total de <strong class="text-red-700 dark:text-red-300 font-bold">$${Number(data.resultingDebt || selectedClient.total_debt).toFixed(2)}</strong>, superando el límite de <strong>$${Number(data.creditLimit || 50).toFixed(2)}</strong>.
+                </p>
+              </div>
+            </div>
+          `,
+          confirmButtonText: "Entendido",
+          confirmButtonColor: "#d97706",
+        });
+      } else {
+        Swal.fire({
+          icon: "success",
+          title: "¡Registrado!",
+          text:
+            payload.movementKind === "pay"
+              ? "Abono guardado con éxito"
+              : "Compra registrada",
+          timer: 1800,
+          showConfirmButton: false,
+        });
+      }
     } catch (err) {
       Swal.fire("Error", err.message, "error");
     }
@@ -934,7 +960,7 @@ export default function App() {
           }
           return false;
         }}
-        systemVersion="1.6.0"
+        systemVersion="1.6.1"
       />
 
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-6 sm:px-6">
@@ -971,6 +997,7 @@ export default function App() {
                   selectedClient={selectedClient}
                   movements={movements}
                   loadingMovements={loadingMovements}
+                  settings={settings}
                   onSelectClient={loadMovements}
                   onNewClient={handleOpenNewClient}
                   onEditClient={handleOpenEditClient}
@@ -1171,6 +1198,7 @@ export default function App() {
         selectedClient={selectedClient}
         movementKind={movementKind}
         sweets={sweets}
+        settings={settings}
         onSubmit={handleMovementSubmit}
       />
 

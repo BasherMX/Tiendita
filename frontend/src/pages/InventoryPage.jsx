@@ -24,7 +24,7 @@ export default function InventoryPage({
       .includes(searchQuery.toLowerCase());
     const stock = Number(s.stock || 0);
     if (filterStock === "low") return matchesQuery && stock > 0 && stock <= 5;
-    if (filterStock === "out") return matchesQuery && stock === 0;
+    if (filterStock === "out") return matchesQuery && stock <= 0;
     return matchesQuery;
   });
 
@@ -223,11 +223,13 @@ export default function InventoryPage({
                     <td className="px-3.5 py-2.5 text-center">
                       <span
                         className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-bold ${
-                          stock === 0
-                            ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
-                            : stock <= 5
-                              ? "bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                              : "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                          stock < 0
+                            ? "bg-red-100/90 text-red-700 border border-red-300 dark:border-red-800/60 dark:bg-red-950/70 dark:text-red-300 font-extrabold"
+                            : stock === 0
+                              ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+                              : stock <= 5
+                                ? "bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+                                : "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
                         }`}
                       >
                         {stock === 0 ? "Agotado" : `${stock} pzas`}

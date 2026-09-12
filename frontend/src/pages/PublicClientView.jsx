@@ -95,6 +95,14 @@ export default function PublicClientView() {
   }
 
   const debtVal = Number(client.total_debt || 0);
+  const creditLimit =
+    Number(client.credit_limit) > 0
+      ? Number(client.credit_limit)
+      : Number(client.effective_credit_limit) ||
+        Number(settings.default_credit_limit) ||
+        50;
+  const isOverCreditLimit = debtVal > creditLimit;
+  const daysWithDebt = Number(client.days_with_debt || 0);
   const waPhone = (settings.business_phone || "523346502871").replace(
     /\D/g,
     "",
@@ -133,6 +141,63 @@ export default function PublicClientView() {
             <span className="hidden sm:inline">WhatsApp</span>
           </a>
         </div>
+
+        {/* Alerta de Límite de Crédito Sobrepasado */}
+        {isOverCreditLimit && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30 text-xs text-red-900 dark:text-red-200 flex items-start gap-3 shadow-xs">
+            <span className="text-2xl shrink-0 leading-none">⚠️</span>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm text-red-900 dark:text-red-100">
+                  Límite de Crédito Sobrepasado
+                </h3>
+                <span className="rounded-md bg-red-200/80 dark:bg-red-900/60 px-2 py-0.5 text-[10px] font-mono font-black text-red-950 dark:text-red-100">
+                  Límite: ${creditLimit.toFixed(2)}
+                </span>
+              </div>
+              <p className="text-red-800 dark:text-red-300">
+                Has sobrepasado el límite máximo de crédito permitido. Tu saldo
+                pendiente actual es de{" "}
+                <strong className="font-tabular font-extrabold text-red-950 dark:text-red-100">
+                  ${debtVal.toFixed(2)}
+                </strong>
+                .
+              </p>
+              <p className="text-[11px] text-red-700/80 dark:text-red-400">
+                Te sugerimos realizar un abono a la brevedad para regularizar tu
+                libreta.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Contador / Alerta de Días Totales con Adeudo (más de 15 días) */}
+        {daysWithDebt > 15 && debtVal > 0 && (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-950/30 text-xs text-amber-950 dark:text-amber-200 flex items-start gap-3 shadow-xs">
+            <span className="text-2xl shrink-0 leading-none">⏰</span>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm text-amber-900 dark:text-amber-200">
+                  Adeudo Pendiente Prolongado
+                </h3>
+                <span className="rounded-md bg-amber-200/90 dark:bg-amber-900/60 px-2 py-0.5 text-[10px] font-mono font-black text-amber-950 dark:text-amber-200">
+                  {daysWithDebt} días acumulados
+                </span>
+              </div>
+              <p className="text-amber-900 dark:text-amber-300">
+                Llevas un total de{" "}
+                <strong className="font-tabular font-extrabold text-amber-950 dark:text-amber-100">
+                  {daysWithDebt} días
+                </strong>{" "}
+                con este saldo pendiente sin liquidar (más de 15 días).
+              </p>
+              <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80">
+                Agradecemos tu pronto apoyo realizando un abono en mostrador o
+                vía SPEI a la cuenta CLABE indicada abajo.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Resumen de Saldo y Puntos */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

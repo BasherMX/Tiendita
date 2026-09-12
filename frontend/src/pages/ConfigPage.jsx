@@ -47,6 +47,10 @@ export default function ConfigPage({
       settings.rewards_enabled !== "false",
     bank_clabe: settings.bank_clabe || "646990403801118437",
     business_phone: settings.business_phone || "523346502871",
+    default_credit_limit:
+      settings.default_credit_limit !== undefined
+        ? String(settings.default_credit_limit)
+        : "50",
   });
 
   function handleSubmit(e) {
@@ -220,6 +224,29 @@ export default function ConfigPage({
                     setForm({ ...form, business_phone: e.target.value })
                   }
                 />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                  Límite Máximo de Crédito General ($)
+                </label>
+                <input
+                  type="number"
+                  step="5"
+                  min="0"
+                  className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono font-bold"
+                  placeholder="50"
+                  value={form.default_credit_limit}
+                  onChange={(e) =>
+                    setForm({ ...form, default_credit_limit: e.target.value })
+                  }
+                />
+                <p className="mt-1 text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                  Límite por defecto para todos los clientes (por defecto
+                  $50.00). Si un cliente sobrepasa este monto aún puede fiar
+                  dulces, pero se mostrará una alerta tras cada movimiento. Se
+                  puede personalizar por cliente en la libreta.
+                </p>
               </div>
             </div>
 
