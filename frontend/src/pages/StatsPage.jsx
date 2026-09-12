@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@mdi/react";
 import {
   mdiChartBar,
@@ -17,6 +17,20 @@ import {
   mdiSwapHorizontal,
   mdiCurrencyUsd,
   mdiPercent,
+  mdiMedal,
+  mdiTrophy,
+  mdiMagnify,
+  mdiClose,
+  mdiAccountGroup,
+  mdiAccountTie,
+  mdiStore,
+  mdiCartOutline,
+  mdiCashMultiple,
+  mdiCalendarSyncOutline,
+  mdiInformationOutline,
+  mdiEyeOutline,
+  mdiStar,
+  mdiCandycane,
 } from "@mdi/js";
 import {
   LineChart,
@@ -113,9 +127,43 @@ export default function StatsPage({
   salesChart = [],
   salesRange = null,
   shiftSalesRange,
+  apiBase,
+  authFetch,
+  handleAuthFail,
 }) {
   const [activeTab, setActiveTab] = useState("general");
   const [cashFlowFilter, setCashFlowFilter] = useState("quincena"); // "semana" | "quincena" | "mes" | "historico"
+
+  // Estado para la pestaña de Clientes & Compradores
+  const [clientPeriod, setClientPeriod] = useState("historico"); // "historico" | "mes" | "quincena" | "semana"
+  const [clientsStats, setClientsStats] = useState(null);
+  const [loadingClientsStats, setLoadingClientsStats] = useState(false);
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [selectedClientDetail, setSelectedClientDetail] = useState(null);
+
+  useEffect(() => {
+    if (activeTab === "clientes" && apiBase && authFetch) {
+      loadClientsStatsData(clientPeriod);
+    }
+  }, [activeTab, clientPeriod]);
+
+  async function loadClientsStatsData(period) {
+    setLoadingClientsStats(true);
+    try {
+      const res = await authFetch(
+        `${apiBase}/api/stats/clients?period=${period}`,
+        {},
+        handleAuthFail,
+      );
+      if (res && res.ok) {
+        setClientsStats(await res.json());
+      }
+    } catch (err) {
+      console.error("Error loading client stats:", err);
+    } finally {
+      setLoadingClientsStats(false);
+    }
+  }
 
   // Métricas del backend
   const kpis = stats?.kpis || {
@@ -242,6 +290,16 @@ export default function StatsPage({
             }`}
           >
             Cartera & Almacén
+          </button>
+          <button
+            onClick={() => setActiveTab("clientes")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
+              activeTab === "clientes"
+                ? "bg-[#FFFFFF] text-amber-700 shadow-xs dark:bg-[#181B1E] dark:text-amber-400"
+                : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+            }`}
+          >
+            Clientes
           </button>
         </div>
       </div>
@@ -1158,6 +1216,800 @@ export default function StatsPage({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 6. PESTAÑA: Clientes & Ranking de Compradores */}
+      {activeTab === "clientes" && (
+        <div className="space-y-6">
+          {/* Header de la Pestaña de Clientes y Filtro de Periodo */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-black text-[#1C1917] dark:text-[#F3F2EE]">
+                  Ranking de Compradores & Hábitos de Consumo
+                </span>
+                <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-bold text-amber-900 dark:bg-amber-400/15 dark:text-amber-300">
+                  {clientsStats?.total_active_buyers || 0} activos
+                </span>
+              </div>
+              <p className="text-xs text-[#78716C] dark:text-[#9CA3AF] mt-0.5">
+                Top de clientes con más compras, ticket promedio, recurrencia y
+                dulces favoritos.
+              </p>
+            </div>
+
+            {/* Selector de Periodo */}
+            <div className="flex items-center gap-1 rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-1 text-xs font-semibold dark:border-[#282C32] dark:bg-[#111315] self-start sm:self-auto overflow-x-auto max-w-full">
+              <button
+                onClick={() => setClientPeriod("historico")}
+                className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
+                  clientPeriod === "historico"
+                    ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                }`}
+              >
+                Histórico
+              </button>
+              <button
+                onClick={() => setClientPeriod("mes")}
+                className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
+                  clientPeriod === "mes"
+                    ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                }`}
+              >
+                Mes Actual
+              </button>
+              <button
+                onClick={() => setClientPeriod("quincena")}
+                className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
+                  clientPeriod === "quincena"
+                    ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                }`}
+              >
+                Quincena Actual
+              </button>
+              <button
+                onClick={() => setClientPeriod("semana")}
+                className={`rounded-lg px-3 py-1.5 transition whitespace-nowrap ${
+                  clientPeriod === "semana"
+                    ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                }`}
+              >
+                Semana Actual
+              </button>
+            </div>
+          </div>
+
+          {loadingClientsStats ? (
+            <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-12 text-center text-xs text-[#78716C] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#9CA3AF]">
+              Cargando ranking y estadísticas de clientes...
+            </div>
+          ) : (
+            <>
+              {/* Podio Destacado Top 3 */}
+              {clientsStats?.podium && clientsStats.podium.length > 0 && (
+                <div>
+                  <div className="mb-3 flex items-center gap-2">
+                    <Icon
+                      path={mdiTrophy}
+                      size={0.75}
+                      className="text-amber-500"
+                    />
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#1C1917] dark:text-[#F3F2EE]">
+                      Podio de Compradores Destacados
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    {clientsStats.podium.map((c, idx) => {
+                      const isGold = idx === 0;
+                      const isSilver = idx === 1;
+                      const isBronze = idx === 2;
+
+                      return (
+                        <div
+                          key={c.id || `podium-${idx}`}
+                          onClick={() => setSelectedClientDetail(c)}
+                          className={`group relative flex flex-col justify-between rounded-2xl border p-4 sm:p-5 transition cursor-pointer hover:shadow-md ${
+                            isGold
+                              ? "border-amber-400/70 bg-gradient-to-b from-amber-500/10 via-amber-500/5 to-transparent dark:border-amber-500/50 shadow-xs"
+                              : isSilver
+                                ? "border-slate-300 bg-gradient-to-b from-slate-100/60 via-slate-100/20 to-transparent dark:border-slate-700 dark:from-slate-800/40 shadow-xs"
+                                : "border-amber-700/40 bg-gradient-to-b from-amber-800/10 via-amber-800/5 to-transparent dark:border-amber-700/30 shadow-xs"
+                          }`}
+                        >
+                          <div>
+                            {/* Medalla & Posición */}
+                            <div className="flex items-center justify-between gap-2 mb-3">
+                              <span
+                                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black shadow-xs ${
+                                  isGold
+                                    ? "bg-amber-400/30 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 border border-amber-400/50"
+                                    : isSilver
+                                      ? "bg-slate-200 text-slate-800 dark:bg-slate-700/50 dark:text-slate-200 border border-slate-300 dark:border-slate-600"
+                                      : "bg-amber-800/20 text-amber-900 dark:bg-amber-700/30 dark:text-amber-200 border border-amber-700/40"
+                                }`}
+                              >
+                                <span>{c.medal_badge}</span>
+                                <span className="font-semibold text-[11px]">
+                                  {isGold
+                                    ? "1° Comprador"
+                                    : isSilver
+                                      ? "2° Comprador"
+                                      : "3° Comprador"}
+                                </span>
+                              </span>
+
+                              {c.is_public ? (
+                                <span className="rounded-md bg-stone-200 px-2 py-0.5 text-[10px] font-bold text-stone-700 dark:bg-stone-800 dark:text-stone-300">
+                                  Mostrador
+                                </span>
+                              ) : (
+                                <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-400/15 dark:text-amber-300">
+                                  Registrado
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Nombre del cliente */}
+                            <h4 className="text-base font-black text-[#1C1917] dark:text-[#F3F2EE] truncate">
+                              {c.name}
+                            </h4>
+                            <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF] mb-3">
+                              {c.phone
+                                ? `Tel: ${c.phone}`
+                                : c.is_public
+                                  ? "Ventas sin cliente vinculado"
+                                  : "Sin teléfono registrado"}
+                            </p>
+
+                            {/* Cifras clave */}
+                            <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#FFFFFF]/70 p-2.5 dark:bg-[#111315]/70 border border-[#E5E2DA]/80 dark:border-[#282C32] text-xs mb-3 font-tabular">
+                              <div>
+                                <span className="block text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
+                                  COMPRAS
+                                </span>
+                                <span className="text-base font-extrabold text-[#1C1917] dark:text-[#F3F2EE]">
+                                  {c.total_tickets}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="block text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
+                                  TOTAL GASTADO
+                                </span>
+                                <span className="text-base font-black text-amber-700 dark:text-amber-400">
+                                  ${c.total_spent.toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Métricas secundarias */}
+                            <div className="space-y-1.5 text-xs text-[#57534E] dark:text-[#9CA3AF]">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="flex items-center gap-1">
+                                  <Icon
+                                    path={mdiCandycane}
+                                    size={0.55}
+                                    className="text-amber-600"
+                                  />
+                                  Favorito:
+                                </span>
+                                <span className="font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate max-w-[140px] text-right">
+                                  {c.favorite_product
+                                    ? `${c.favorite_product.name} (${c.favorite_product.quantity} pz)`
+                                    : "—"}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="flex items-center gap-1">
+                                  <Icon
+                                    path={mdiCurrencyUsd}
+                                    size={0.55}
+                                    className="text-emerald-600"
+                                  />
+                                  Ticket Promedio:
+                                </span>
+                                <span className="font-bold font-tabular text-[#1C1917] dark:text-[#F3F2EE]">
+                                  ${c.average_ticket.toFixed(2)}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="flex items-center gap-1">
+                                  <Icon
+                                    path={mdiCartOutline}
+                                    size={0.55}
+                                    className="text-blue-600"
+                                  />
+                                  Cross-Selling:
+                                </span>
+                                <span className="font-bold font-tabular text-[#1C1917] dark:text-[#F3F2EE]">
+                                  {c.cross_selling_percent}%
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="flex items-center gap-1">
+                                  <Icon
+                                    path={mdiCalendarSyncOutline}
+                                    size={0.55}
+                                    className="text-purple-600"
+                                  />
+                                  Frecuencia:
+                                </span>
+                                <span className="font-bold font-tabular text-[#1C1917] dark:text-[#F3F2EE]">
+                                  {c.avg_days_between_purchases !== null
+                                    ? `Cada ${c.avg_days_between_purchases} días`
+                                    : c.total_tickets === 1
+                                      ? "1 sola compra"
+                                      : "—"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedClientDetail(c);
+                            }}
+                            className="mt-4 flex items-center justify-center gap-1.5 w-full rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F7F6F2] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F2EE] dark:hover:bg-[#202428] transition shadow-xs"
+                          >
+                            <Icon path={mdiEyeOutline} size={0.65} />
+                            <span>Ver Detalle & Hábitos</span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Buscador de Clientes & Público General */}
+              <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-5 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+                <div className="mb-3.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <Icon
+                      path={mdiAccountGroup}
+                      size={0.75}
+                      className="text-amber-600"
+                    />
+                    <span className="text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                      Directorio de Compradores & Público General
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                    Mostrando{" "}
+                    {
+                      (clientsStats?.clients || []).filter((c) => {
+                        if (!clientSearchQuery.trim()) return true;
+                        const q = clientSearchQuery.toLowerCase().trim();
+                        return (
+                          (c.name || "").toLowerCase().includes(q) ||
+                          (c.phone && c.phone.includes(q)) ||
+                          (c.is_public &&
+                            "público general mostrador".includes(q)) ||
+                          c.favorite_product?.name?.toLowerCase().includes(q)
+                        );
+                      }).length
+                    }{" "}
+                    de {clientsStats?.clients?.length || 0} compradores
+                  </span>
+                </div>
+
+                {/* Input de búsqueda con botón "x" de limpieza */}
+                <div className="relative mb-4">
+                  <Icon
+                    path={mdiMagnify}
+                    size={0.7}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#78716C] dark:text-[#9CA3AF] pointer-events-none"
+                  />
+                  <input
+                    className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] py-2.5 pl-10 pr-9 text-xs outline-none transition focus:bg-[#FFFFFF] dark:border-[#282C32] dark:bg-[#111315] dark:focus:bg-[#181B1E] text-[#1C1917] dark:text-[#F3F2EE]"
+                    placeholder="Buscar por nombre de cliente, teléfono, producto favorito o 'Público General'..."
+                    value={clientSearchQuery}
+                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                  />
+                  {clientSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setClientSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-[#78716C] hover:bg-[#E5E2DA]/60 hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:bg-[#282C32] dark:hover:text-[#F3F2EE] transition"
+                      title="Borrar búsqueda"
+                    >
+                      <Icon path={mdiClose} size={0.6} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Tabla de Ranking y Comportamiento */}
+                <div className="overflow-x-auto rounded-xl border border-[#E5E2DA] dark:border-[#282C32]">
+                  <table className="w-full min-w-[780px] text-left text-xs">
+                    <thead className="bg-[#F7F6F2] text-[#57534E] border-b border-[#E5E2DA] dark:bg-[#111315] dark:text-[#9CA3AF] dark:border-[#282C32]">
+                      <tr>
+                        <th className="px-3 py-2.5 text-center font-semibold w-16">
+                          #
+                        </th>
+                        <th className="px-3 py-2.5 font-semibold">Comprador</th>
+                        <th className="px-3 py-2.5 text-center font-semibold">
+                          Compras
+                        </th>
+                        <th className="px-3 py-2.5 text-right font-semibold">
+                          Total Gastado
+                        </th>
+                        <th className="px-3 py-2.5 text-right font-semibold">
+                          Ticket Prom.
+                        </th>
+                        <th className="px-3 py-2.5 font-semibold">
+                          Producto Favorito
+                        </th>
+                        <th className="px-3 py-2.5 text-center font-semibold">
+                          Cross-Selling
+                        </th>
+                        <th className="px-3 py-2.5 font-semibold">
+                          Día Fuerte
+                        </th>
+                        <th className="px-3 py-2.5 text-center font-semibold">
+                          Frecuencia
+                        </th>
+                        <th className="px-3 py-2.5 text-right font-semibold">
+                          Última Compra
+                        </th>
+                        <th className="px-2 py-2.5 text-center font-semibold"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E5E2DA] dark:divide-[#282C32] font-tabular">
+                      {(clientsStats?.clients || [])
+                        .filter((c) => {
+                          if (!clientSearchQuery.trim()) return true;
+                          const q = clientSearchQuery.toLowerCase().trim();
+                          return (
+                            (c.name || "").toLowerCase().includes(q) ||
+                            (c.phone && c.phone.includes(q)) ||
+                            (c.is_public &&
+                              "público general mostrador".includes(q)) ||
+                            c.favorite_product?.name?.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((c) => (
+                          <tr
+                            key={c.id || c.name}
+                            onClick={() => setSelectedClientDetail(c)}
+                            className="hover:bg-[#F7F6F2]/70 dark:hover:bg-[#202428]/60 transition-colors cursor-pointer"
+                          >
+                            {/* Posición / Medalla */}
+                            <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                              <span
+                                className={`inline-flex items-center justify-center rounded-lg px-2 py-0.5 text-xs font-black ${
+                                  c.medal === "gold"
+                                    ? "bg-amber-400/30 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200"
+                                    : c.medal === "silver"
+                                      ? "bg-slate-200 text-slate-800 dark:bg-slate-700/50 dark:text-slate-200"
+                                      : c.medal === "bronze"
+                                        ? "bg-amber-800/20 text-amber-900 dark:bg-amber-700/30 dark:text-amber-200"
+                                        : "bg-stone-100 text-stone-600 dark:bg-[#282C32] dark:text-stone-400"
+                                }`}
+                              >
+                                {c.medal_badge}
+                              </span>
+                            </td>
+
+                            {/* Comprador */}
+                            <td className="px-3 py-2.5 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                                    c.is_public
+                                      ? "bg-stone-200 text-stone-800 dark:bg-stone-800 dark:text-stone-200"
+                                      : "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200"
+                                  }`}
+                                >
+                                  <Icon
+                                    path={
+                                      c.is_public ? mdiStore : mdiAccountTie
+                                    }
+                                    size={0.65}
+                                  />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-bold text-[#1C1917] dark:text-[#F3F2EE] truncate">
+                                    {c.name}
+                                  </div>
+                                  <div className="text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
+                                    {c.phone
+                                      ? `Tel: ${c.phone}`
+                                      : c.is_public
+                                        ? "Ventas Mostrador"
+                                        : "Sin teléfono"}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Compras */}
+                            <td className="px-3 py-2.5 text-center font-extrabold text-[#1C1917] dark:text-[#F3F2EE] whitespace-nowrap">
+                              {c.total_tickets > 0 ? (
+                                <span className="rounded-md bg-stone-100 px-2 py-0.5 dark:bg-[#282C32]">
+                                  {c.total_tickets}
+                                </span>
+                              ) : (
+                                <span className="text-[#78716C] dark:text-[#9CA3AF]">
+                                  0
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Total Gastado */}
+                            <td className="px-3 py-2.5 text-right font-black text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                              ${c.total_spent.toFixed(2)}
+                            </td>
+
+                            {/* Ticket Promedio */}
+                            <td className="px-3 py-2.5 text-right font-bold text-[#1C1917] dark:text-[#F3F2EE] whitespace-nowrap">
+                              ${c.average_ticket.toFixed(2)}
+                            </td>
+
+                            {/* Producto Favorito */}
+                            <td className="px-3 py-2.5 text-[#1C1917] dark:text-[#F3F2EE] whitespace-nowrap">
+                              {c.favorite_product ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-medium truncate max-w-[130px]">
+                                    {c.favorite_product.name}
+                                  </span>
+                                  <span className="rounded bg-amber-500/10 px-1 py-0.2 text-[10px] font-bold text-amber-900 dark:bg-amber-400/15 dark:text-amber-300">
+                                    {c.favorite_product.quantity} pz
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-[#78716C] dark:text-[#9CA3AF]">
+                                  —
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Cross-Selling */}
+                            <td className="px-3 py-2.5 text-center whitespace-nowrap font-bold">
+                              {c.total_tickets > 0 ? (
+                                <span
+                                  className={`rounded px-1.5 py-0.5 text-[11px] ${
+                                    c.cross_selling_percent >= 50
+                                      ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                      : "bg-stone-100 text-stone-700 dark:bg-[#282C32] dark:text-stone-300"
+                                  }`}
+                                >
+                                  {c.cross_selling_percent}%
+                                </span>
+                              ) : (
+                                <span className="text-[#78716C] dark:text-[#9CA3AF]">
+                                  —
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Día Fuerte */}
+                            <td className="px-3 py-2.5 text-[#57534E] dark:text-[#9CA3AF] whitespace-nowrap font-medium">
+                              {c.top_day_name}
+                            </td>
+
+                            {/* Frecuencia */}
+                            <td className="px-3 py-2.5 text-center text-[#57534E] dark:text-[#9CA3AF] whitespace-nowrap">
+                              {c.avg_days_between_purchases !== null
+                                ? `Cada ${c.avg_days_between_purchases}d`
+                                : c.total_tickets === 1
+                                  ? "1 compra"
+                                  : "—"}
+                            </td>
+
+                            {/* Última Compra */}
+                            <td className="px-3 py-2.5 text-right text-[#78716C] dark:text-[#9CA3AF] whitespace-nowrap text-[11px]">
+                              {c.last_purchase
+                                ? new Date(c.last_purchase).toLocaleDateString(
+                                    "es-MX",
+                                    {
+                                      day: "2-digit",
+                                      month: "short",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    },
+                                  )
+                                : "Sin compras"}
+                            </td>
+
+                            {/* Botón Detalle */}
+                            <td className="px-2 py-2.5 text-center whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedClientDetail(c);
+                                }}
+                                title="Ver desglose estadístico del cliente"
+                                className="rounded-md p-1.5 text-amber-700 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-950/50 transition"
+                              >
+                                <Icon path={mdiEyeOutline} size={0.65} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+
+                      {(!clientsStats?.clients ||
+                        clientsStats.clients.length === 0) && (
+                        <tr>
+                          <td
+                            colSpan={11}
+                            className="py-12 text-center text-[#78716C] dark:text-[#9CA3AF]"
+                          >
+                            Sin compradores registrados en este periodo
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Modal / Sub-pestaña de Detalle Estadístico por Cliente */}
+          {selectedClientDetail && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1C1917]/60 p-4 backdrop-blur-xs">
+              <div className="w-full max-w-2xl rounded-2xl border border-[#E5E2DA] bg-white p-5 sm:p-6 shadow-2xl dark:border-[#282C32] dark:bg-[#181B1E] flex flex-col max-h-[90vh]">
+                {/* Header del Modal */}
+                <div className="mb-4 flex items-center justify-between border-b border-[#E5E2DA] pb-3.5 dark:border-[#282C32]">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">
+                      {selectedClientDetail.medal === "gold"
+                        ? "🥇"
+                        : selectedClientDetail.medal === "silver"
+                          ? "🥈"
+                          : selectedClientDetail.medal === "bronze"
+                            ? "🥉"
+                            : "📊"}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-black text-[#1C1917] dark:text-[#F3F2EE]">
+                          {selectedClientDetail.name}
+                        </h3>
+                        <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-400/15 dark:text-amber-300">
+                          {selectedClientDetail.medal_badge}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#78716C] dark:text-[#9CA3AF]">
+                        {selectedClientDetail.phone
+                          ? `Teléfono: ${selectedClientDetail.phone}`
+                          : selectedClientDetail.is_public
+                            ? "Ventas generales de mostrador"
+                            : "Cliente registrado en sistema"}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedClientDetail(null)}
+                    className="rounded-lg p-1.5 text-[#78716C] hover:bg-[#F7F6F2] dark:text-[#9CA3AF] dark:hover:bg-[#202428] transition"
+                  >
+                    <Icon path={mdiClose} size={0.75} />
+                  </button>
+                </div>
+
+                {/* 4 Tarjetas de Métricas Clave del Cliente */}
+                <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4 font-tabular">
+                  <div className="rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-3 dark:border-[#282C32] dark:bg-[#111315]">
+                    <span className="block text-[10px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                      TOTAL COMPRAS
+                    </span>
+                    <span className="text-lg font-black text-[#1C1917] dark:text-[#F3F2EE]">
+                      {selectedClientDetail.total_tickets}
+                    </span>
+                    <span className="block text-[10px] text-amber-700 dark:text-amber-400 font-bold">
+                      ${selectedClientDetail.total_spent.toFixed(2)} gastado
+                    </span>
+                  </div>
+
+                  <div className="rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-3 dark:border-[#282C32] dark:bg-[#111315]">
+                    <span className="block text-[10px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                      TICKET PROMEDIO
+                    </span>
+                    <span className="text-lg font-black text-[#1C1917] dark:text-[#F3F2EE]">
+                      ${selectedClientDetail.average_ticket.toFixed(2)}
+                    </span>
+                    <span className="block text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
+                      Por compra
+                    </span>
+                  </div>
+
+                  <div className="rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-3 dark:border-[#282C32] dark:bg-[#111315]">
+                    <span className="block text-[10px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                      CROSS-SELLING
+                    </span>
+                    <span className="text-lg font-black text-[#1C1917] dark:text-[#F3F2EE]">
+                      {selectedClientDetail.cross_selling_percent}%
+                    </span>
+                    <span className="block text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
+                      {selectedClientDetail.cross_selling_count} carritos mixtos
+                    </span>
+                  </div>
+
+                  <div className="rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-3 dark:border-[#282C32] dark:bg-[#111315]">
+                    <span className="block text-[10px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                      FRECUENCIA
+                    </span>
+                    <span className="text-sm font-black text-[#1C1917] dark:text-[#F3F2EE]">
+                      {selectedClientDetail.avg_days_between_purchases !== null
+                        ? `Cada ${selectedClientDetail.avg_days_between_purchases}d`
+                        : "1 sola compra"}
+                    </span>
+                    <span className="block text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
+                      Pico: {selectedClientDetail.top_day_name}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Contenido Desglosado: Top Dulces y Métodos de Pago */}
+                <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                  {/* Top Dulces Comprados */}
+                  <div className="rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 dark:border-[#282C32] dark:bg-[#111315]">
+                    <div className="mb-2.5 flex items-center justify-between text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                      <span className="flex items-center gap-1.5">
+                        <Icon
+                          path={mdiCandycane}
+                          size={0.65}
+                          className="text-amber-600"
+                        />
+                        Top Productos Comprados por este Cliente
+                      </span>
+                      <span className="text-[11px] font-normal text-[#78716C] dark:text-[#9CA3AF]">
+                        {selectedClientDetail.top_products?.length || 0}{" "}
+                        variedad
+                        {selectedClientDetail.top_products?.length !== 1
+                          ? "es"
+                          : ""}
+                      </span>
+                    </div>
+
+                    {selectedClientDetail.top_products &&
+                    selectedClientDetail.top_products.length > 0 ? (
+                      <div className="space-y-2.5">
+                        {selectedClientDetail.top_products.map((prod, idx) => {
+                          const maxQty =
+                            selectedClientDetail.top_products[0]?.quantity || 1;
+                          const barWidth = Math.max(
+                            8,
+                            Math.round((prod.quantity / maxQty) * 100),
+                          );
+
+                          return (
+                            <div key={idx} className="space-y-1 text-xs">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-[#1C1917] dark:text-[#F3F2EE]">
+                                  {idx + 1}. {prod.name}
+                                </span>
+                                <div className="flex items-center gap-2 font-tabular">
+                                  <span className="font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                                    {prod.quantity} pzas
+                                  </span>
+                                  <span className="text-[#78716C] dark:text-[#9CA3AF]">
+                                    (${prod.total_spent.toFixed(2)})
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="h-1.5 w-full rounded-full bg-[#E5E2DA] dark:bg-[#282C32] overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-amber-600 transition-all duration-300"
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="py-4 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
+                        Sin registro de productos individuales para este cliente
+                        en el periodo.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Métodos de Pago Preferidos */}
+                  <div className="rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 dark:border-[#282C32] dark:bg-[#111315]">
+                    <span className="block text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE] mb-2">
+                      Métodos de Pago Utilizados
+                    </span>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {Object.entries(
+                        selectedClientDetail.payment_methods || {},
+                      ).map(([pm, count]) => (
+                        <div
+                          key={pm}
+                          className="flex items-center gap-1.5 rounded-lg border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-1.5 dark:border-[#282C32] dark:bg-[#181B1E]"
+                        >
+                          <span className="font-semibold capitalize text-[#1C1917] dark:text-[#F3F2EE]">
+                            {pm === "cash"
+                              ? "Efectivo"
+                              : pm === "transfer"
+                                ? "Transferencia"
+                                : pm === "card"
+                                  ? "Tarjeta"
+                                  : pm === "credit"
+                                    ? "Crédito (Fiado)"
+                                    : pm}
+                          </span>
+                          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-400/15 dark:text-amber-300">
+                            {count} transacci{count !== 1 ? "ones" : "ón"}
+                          </span>
+                        </div>
+                      ))}
+                      {Object.keys(selectedClientDetail.payment_methods || {})
+                        .length === 0 && (
+                        <p className="text-xs text-[#78716C] dark:text-[#9CA3AF]">
+                          Sin métodos de pago registrados.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Compras Recientes */}
+                  {selectedClientDetail.recent_purchases &&
+                    selectedClientDetail.recent_purchases.length > 0 && (
+                      <div className="rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 dark:border-[#282C32] dark:bg-[#111315]">
+                        <span className="block text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE] mb-2">
+                          Últimas Compras en este Periodo
+                        </span>
+                        <div className="space-y-1.5 divide-y divide-[#E5E2DA] dark:divide-[#282C32]">
+                          {selectedClientDetail.recent_purchases.map(
+                            (rec, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between pt-1.5 text-xs font-tabular"
+                              >
+                                <div>
+                                  <div className="font-semibold text-[#1C1917] dark:text-[#F3F2EE]">
+                                    {new Date(rec.date).toLocaleDateString(
+                                      "es-MX",
+                                      {
+                                        day: "2-digit",
+                                        month: "short",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      },
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                                    {rec.items_preview ||
+                                      `${rec.items_count} artículos`}
+                                  </div>
+                                </div>
+                                <span className="font-black text-amber-700 dark:text-amber-400">
+                                  ${Number(rec.amount).toFixed(2)}
+                                </span>
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    )}
+                </div>
+
+                {/* Footer del Modal */}
+                <div className="mt-4 border-t border-[#E5E2DA] pt-3 dark:border-[#282C32]">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedClientDetail(null)}
+                    className="w-full rounded-xl bg-[#F7F6F2] py-2 text-xs font-bold text-[#1C1917] hover:bg-[#E5E2DA] dark:bg-[#202428] dark:text-[#F3F2EE] dark:hover:bg-[#282C32] transition"
+                  >
+                    Cerrar Detalle de Cliente
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

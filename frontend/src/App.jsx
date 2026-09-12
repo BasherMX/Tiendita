@@ -960,7 +960,7 @@ export default function App() {
           }
           return false;
         }}
-        systemVersion="1.7.2"
+        systemVersion="1.7.3"
       />
 
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-6 sm:px-6">
@@ -1099,6 +1099,9 @@ export default function App() {
                   salesChart={salesChart}
                   salesRange={salesRange}
                   shiftSalesRange={shiftSalesRange}
+                  apiBase={apiBase}
+                  authFetch={authFetch}
+                  handleAuthFail={handleAuthFail}
                 />
               ) : (
                 <Navigate to="/login" replace />

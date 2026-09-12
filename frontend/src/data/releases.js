@@ -1,5 +1,37 @@
 export const releases = [
   {
+    version: "1.7.3",
+    date: "11 de Septiembre, 2026",
+    tagline:
+      "Tab de Clientes en Estadísticas: Podio Top 3, Hábitos de Consumo, Buscador y Detalle por Cliente",
+    highlights: [
+      "Pestaña 'Clientes' en Estadísticas: Módulo analítico dedicado al comportamiento de compra tanto de clientes registrados como de ventas a público general.",
+      "Podio de honor Top 3: Destacado visual con medallas de Oro 🥇, Plata 🥈 y Bronce 🥉 para los compradores líderes del periodo.",
+      "Filtros de periodo dinámicos: Selector interactivo entre Histórico (por defecto), Mes actual, Quincena actual y Semana actual.",
+      "Métricas avanzadas de cliente: Producto dulce favorito (piezas y nombre), última compra, tickets totales, gasto acumulado, ticket promedio, tasa de cross-selling (% tickets multitítulo), día preferido de compra y frecuencia promedio en días.",
+      "Buscador predictivo con botón 'x': Encuentra al instante cualquier cliente o 'Público General (Mostrador)' con borrado rápido en el campo de texto.",
+      "Modal interactivo de Detalle por Cliente: Gráfico de barras de su Top 5 dulces favoritos, desglose de métodos de pago y lista de tickets recientes.",
+    ],
+    sections: [
+      {
+        title: "🏆 Podio & Hábitos de Consumo",
+        items: [
+          "Tarjetas distinguidas con gradientes temáticos para el Top 3 con insignias de medallas.",
+          "Cálculo de recurrencia en días entre compras sucesivas.",
+          "Detección de productos preferidos y cross-selling por cliente.",
+        ],
+      },
+      {
+        title: "🔍 Buscador & Modal Drill-Down",
+        items: [
+          "Búsqueda instantánea con botón de limpieza 'x' integrado.",
+          "Sub-vista emergente con desglose de preferencias de dulces y métodos de pago.",
+          "Visualización adaptativa 100% Mobile-First para celulares y pantallas de mostrador.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.7.2",
     date: "11 de Septiembre, 2026",
     tagline:

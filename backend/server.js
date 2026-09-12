@@ -758,6 +758,354 @@ app.get("/api/stats", authGuard, async (req, res) => {
   }
 });
 
+function getPeriodDateRange(period) {
+  if (!period || period === "historico") return null;
+  const now = new Date();
+  const localStr = now.toLocaleDateString("en-CA", {
+    timeZone: "America/Mexico_City",
+  });
+  const [yearStr, monthStr, dayStr] = localStr.split("-");
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+
+  if (period === "mes") {
+    const startStr = `${year}-${String(month).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endStr = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    return {
+      start: `${startStr} 00:00:00`,
+      end: `${endStr} 23:59:59`,
+    };
+  } else if (period === "quincena") {
+    const mStr = String(month).padStart(2, "0");
+    if (day <= 15) {
+      return {
+        start: `${year}-${mStr}-01 00:00:00`,
+        end: `${year}-${mStr}-15 23:59:59`,
+      };
+    } else {
+      const lastDay = new Date(year, month, 0).getDate();
+      return {
+        start: `${year}-${mStr}-16 00:00:00`,
+        end: `${year}-${mStr}-${String(lastDay).padStart(2, "0")} 23:59:59`,
+      };
+    }
+  } else if (period === "semana") {
+    const localDate = new Date(`${localStr}T12:00:00`);
+    const dayOfWeek = localDate.getDay();
+    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const mon = new Date(localDate);
+    mon.setDate(localDate.getDate() - diffToMonday);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    const monStr = mon.toLocaleDateString("en-CA");
+    const sunStr = sun.toLocaleDateString("en-CA");
+    return {
+      start: `${monStr} 00:00:00`,
+      end: `${sunStr} 23:59:59`,
+    };
+  }
+  return null;
+}
+
+app.get("/api/stats/clients", authGuard, async (req, res) => {
+  const { period = "historico" } = req.query;
+  try {
+    const range = getPeriodDateRange(period);
+    const dateParams = range ? [range.start, range.end] : [];
+
+    // 1. Clientes registrados
+    const clientsRes = await query(
+      "SELECT id, name, phone, points, total_debt FROM clients ORDER BY name ASC",
+    );
+
+    // 2. Compras de clientes con items
+    const movSql = `
+      SELECT 
+        m.id AS movement_id,
+        m.client_id,
+        m.amount,
+        m.concept,
+        m.payment_method,
+        m.created_at,
+        EXTRACT(DOW FROM (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow,
+        mi.sweet_id,
+        mi.quantity,
+        mi.unit_price,
+        s.name AS sweet_name
+      FROM movements m
+      LEFT JOIN movement_items mi ON mi.movement_id = m.id
+      LEFT JOIN sweets s ON s.id = mi.sweet_id
+      WHERE ((m.amount > 0) OR (m.amount = 0 AND m.concept LIKE '%al contado%'))
+        AND m.concept LIKE 'Compra%'
+        ${range ? "AND (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') BETWEEN $1 AND $2" : ""}
+      ORDER BY m.created_at DESC
+    `;
+    const movRes = await query(movSql, dateParams);
+
+    // 3. Ventas al mostrador (Público General)
+    const salesSql = `
+      SELECT 
+        s.id AS sale_id,
+        s.total_amount,
+        s.payment_method,
+        s.created_at,
+        EXTRACT(DOW FROM (s.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS dow,
+        si.sweet_id,
+        si.quantity,
+        si.unit_price,
+        sw.name AS sweet_name
+      FROM sales s
+      LEFT JOIN sale_items si ON si.sale_id = s.id
+      LEFT JOIN sweets sw ON sw.id = si.sweet_id
+      ${range ? "WHERE (s.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') BETWEEN $1 AND $2" : ""}
+      ORDER BY s.created_at DESC
+    `;
+    const salesRes = await query(salesSql, dateParams);
+
+    const DOW_NAMES = [
+      "Domingo",
+      "Lunes",
+      "Martes",
+      "Miércoles",
+      "Jueves",
+      "Viernes",
+      "Sábado",
+    ];
+
+    function processTickets(rows, isSale = false) {
+      const ticketsMap = new Map();
+      rows.forEach((r) => {
+        const ticketId = isSale ? r.sale_id : r.movement_id;
+        if (!ticketsMap.has(ticketId)) {
+          ticketsMap.set(ticketId, {
+            id: ticketId,
+            amount: isSale
+              ? Number(r.total_amount || 0)
+              : Number(r.amount || 0),
+            created_at: r.created_at,
+            payment_method: r.payment_method || "cash",
+            dow: r.dow,
+            items: [],
+          });
+        }
+        if (r.sweet_id && r.sweet_name) {
+          ticketsMap.get(ticketId).items.push({
+            sweet_id: r.sweet_id,
+            sweet_name: r.sweet_name,
+            quantity: Number(r.quantity || 0),
+            unit_price: Number(r.unit_price || 0),
+          });
+        }
+      });
+
+      const tickets = Array.from(ticketsMap.values());
+      const totalTickets = tickets.length;
+      if (totalTickets === 0) {
+        return {
+          total_tickets: 0,
+          total_spent: 0,
+          average_ticket: 0,
+          cross_selling_count: 0,
+          cross_selling_percent: 0,
+          favorite_product: null,
+          top_products: [],
+          top_day_name: "—",
+          avg_days_between_purchases: null,
+          last_purchase: null,
+          payment_methods: {},
+          recent_purchases: [],
+        };
+      }
+
+      let totalSpent = 0;
+      let crossSellingCount = 0;
+      const productMap = new Map();
+      const dowCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      const pmCounts = {};
+
+      tickets.forEach((t) => {
+        let ticketTotal = t.amount;
+        if (!isSale && ticketTotal === 0 && t.items.length > 0) {
+          ticketTotal = t.items.reduce(
+            (sum, it) => sum + it.quantity * it.unit_price,
+            0,
+          );
+        }
+        totalSpent += ticketTotal;
+
+        if (t.items.length >= 2) {
+          crossSellingCount++;
+        }
+
+        t.items.forEach((it) => {
+          const prev = productMap.get(it.sweet_name) || {
+            name: it.sweet_name,
+            quantity: 0,
+            total_spent: 0,
+          };
+          prev.quantity += it.quantity;
+          prev.total_spent += Number((it.quantity * it.unit_price).toFixed(2));
+          productMap.set(it.sweet_name, prev);
+        });
+
+        if (t.dow >= 1 && t.dow <= 5) {
+          dowCounts[t.dow] = (dowCounts[t.dow] || 0) + 1;
+        }
+
+        const pm = t.payment_method || "cash";
+        pmCounts[pm] = (pmCounts[pm] || 0) + 1;
+      });
+
+      const sortedProducts = Array.from(productMap.values()).sort(
+        (a, b) => b.quantity - a.quantity || b.total_spent - a.total_spent,
+      );
+      const favoriteProduct = sortedProducts[0] || null;
+      const topProducts = sortedProducts.slice(0, 5);
+
+      let bestDow = null;
+      let maxDowCount = 0;
+      Object.entries(dowCounts).forEach(([dow, count]) => {
+        if (count > maxDowCount) {
+          maxDowCount = count;
+          bestDow = Number(dow);
+        }
+      });
+      const topDayName = bestDow ? DOW_NAMES[bestDow] : "—";
+
+      const sortedDates = tickets
+        .map((t) => new Date(t.created_at).getTime())
+        .sort((a, b) => a - b);
+      let avgDaysBetween = null;
+      if (sortedDates.length > 1) {
+        const spanDays = Math.max(
+          0,
+          (sortedDates[sortedDates.length - 1] - sortedDates[0]) /
+            (1000 * 60 * 60 * 24),
+        );
+        avgDaysBetween = Number(
+          (spanDays / (sortedDates.length - 1)).toFixed(1),
+        );
+      }
+
+      const lastPurchase = tickets[0]?.created_at || null;
+
+      return {
+        total_tickets: totalTickets,
+        total_spent: Number(totalSpent.toFixed(2)),
+        average_ticket: Number((totalSpent / totalTickets).toFixed(2)),
+        cross_selling_count: crossSellingCount,
+        cross_selling_percent: Math.round(
+          (crossSellingCount / totalTickets) * 100,
+        ),
+        favorite_product: favoriteProduct,
+        top_products: topProducts,
+        top_day_name: topDayName,
+        avg_days_between_purchases: avgDaysBetween,
+        last_purchase: lastPurchase,
+        payment_methods: pmCounts,
+        recent_purchases: tickets.slice(0, 8).map((t) => ({
+          id: t.id,
+          date: t.created_at,
+          amount:
+            t.amount === 0 && t.items.length > 0
+              ? t.items.reduce((s, it) => s + it.quantity * it.unit_price, 0)
+              : t.amount,
+          items_count: t.items.length,
+          payment_method: t.payment_method,
+          items_preview: t.items
+            .map((it) => `${it.quantity}x ${it.sweet_name}`)
+            .slice(0, 3)
+            .join(", "),
+        })),
+      };
+    }
+
+    // Agrupar compras por cliente
+    const clientMovementsMap = new Map();
+    movRes.rows.forEach((r) => {
+      if (!clientMovementsMap.has(r.client_id)) {
+        clientMovementsMap.set(r.client_id, []);
+      }
+      clientMovementsMap.get(r.client_id).push(r);
+    });
+
+    const clientsList = clientsRes.rows.map((c) => {
+      const rows = clientMovementsMap.get(c.id) || [];
+      const stats = processTickets(rows, false);
+      return {
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        points: Number(c.points || 0),
+        total_debt: Number(c.total_debt || 0),
+        is_public: false,
+        ...stats,
+      };
+    });
+
+    // Añadir Público General (Ventas Mostrador)
+    const publicStats = processTickets(salesRes.rows, true);
+    const publicGeneralEntity = {
+      id: 0,
+      name: "Público General (Mostrador)",
+      phone: null,
+      points: 0,
+      total_debt: 0,
+      is_public: true,
+      ...publicStats,
+    };
+
+    const combinedList = [...clientsList, publicGeneralEntity];
+
+    // Ordenar por total_tickets DESC y total_spent DESC
+    combinedList.sort((a, b) => {
+      if (b.total_tickets !== a.total_tickets) {
+        return b.total_tickets - a.total_tickets;
+      }
+      return b.total_spent - a.total_spent;
+    });
+
+    // Asignar rangos y medallas
+    combinedList.forEach((item, index) => {
+      item.rank = index + 1;
+      if (item.total_tickets > 0) {
+        if (index === 0) {
+          item.medal = "gold";
+          item.medal_badge = "🥇 1°";
+        } else if (index === 1) {
+          item.medal = "silver";
+          item.medal_badge = "🥈 2°";
+        } else if (index === 2) {
+          item.medal = "bronze";
+          item.medal_badge = "🥉 3°";
+        } else {
+          item.medal = null;
+          item.medal_badge = `#${index + 1}`;
+        }
+      } else {
+        item.medal = null;
+        item.medal_badge = `#${index + 1}`;
+      }
+    });
+
+    const podium = combinedList.filter((c) => c.total_tickets > 0).slice(0, 3);
+
+    return res.json({
+      period,
+      range,
+      podium,
+      clients: combinedList,
+      total_active_buyers: combinedList.filter((c) => c.total_tickets > 0)
+        .length,
+    });
+  } catch (error) {
+    console.error("Error generating client stats:", error);
+    return res.status(500).json({ message: error.message });
+  }
+});
+
 app.get("/api/stats/sales", authGuard, async (req, res) => {
   const { from, to } = req.query;
   const hasRange = from || to;
