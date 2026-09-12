@@ -52,8 +52,8 @@ export default function Navbar({
   }
 
   return (
-    <nav className="sticky top-0 z-30 border-b border-[#E5E2DA] bg-[#FFFFFF]/90 backdrop-blur-md dark:border-[#282C32] dark:bg-[#181B1E]/90 transition-colors">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
+    <nav className="sticky top-0 z-30 border-b border-[#E5E2DA] bg-[#FFFFFF]/90 backdrop-blur-md dark:border-[#282C32] dark:bg-[#181B1E]/90 transition-colors pt-[env(safe-area-inset-top,0px)] w-full max-w-full">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2.5 px-3 py-2.5 sm:px-6 sm:gap-3">
         {/* Brand & Version Badge */}
         <div className="flex items-center gap-3">
           <button

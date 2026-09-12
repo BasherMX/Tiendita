@@ -1,5 +1,37 @@
 export const releases = [
   {
+    version: "1.7.4",
+    date: "11 de Septiembre, 2026",
+    tagline:
+      "Corrección de Safe Areas Móviles (Notch/Status Bar) y Blindaje contra Desbordes en Clientes",
+    highlights: [
+      "Integración nativa de Safe Areas (iPhone/Android): Eliminación del área blanca en la barra de estado y notch superior. El Navbar ahora cubre el área de notificaciones con pt-[env(safe-area-inset-top)] y color translúcido exacto.",
+      "Sincronización dinámica de theme-color: Sincronización en tiempo real de meta theme-color (#181B1E en oscuro, #FFFFFF en claro) y estilo black-translucent para iOS Safari / PWA.",
+      "Blindaje contra desbordes en Clientes: Estructura flex y grid con min-w-0 max-w-full y overflow-x-hidden para impedir cualquier desplazamiento lateral de la pantalla en dispositivos móviles.",
+      "Header de Cliente adaptativo: Botones 'Enlace Público' y 'WhatsApp' con distribución responsiva fluida que no empuja el nombre del cliente ni fuerza el ancho del viewport.",
+      "Libro de movimientos calibrado: Ancho base adaptado a 360px con scroll horizontal contenido estrictamente dentro de la tabla sin mover la página.",
+      "Corrección en Modal de Fiar/Abonar: Sustitución de selectores con w-13 no estándar por clases calibradas (w-12, w-14 shrink-0) en la lista de dulces para asegurar que quepa en cualquier teléfono.",
+    ],
+    sections: [
+      {
+        title: "📱 Safe Areas & Experiencia SPA",
+        items: [
+          "Eliminación de padding-top en #root para que la barra de navegación toque la cima física del dispositivo.",
+          "Estilos html y body con background exacto para prevenir destellos blancos durante el rebote de scroll.",
+          "Efecto de tema que actualiza dinámicamente las etiquetas meta de color del sistema.",
+        ],
+      },
+      {
+        title: "🛡️ Protección Mobile-First contra Desbordes",
+        items: [
+          "Contenedor principal con min-w-0 y overflow-x-hidden permanente.",
+          "Fila de productos en modal de movimientos con anchos compactos y protección shrink-0.",
+          "Selectores de método de pago con truncado elástico para pantallas desde 320px.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.7.3",
     date: "11 de Septiembre, 2026",
     tagline:

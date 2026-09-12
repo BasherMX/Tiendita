@@ -36,7 +36,7 @@ export default function PaymentMethodSelector({
             key={method.id}
             type="button"
             onClick={() => onChange(method.id)}
-            className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border p-2.5 text-xs font-semibold transition-all ${
+            className={`flex flex-col items-center justify-center gap-1 sm:gap-1.5 rounded-xl border p-2 sm:p-2.5 text-[11px] sm:text-xs font-semibold transition-all min-w-0 ${
               selected
                 ? "border-[#D97706] bg-[#FEF3C7]/40 text-[#92400E] shadow-sm ring-1 ring-[#D97706] dark:border-[#D97706] dark:bg-[#78350F]/20 dark:text-[#FDE68A]"
                 : "border-[#E5E2DA] bg-white text-[#57534E] hover:border-[#D97706]/50 hover:bg-[#FAF7F0] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#9CA3AF] dark:hover:bg-[#202428]"
@@ -44,12 +44,12 @@ export default function PaymentMethodSelector({
           >
             <Icon
               path={method.icon}
-              size={0.85}
+              size={0.8}
               className={
                 selected ? "text-[#D97706] dark:text-[#F59E0B]" : method.color
               }
             />
-            <span>{method.label}</span>
+            <span className="truncate w-full text-center">{method.label}</span>
           </button>
         );
       })}

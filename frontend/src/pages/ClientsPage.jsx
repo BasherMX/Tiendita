@@ -71,7 +71,7 @@ export default function ClientsPage({
   const daysWithDebt = Number(selectedClient?.days_with_debt || 0);
 
   return (
-    <div className="grid gap-5 lg:h-[calc(100vh-6.5rem)] lg:grid-cols-[minmax(320px,420px)_1fr]">
+    <div className="grid gap-5 lg:h-[calc(100vh-6.5rem)] lg:grid-cols-[minmax(320px,420px)_1fr] min-w-0 max-w-full">
       {/* Columna Izquierda: Directorio de Clientes */}
       <div
         className={`flex flex-col gap-3 lg:min-h-0 ${
@@ -265,31 +265,31 @@ export default function ClientsPage({
 
       {/* Columna Derecha: Detalle del Cliente Seleccionado */}
       <div
-        className={`flex flex-col gap-3 lg:min-h-0 ${
+        className={`flex flex-col gap-3 lg:min-h-0 min-w-0 max-w-full ${
           mobileView === "list" && selectedClient ? "hidden lg:flex" : "flex"
         }`}
       >
         {selectedClient ? (
-          <div className="flex flex-1 flex-col rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-5 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E] lg:min-h-0">
+          <div className="flex flex-1 flex-col rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-3.5 sm:p-5 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E] lg:min-h-0 min-w-0 max-w-full">
             {/* Header del Cliente */}
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E2DA] pb-3.5 dark:border-[#282C32]">
-              <div className="flex items-center gap-2.5">
+            <div className="mb-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-[#E5E2DA] pb-3 dark:border-[#282C32] min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
                 <button
                   onClick={() => setMobileView("list")}
-                  className="rounded-lg border border-[#E5E2DA] p-1 text-[#57534E] hover:bg-[#F7F6F2] lg:hidden dark:border-[#282C32] dark:text-[#9CA3AF]"
+                  className="rounded-lg border border-[#E5E2DA] p-1 text-[#57534E] hover:bg-[#F7F6F2] lg:hidden dark:border-[#282C32] dark:text-[#9CA3AF] shrink-0"
                   title="Volver a la lista"
                 >
                   <Icon path={mdiChevronLeft} size={0.8} />
                 </button>
-                <div>
-                  <h2 className="text-lg font-black text-[#1C1917] dark:text-[#F3F2EE] leading-tight">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base sm:text-lg font-black text-[#1C1917] dark:text-[#F3F2EE] leading-tight truncate">
                     {selectedClient.name}
                   </h2>
-                  <div className="flex items-center gap-2 text-xs text-[#78716C] dark:text-[#9CA3AF] mt-0.5">
+                  <div className="flex items-center gap-2 text-[11px] sm:text-xs text-[#78716C] dark:text-[#9CA3AF] mt-0.5 truncate">
                     {selectedClient.phone ? (
-                      <span className="flex items-center gap-1">
-                        <Icon path={mdiPhone} size={0.5} />
-                        {selectedClient.phone}
+                      <span className="flex items-center gap-1 truncate">
+                        <Icon path={mdiPhone} size={0.5} className="shrink-0" />
+                        <span className="truncate">{selectedClient.phone}</span>
                       </span>
                     ) : (
                       <span>Sin teléfono registrado</span>
@@ -299,10 +299,10 @@ export default function ClientsPage({
               </div>
 
               {/* Botones de Compartir y WhatsApp */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                 <button
                   onClick={() => onShareLink(selectedClient)}
-                  className="flex items-center gap-1.5 rounded-lg border border-[#E5E2DA] bg-[#FFFFFF] px-3 py-1.5 text-xs font-semibold text-[#1C1917] hover:bg-[#F7F6F2] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F2EE] dark:hover:bg-[#282C32] transition"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-lg border border-[#E5E2DA] bg-[#FFFFFF] px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-[#1C1917] hover:bg-[#F7F6F2] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F2EE] dark:hover:bg-[#282C32] transition"
                   title="Copiar enlace de estado de cuenta público"
                 >
                   <Icon path={mdiShareVariant} size={0.65} />
@@ -310,7 +310,7 @@ export default function ClientsPage({
                 </button>
                 <button
                   onClick={() => onSendWhatsappStatement(selectedClient)}
-                  className="flex items-center gap-1.5 rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#1EBE5D] shadow-xs transition"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-lg bg-[#25D366] px-2.5 sm:px-3 py-1.5 text-xs font-bold text-white hover:bg-[#1EBE5D] shadow-xs transition"
                   title="Enviar estado de cuenta por WhatsApp"
                 >
                   <Icon path={mdiWhatsapp} size={0.65} />
@@ -437,7 +437,7 @@ export default function ClientsPage({
             </div>
 
             {/* Libro Contable de Movimientos (Mobile-first responsive table) */}
-            <div className="flex-1 flex flex-col lg:min-h-0">
+            <div className="flex-1 flex flex-col lg:min-h-0 min-w-0 max-w-full">
               <div className="mb-2 flex items-center justify-between text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
                 <span>Libro de Movimientos</span>
                 <span className="font-normal text-[#78716C] dark:text-[#9CA3AF]">
@@ -445,22 +445,28 @@ export default function ClientsPage({
                 </span>
               </div>
 
-              <div className="flex-1 overflow-x-auto overflow-y-auto rounded-xl border border-[#E5E2DA] dark:border-[#282C32]">
+              <div className="flex-1 overflow-x-auto overflow-y-auto rounded-xl border border-[#E5E2DA] dark:border-[#282C32] w-full max-w-full">
                 {loadingMovements ? (
                   <div className="py-12 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
                     Cargando movimientos...
                   </div>
                 ) : (
-                  <table className="w-full min-w-[480px] text-left text-xs">
+                  <table className="w-full min-w-[360px] sm:min-w-[460px] text-left text-xs">
                     <thead className="sticky top-0 bg-[#F7F6F2] text-[#57534E] border-b border-[#E5E2DA] dark:bg-[#111315] dark:text-[#9CA3AF] dark:border-[#282C32] z-10">
                       <tr>
-                        <th className="px-3 py-2 font-semibold">Fecha</th>
-                        <th className="px-3 py-2 font-semibold">Concepto</th>
-                        <th className="px-3 py-2 font-semibold">Método</th>
-                        <th className="px-3 py-2 text-right font-semibold">
+                        <th className="px-2.5 sm:px-3 py-2 font-semibold">
+                          Fecha
+                        </th>
+                        <th className="px-2.5 sm:px-3 py-2 font-semibold">
+                          Concepto
+                        </th>
+                        <th className="px-2 sm:px-3 py-2 font-semibold">
+                          Método
+                        </th>
+                        <th className="px-2.5 sm:px-3 py-2 text-right font-semibold">
                           Monto
                         </th>
-                        <th className="px-2 py-2 text-center font-semibold">
+                        <th className="px-1.5 sm:px-2 py-2 text-center font-semibold">
                           Acciones
                         </th>
                       </tr>
@@ -487,7 +493,7 @@ export default function ClientsPage({
                             key={m.id}
                             className="hover:bg-[#F7F6F2]/60 dark:hover:bg-[#202428]/50 transition-colors"
                           >
-                            <td className="px-3 py-2 text-[#78716C] dark:text-[#9CA3AF] whitespace-nowrap">
+                            <td className="px-2.5 sm:px-3 py-2 text-[#78716C] dark:text-[#9CA3AF] whitespace-nowrap">
                               {new Date(m.created_at).toLocaleDateString(
                                 "es-MX",
                                 {
@@ -498,18 +504,20 @@ export default function ClientsPage({
                                 },
                               )}
                             </td>
-                            <td className="px-3 py-2 font-medium text-[#1C1917] dark:text-[#F3F2EE]">
+                            <td className="px-2.5 sm:px-3 py-2 font-medium text-[#1C1917] dark:text-[#F3F2EE]">
                               <div className="flex items-center gap-1.5">
-                                <span>{m.concept}</span>
+                                <span className="truncate max-w-[120px] sm:max-w-none">
+                                  {m.concept}
+                                </span>
                                 {Array.isArray(m.items) &&
                                   m.items.length > 0 && (
-                                    <span className="text-[10px] text-[#78716C] dark:text-[#9CA3AF] bg-[#E5E2DA]/50 dark:bg-[#282C32] px-1 rounded">
+                                    <span className="text-[10px] text-[#78716C] dark:text-[#9CA3AF] bg-[#E5E2DA]/50 dark:bg-[#282C32] px-1 rounded shrink-0">
                                       ({m.items.length} art)
                                     </span>
                                   )}
                               </div>
                             </td>
-                            <td className="px-3 py-2 text-[#78716C] dark:text-[#9CA3AF] capitalize whitespace-nowrap">
+                            <td className="px-2 sm:px-3 py-2 text-[#78716C] dark:text-[#9CA3AF] capitalize whitespace-nowrap">
                               {m.payment_method === "cash"
                                 ? "Efectivo"
                                 : m.payment_method === "transfer"
@@ -520,7 +528,7 @@ export default function ClientsPage({
                                       ? "Crédito"
                                       : m.payment_method || "—"}
                             </td>
-                            <td className="px-3 py-2 text-right font-black whitespace-nowrap">
+                            <td className="px-2.5 sm:px-3 py-2 text-right font-black whitespace-nowrap">
                               {isInstantPurchase ? (
                                 <div className="flex flex-col items-end">
                                   <span className="text-[#1C1917] dark:text-[#F3F2EE]">
@@ -543,7 +551,7 @@ export default function ClientsPage({
                                 </span>
                               )}
                             </td>
-                            <td className="px-2 py-2 text-center whitespace-nowrap">
+                            <td className="px-1.5 sm:px-2 py-2 text-center whitespace-nowrap">
                               <div className="flex items-center justify-center gap-1">
                                 <button
                                   onClick={() => setSelectedMovementDetail(m)}

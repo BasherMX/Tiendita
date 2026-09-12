@@ -102,10 +102,15 @@ export default function App() {
     sweetId: "",
   });
 
-  // Manejo de tema Dark/Light
+  // Manejo de tema Dark/Light y sincronización de safe-area / theme-color en móviles
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    const isDark = theme === "dark";
+    document.documentElement.classList.toggle("dark", isDark);
     localStorage.setItem("theme", theme);
+    const themeColor = isDark ? "#181B1E" : "#FFFFFF";
+    document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+      meta.setAttribute("content", themeColor);
+    });
   }, [theme]);
 
   // Redirigir a inicio si ya hay token y está en login
@@ -947,7 +952,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F6F2] text-[#1C1917] dark:bg-[#111315] dark:text-[#F3F2EE] flex flex-col transition-colors">
+    <div className="min-h-screen bg-[#F7F6F2] text-[#1C1917] dark:bg-[#111315] dark:text-[#F3F2EE] flex flex-col transition-colors overflow-x-hidden w-full max-w-full">
       <Navbar
         token={token}
         theme={theme}
@@ -960,10 +965,10 @@ export default function App() {
           }
           return false;
         }}
-        systemVersion="1.7.3"
+        systemVersion="1.7.4"
       />
 
-      <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-6 sm:px-6">
+      <main className="mx-auto flex-1 w-full max-w-7xl px-3 sm:px-6 py-4 sm:py-6 min-w-0 max-w-full overflow-x-hidden">
         <Routes>
           <Route
             path="/login"

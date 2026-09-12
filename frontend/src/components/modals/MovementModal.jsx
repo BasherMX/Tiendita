@@ -103,7 +103,7 @@ export default function MovementModal({
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}
-        className="w-full max-w-lg rounded-2xl border border-[#E5E2DA] bg-white p-4 sm:p-6 shadow-2xl dark:border-[#282C32] dark:bg-[#181B1E] max-h-[92vh] flex flex-col"
+        className="w-full max-w-lg rounded-2xl border border-[#E5E2DA] bg-white p-4 sm:p-6 shadow-2xl dark:border-[#282C32] dark:bg-[#181B1E] max-h-[92vh] flex flex-col min-w-0"
       >
         {/* Header */}
         <div className="mb-3 sm:mb-4 flex items-center justify-between shrink-0">
@@ -210,7 +210,7 @@ export default function MovementModal({
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center gap-1.5 sm:gap-2"
+                    className="flex items-center gap-1.5 sm:gap-2 min-w-0"
                   >
                     <div className="flex-1 min-w-0">
                       <SweetCombobox
@@ -222,13 +222,13 @@ export default function MovementModal({
                     <input
                       type="number"
                       min="1"
-                      className="w-13 sm:w-16 rounded-xl border border-[#E5E2DA] bg-white px-1.5 py-2 text-center text-xs sm:text-sm font-tabular outline-none focus:border-[#D97706] focus:ring-1 focus:ring-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
+                      className="w-12 sm:w-16 rounded-xl border border-[#E5E2DA] bg-white px-1.5 py-2 text-center text-xs sm:text-sm font-tabular outline-none focus:border-[#D97706] focus:ring-1 focus:ring-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6] shrink-0"
                       value={item.quantity}
                       onChange={(e) =>
                         updateItem(item.id, "quantity", e.target.value)
                       }
                     />
-                    <div className="w-13 sm:w-16 text-right text-[11px] sm:text-xs font-bold font-tabular text-[#1C1917] dark:text-[#F3F4F6] shrink-0">
+                    <div className="w-14 sm:w-16 text-right text-[11px] sm:text-xs font-bold font-tabular text-[#1C1917] dark:text-[#F3F4F6] shrink-0">
                       ${sub.toFixed(2)}
                     </div>
                     {items.length > 1 && (
@@ -298,13 +298,13 @@ export default function MovementModal({
                   disponibles)
                 </label>
                 {usePoints && (
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
                     <input
                       type="number"
                       step="0.1"
                       min="0"
                       max={Math.min(clientPoints, computedTotal)}
-                      className="w-32 rounded-lg border border-[#E5E2DA] bg-white px-3 py-1.5 text-xs font-tabular outline-none focus:border-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
+                      className="w-28 sm:w-32 rounded-lg border border-[#E5E2DA] bg-white px-2.5 py-1.5 text-xs font-tabular outline-none focus:border-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
                       placeholder="Puntos a usar"
                       value={pointsToUse}
                       onChange={(e) => setPointsToUse(e.target.value)}
