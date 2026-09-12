@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@mdi/react";
 import {
   mdiAccountGroup,
@@ -42,6 +42,12 @@ export default function ClientsPage({
   const [filterDebt, setFilterDebt] = useState("all"); // "all" | "debt" | "clean"
   const [mobileView, setMobileView] = useState("list"); // "list" | "detail"
   const [selectedMovementDetail, setSelectedMovementDetail] = useState(null);
+
+  useEffect(() => {
+    if (!selectedClient && clients && clients.length > 0) {
+      onSelectClient(clients[0]);
+    }
+  }, [clients, selectedClient, onSelectClient]);
 
   const filteredClients = clients.filter((c) => {
     const matchesSearch =

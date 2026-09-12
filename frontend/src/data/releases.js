@@ -1,5 +1,32 @@
 export const releases = [
   {
+    version: "1.7.6",
+    date: "11 de Septiembre, 2026",
+    tagline:
+      "Restauración de Contenedor Centrado en Escritorio y Selección Automática de Cliente",
+    highlights: [
+      "Contenedor centrado en desktop: Se corrigió la regla max-w-7xl en el layout principal y barra de navegación (px-4 sm:px-6 lg:px-8), devolviendo los márgenes y centrado balanceado en pantallas grandes.",
+      "Selección automática de cliente: Al ingresar al módulo de Clientes, el primer cliente del directorio se autoselecciona por defecto en desktop mostrando su historial inmediatamente sin clics adicionales.",
+      "Preservación mobile-first: En dispositivos móviles la navegación se mantiene en la lista general inicial de clientes sin transiciones forzadas.",
+    ],
+    sections: [
+      {
+        title: "🖥️ Layout & Experiencia de Escritorio",
+        items: [
+          "Eliminación de la sobreescritura max-w-full que expandía el contenido de borde a borde en monitores anchos.",
+          "Padding responsivo unificado max-w-7xl mx-auto px-4 sm:px-6 lg:px-8.",
+        ],
+      },
+      {
+        title: "👥 Directorio de Clientes",
+        items: [
+          "Carga inmediata del expediente y movimientos del primer cliente al abrir la vista.",
+          "Sincronización fluida entre lista y panel de detalles en pantallas medianas y grandes.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.7.5",
     date: "11 de Septiembre, 2026",
     tagline:
