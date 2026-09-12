@@ -49,6 +49,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { formatRangeLabel } from "../utils/dateUtils.js";
+import {
+  apiBase as defaultApiBase,
+  authFetch as defaultAuthFetch,
+} from "../services/api.js";
 
 function formatDayLabel(dayStr) {
   if (!dayStr) return "";
@@ -127,8 +131,8 @@ export default function StatsPage({
   salesChart = [],
   salesRange = null,
   shiftSalesRange,
-  apiBase,
-  authFetch,
+  apiBase = defaultApiBase,
+  authFetch = defaultAuthFetch,
   handleAuthFail,
 }) {
   const [activeTab, setActiveTab] = useState("general");
@@ -142,7 +146,7 @@ export default function StatsPage({
   const [selectedClientDetail, setSelectedClientDetail] = useState(null);
 
   useEffect(() => {
-    if (activeTab === "clientes" && apiBase && authFetch) {
+    if (activeTab === "clientes") {
       loadClientsStatsData(clientPeriod);
     }
   }, [activeTab, clientPeriod]);
@@ -150,13 +154,18 @@ export default function StatsPage({
   async function loadClientsStatsData(period) {
     setLoadingClientsStats(true);
     try {
-      const res = await authFetch(
-        `${apiBase}/api/stats/clients?period=${period}`,
+      const baseUrl = apiBase || defaultApiBase || "";
+      const fetchFn = authFetch || defaultAuthFetch;
+      const res = await fetchFn(
+        `${baseUrl}/api/stats/clients?period=${period}`,
         {},
         handleAuthFail,
       );
       if (res && res.ok) {
-        setClientsStats(await res.json());
+        const data = await res.json();
+        setClientsStats(data);
+      } else {
+        console.error("Error fetching client stats, status:", res?.status);
       }
     } catch (err) {
       console.error("Error loading client stats:", err);

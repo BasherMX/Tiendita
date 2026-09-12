@@ -1,5 +1,25 @@
 export const releases = [
   {
+    version: "1.7.5",
+    date: "11 de Septiembre, 2026",
+    tagline:
+      "Hotfix: Carga de Estadísticas de Clientes en Producción/Vercel y Tolerancia de Búsqueda SQL",
+    highlights: [
+      "Activación de carga de datos en Estadísticas de Clientes: Se eliminó la condición que bloqueaba la llamada API cuando apiBase es una cadena vacía (ruta relativa estándar en Vercel/producción y redes locales).",
+      "Consistencia de servicios API: Importación directa de apiBase y authFetch con valores por defecto resilientes en StatsPage.jsx.",
+      "Consultas SQL de compras con ILIKE: Las compras de clientes ahora se localizan mediante búsquedas insensibles a mayúsculas/minúsculas (ILIKE '%compra%') para abarcar todos los conceptos históricos.",
+    ],
+    sections: [
+      {
+        title: "⚡ Conectividad & Datos",
+        items: [
+          "Resolución de llamadas relativas a /api/stats/clients en cualquier entorno de hosting (Vercel, LAN, localhost).",
+          "Mapeo de compras de clientes con conceptos mixtos y compras al contado garantizado.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.7.4",
     date: "11 de Septiembre, 2026",
     tagline:

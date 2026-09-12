@@ -837,8 +837,8 @@ app.get("/api/stats/clients", authGuard, async (req, res) => {
       FROM movements m
       LEFT JOIN movement_items mi ON mi.movement_id = m.id
       LEFT JOIN sweets s ON s.id = mi.sweet_id
-      WHERE ((m.amount > 0) OR (m.amount = 0 AND m.concept LIKE '%al contado%'))
-        AND m.concept LIKE 'Compra%'
+      WHERE ((m.amount > 0) OR (m.amount = 0 AND m.concept ILIKE '%contado%'))
+        AND m.concept ILIKE '%compra%'
         ${range ? "AND (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') BETWEEN $1 AND $2" : ""}
       ORDER BY m.created_at DESC
     `;
