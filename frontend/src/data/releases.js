@@ -1,5 +1,26 @@
 export const releases = [
   {
+    version: "1.8.7",
+    date: "12 de Septiembre, 2026",
+    tagline:
+      "Despacho inteligente de estados de cuenta individuales con detección de OpenWA en línea",
+    highlights: [
+      "Envío individual inteligente en detalle de cliente: Al presionar 'WhatsApp', el mensaje (con desglose completo de compras pendientes y enlace público) se envía a la cola para despacho automático si OpenWA está activo.",
+      "Detección de estado del Worker (Heartbeat): El sistema verifica en tiempo real si tu servidor OpenWA está en línea. Si la PC está apagada o sin conexión, activa automáticamente el modo de respaldo manual abriendo WhatsApp Web o la App.",
+      "Limpieza de tickets de movimiento: Los tickets de compras individuales ya no incluyen el historial de compras pendientes para mantener los mensajes limpios y concretos.",
+    ],
+    sections: [
+      {
+        title: "⚡ Flujo de Mensajería & Respaldo",
+        items: [
+          "Detección en tiempo real de worker activo mediante heartbeat en `/api/whatsapp/queue/pending`.",
+          "Encolamiento directo y despacho transparente desde el botón WhatsApp del cliente.",
+          "Fallback interactivo a WhatsApp Web cuando el worker no esté reportando conexión.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.6",
     date: "12 de Septiembre, 2026",
     tagline:

@@ -511,16 +511,29 @@ export default function App() {
         handleAuthFail,
       );
       const data = await res.json();
-      if (data.waUrl) {
+      if (!res.ok)
+        throw new Error(data.message || "Error al enviar estado de cuenta");
+
+      if (data.queued) {
         Swal.fire({
-          icon: data.warning ? "warning" : "success",
-          title: data.warning ? "Atención" : "Enviado",
-          text: data.message || "Estado de cuenta preparado.",
+          icon: "success",
+          title: "¡Despachado en Automático!",
+          text: `El estado de cuenta de ${client.name} fue encolado y enviado por OpenWA.`,
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } else {
+        // Modo manual (OpenWA offline)
+        Swal.fire({
+          icon: "info",
+          title: "Envío Manual (OpenWA Desconectado)",
+          text: `El servidor OpenWA en tu PC no fue detectado en línea. Puedes abrir WhatsApp Web/App para enviarlo manualmente a ${client.name}.`,
           showCancelButton: true,
+          confirmButtonColor: "#25d366",
           confirmButtonText: "Abrir WhatsApp",
-          cancelButtonText: "Listo",
+          cancelButtonText: "Cerrar",
         }).then((result) => {
-          if (result.isConfirmed) {
+          if (result.isConfirmed && data.waUrl) {
             window.open(data.waUrl, "_blank");
           }
         });
@@ -1056,7 +1069,7 @@ export default function App() {
           }
           return false;
         }}
-        systemVersion="1.8.6"
+        systemVersion="1.8.7"
       />
 
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-6 min-w-0">

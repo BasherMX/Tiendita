@@ -2721,7 +2721,11 @@ async function sendWhatsAppMessage(phone, text) {
 }
 
 // Helper reutilizable para encolar mensajes en whatsapp_queue (Patrón Outbox)
-export async function enqueueWhatsAppNotification(phone, message, uniqueTag = null) {
+export async function enqueueWhatsAppNotification(
+  phone,
+  message,
+  uniqueTag = null,
+) {
   if (!phone || !message) return null;
   const cleanPhone = formatWhatsAppNumber(phone);
   if (!cleanPhone) return null;
@@ -2775,6 +2779,16 @@ app.get(
   whatsappQueueAuthGuard,
   async (req, res) => {
     try {
+      // Registrar heartbeat del worker en settings (evita consultar si está offline)
+      try {
+        await query(
+          "INSERT INTO settings (key, value) VALUES ('whatsapp_worker_last_ping', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+          [String(Date.now())],
+        );
+      } catch (e) {
+        // Silencioso
+      }
+
       const result = await query(
         `SELECT id, phone, message 
        FROM whatsapp_queue 
@@ -2800,6 +2814,16 @@ app.post(
     }
 
     try {
+      // Registrar heartbeat del worker
+      try {
+        await query(
+          "INSERT INTO settings (key, value) VALUES ('whatsapp_worker_last_ping', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+          [String(Date.now())],
+        );
+      } catch (e) {
+        // Silencioso
+      }
+
       const result = await query(
         `UPDATE whatsapp_queue 
        SET status = $1, 
@@ -2827,6 +2851,98 @@ app.post(
     }
   },
 );
+
+// Helper para saber si el worker externo de OpenWA está activo (ping en los últimos 60 segundos)
+async function isWhatsAppWorkerActive() {
+  try {
+    const res = await query(
+      "SELECT value FROM settings WHERE key = 'whatsapp_worker_last_ping'",
+    );
+    if (res.rows.length && res.rows[0].value) {
+      const lastPing = parseInt(res.rows[0].value, 10);
+      const diffMs = Date.now() - lastPing;
+      // Considerado activo si reportó en los últimos 60 segundos
+      return diffMs < 60000;
+    }
+  } catch (e) {
+    // Si falla la consulta
+  }
+  return false;
+}
+
+app.get("/api/whatsapp/status", authGuard, async (req, res) => {
+  try {
+    const settings = await getSettings();
+    const provider = settings.whatsapp_provider || "meta";
+    const workerActive = await isWhatsAppWorkerActive();
+
+    if (workerActive) {
+      return res.json({
+        status: "CONNECTED",
+        provider: "openwa_worker",
+        workerActive: true,
+      });
+    }
+
+    if (provider === "meta") {
+      const token =
+        settings.meta_whatsapp_token || process.env.META_WHATSAPP_TOKEN;
+      const phoneId =
+        settings.meta_phone_number_id || process.env.META_PHONE_NUMBER_ID;
+      if (token && phoneId) {
+        return res.json({
+          status: "CONNECTED",
+          provider: "meta",
+          workerActive: false,
+        });
+      } else {
+        return res.json({
+          status: "DISCONNECTED",
+          provider: "meta",
+          workerActive: false,
+        });
+      }
+    } else {
+      const gatewayUrl = settings.whatsapp_gateway_url || "";
+      if (
+        !gatewayUrl ||
+        gatewayUrl.includes("openwa:2785") ||
+        gatewayUrl.includes("localhost")
+      ) {
+        return res.json({
+          status: "DISCONNECTED",
+          provider: "openwa",
+          workerActive: false,
+        });
+      }
+      const sessionName = settings.whatsapp_session_id || "tiendita";
+      try {
+        const resp = await fetch(`${gatewayUrl}/api/sessions/${sessionName}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          return res.json({
+            status: data.status || "CONNECTED",
+            provider: "openwa",
+            workerActive: false,
+          });
+        }
+      } catch (e) {
+        return res.json({
+          status: "DISCONNECTED",
+          provider: "openwa",
+          workerActive: false,
+        });
+      }
+      return res.json({
+        status: "DISCONNECTED",
+        provider: "openwa",
+        workerActive: false,
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
 
 async function sendWhatsAppTicketAutomatically(
   client,
@@ -2895,7 +3011,11 @@ async function sendWhatsAppTicketAutomatically(
         ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
         : null) ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
-    let baseUrl = (settings.app_url || envBaseUrl || "http://localhost:1416").replace(/\/+$/, "");
+    let baseUrl = (
+      settings.app_url ||
+      envBaseUrl ||
+      "http://localhost:1416"
+    ).replace(/\/+$/, "");
     if (ticketCode) {
       lines.push(``);
       lines.push(`🔗 *Consulta tu estado de cuenta completo aquí:*`);
@@ -3006,7 +3126,11 @@ app.post("/api/clients/:id/whatsapp-statement", authGuard, async (req, res) => {
         ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
         : null) ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
-    const baseUrl = (settings.app_url || envBaseUrl || "http://localhost:1416").replace(/\/+$/, "");
+    const baseUrl = (
+      settings.app_url ||
+      envBaseUrl ||
+      "http://localhost:1416"
+    ).replace(/\/+$/, "");
     const stmtCode = encodeClientId(client.id);
     let linkStr = "";
     if (stmtCode) {
@@ -3029,33 +3153,47 @@ app.post("/api/clients/:id/whatsapp-statement", authGuard, async (req, res) => {
     const cleanPhone = formatWhatsAppNumber(client.phone);
     const manualWaUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 
-    try {
-      await sendWhatsAppMessage(client.phone, message);
+    // Verificar si el worker de OpenWA o API oficial están activos
+    const workerActive = await isWhatsAppWorkerActive();
+    const isMetaActive =
+      settings.whatsapp_provider === "meta" &&
+      (settings.meta_whatsapp_token || process.env.META_WHATSAPP_TOKEN);
+
+    if (workerActive || isMetaActive) {
+      // Encolar mensaje en la tabla para que el worker de la PC del trabajo lo despache automáticamente
+      const uniqueTag = `INDIVIDUAL_STMT_${client.id}_${Date.now()}`;
+      await enqueueWhatsAppNotification(client.phone, message, uniqueTag);
+
+      // Intentar también envío directo si hay provider configurado
+      try {
+        await sendWhatsAppMessage(client.phone, message);
+      } catch (e) {
+        // Respaldado en la cola
+      }
+
       return res.json({
-        message: "Estado de cuenta enviado por WhatsApp",
+        success: true,
+        queued: true,
+        workerActive: true,
+        message:
+          "Estado de cuenta encolado y enviado automáticamente por WhatsApp",
         waUrl: manualWaUrl,
       });
-    } catch (sendError) {
-      console.warn(
-        "Could not send via API, providing fallback URL:",
-        sendError.message,
-      );
+    } else {
+      // Si el worker en la otra PC no está activo (apagada / sin conexión), proporcionar URL para envío manual
       return res.json({
-        message: "No se pudo enviar automáticamente por API de WhatsApp.",
-        warning: sendError.message,
+        success: true,
+        queued: false,
+        workerActive: false,
+        message:
+          "Servicio OpenWA no detectado en línea. Se preparó el enlace para envío manual por WhatsApp.",
         waUrl: manualWaUrl,
       });
-// Días feriados oficiales en México (d-m)
-const MEXICAN_HOLIDAYS = [
-  "1-1", // Año nuevo
-  "5-2", // Día de la Constitución (o primer lunes)
-  "21-3", // Natalicio Benito Juárez
-  "1-5", // Día del Trabajo
-  "16-9", // Día de la Independencia
-  "20-11", // Revolución Mexicana
-  "25-12", // Navidad
-  "1-10", // Transmisión del Poder Ejecutivo Federal
-];
+    }
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
 
 function isMexicanHoliday(date) {
   const d = date.getDate();
@@ -3106,16 +3244,27 @@ function isQuincenaTriggerDay(nowDate = new Date()) {
   const q2Tag = `Q2_${year}_${String(month).padStart(2, "0")}`;
 
   if (q1Date.getDate() === day) {
-    return { isTriggerDay: true, quincenaTag: q1Tag, label: `1ra Quincena (${dayStr}/${monthStr}/${yearStr})` };
+    return {
+      isTriggerDay: true,
+      quincenaTag: q1Tag,
+      label: `1ra Quincena (${dayStr}/${monthStr}/${yearStr})`,
+    };
   }
   if (q2Date.getDate() === day) {
-    return { isTriggerDay: true, quincenaTag: q2Tag, label: `2da Quincena (${dayStr}/${monthStr}/${yearStr})` };
+    return {
+      isTriggerDay: true,
+      quincenaTag: q2Tag,
+      label: `2da Quincena (${dayStr}/${monthStr}/${yearStr})`,
+    };
   }
   return { isTriggerDay: false, quincenaTag: null, label: null };
 }
 
 // Función central para enviar estados de cuenta a todos los clientes con deuda > 0
-export async function sendBulkStatements(tagPrefix = "MANUAL", triggerSource = "Manual Admin") {
+export async function sendBulkStatements(
+  tagPrefix = "MANUAL",
+  triggerSource = "Manual Admin",
+) {
   const masterPhone = "5214492777186";
   const settings = await getSettings();
   const envBaseUrl =
@@ -3124,7 +3273,11 @@ export async function sendBulkStatements(tagPrefix = "MANUAL", triggerSource = "
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : null) ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
-  const baseUrl = (settings.app_url || envBaseUrl || "http://localhost:1416").replace(/\/+$/, "");
+  const baseUrl = (
+    settings.app_url ||
+    envBaseUrl ||
+    "http://localhost:1416"
+  ).replace(/\/+$/, "");
 
   const clientsWithDebtRes = await query(
     "SELECT id, name, total_debt, points, phone FROM clients WHERE total_debt > 0 ORDER BY name ASC",
@@ -3148,7 +3301,10 @@ export async function sendBulkStatements(tagPrefix = "MANUAL", triggerSource = "
     }
 
     let breakdownStr = "";
-    const breakdown = await getClientDebtBreakdown(client.id, client.total_debt);
+    const breakdown = await getClientDebtBreakdown(
+      client.id,
+      client.total_debt,
+    );
     if (breakdown.length > 0) {
       breakdownStr = `\n\n${formatDebtBreakdownText(breakdown)}`;
     }
@@ -3156,7 +3312,11 @@ export async function sendBulkStatements(tagPrefix = "MANUAL", triggerSource = "
     const message = `Hola *${client.name}*, te recordamos que tu saldo total en Tiendita es de *$${Number(client.total_debt).toFixed(2)}* y cuentas con *${Number(client.points || 0).toFixed(1)}* pts.${breakdownStr}${linkStr}\n\n¡Gracias por tu preferencia! 🙌`;
     const uniqueTag = `${tagPrefix}_CLI_${client.id}`;
 
-    const enqueued = await enqueueWhatsAppNotification(client.phone, message, uniqueTag);
+    const enqueued = await enqueueWhatsAppNotification(
+      client.phone,
+      message,
+      uniqueTag,
+    );
     if (enqueued) {
       enqueuedCount++;
     } else {
@@ -3183,7 +3343,9 @@ export async function sendBulkStatements(tagPrefix = "MANUAL", triggerSource = "
 • Sin teléfono registrado: *${noPhoneCount}*\n\n✅ Todos los mensajes fueron procesados y programados en la cola de WhatsApp.`;
 
   await enqueueWhatsAppNotification(masterPhone, masterMessage, masterTag);
-  console.log(`[WhatsApp Bulk] Processed bulk statements for ${clientsList.length} clients.`);
+  console.log(
+    `[WhatsApp Bulk] Processed bulk statements for ${clientsList.length} clients.`,
+  );
 
   return {
     totalClients: clientsList.length,
@@ -3200,12 +3362,17 @@ app.post("/api/clients/send-bulk-statements", authGuard, async (req, res) => {
   const effectivePass = await getEffectiveAdminPass();
 
   if (!password || password !== effectivePass) {
-    return res.status(401).json({ message: "Contraseña de administrador incorrecta" });
+    return res
+      .status(401)
+      .json({ message: "Contraseña de administrador incorrecta" });
   }
 
   try {
     const todayTag = new Date().toISOString().slice(0, 10);
-    const result = await sendBulkStatements(`MANUAL_${todayTag}`, "Manual desde Panel");
+    const result = await sendBulkStatements(
+      `MANUAL_${todayTag}`,
+      "Manual desde Panel",
+    );
     return res.json({
       success: true,
       message: `Envío masivo iniciado: ${result.enqueuedCount} mensajes encolados. Se notificó al número máster.`,
@@ -3220,8 +3387,15 @@ app.post("/api/clients/send-bulk-statements", authGuard, async (req, res) => {
 // Endpoint para el Cron de Quincena (Llamado a las 8:30am o periódicamente por cron job)
 app.all("/api/cron/check-quincena", async (req, res) => {
   // Validación de seguridad de cron (opcional con token o header)
-  const cronSecret = process.env.CRON_SECRET || process.env.WHATSAPP_QUEUE_API_KEY || "tiendita_secret_wa_token_2026";
-  const authHeader = req.headers.authorization || req.headers["x-api-key"] || req.query.key || "";
+  const cronSecret =
+    process.env.CRON_SECRET ||
+    process.env.WHATSAPP_QUEUE_API_KEY ||
+    "tiendita_secret_wa_token_2026";
+  const authHeader =
+    req.headers.authorization ||
+    req.headers["x-api-key"] ||
+    req.query.key ||
+    "";
   const provided = authHeader.replace("Bearer ", "").trim();
 
   // Permitir si coincide con key o si se invoca internamente
@@ -3241,7 +3415,10 @@ app.all("/api/cron/check-quincena", async (req, res) => {
   }
 
   try {
-    const result = await sendBulkStatements(triggerCheck.quincenaTag, `Automático Quincena (${triggerCheck.label})`);
+    const result = await sendBulkStatements(
+      triggerCheck.quincenaTag,
+      `Automático Quincena (${triggerCheck.label})`,
+    );
     return res.json({
       triggered: true,
       quincena: triggerCheck.label,
@@ -3268,15 +3445,28 @@ function initInternalQuincenaCron() {
     const minute = parseInt(mStr, 10);
 
     // Revisar a las 08:30 AM en zona horaria America/Mexico_City
-    if (hour === 8 && minute >= 30 && minute <= 35 && lastCheckedQuincenaHour !== hour) {
+    if (
+      hour === 8 &&
+      minute >= 30 &&
+      minute <= 35 &&
+      lastCheckedQuincenaHour !== hour
+    ) {
       lastCheckedQuincenaHour = hour;
       const triggerCheck = isQuincenaTriggerDay(now);
       if (triggerCheck.isTriggerDay) {
-        console.log(`[Internal Cron] Running quincena auto statements for ${triggerCheck.label}`);
+        console.log(
+          `[Internal Cron] Running quincena auto statements for ${triggerCheck.label}`,
+        );
         try {
-          await sendBulkStatements(triggerCheck.quincenaTag, `Automático Quincena 8:30am (${triggerCheck.label})`);
+          await sendBulkStatements(
+            triggerCheck.quincenaTag,
+            `Automático Quincena 8:30am (${triggerCheck.label})`,
+          );
         } catch (e) {
-          console.error("[Internal Cron] Error executing bulk statements:", e.message);
+          console.error(
+            "[Internal Cron] Error executing bulk statements:",
+            e.message,
+          );
         }
       }
     } else if (hour !== 8) {
@@ -3284,7 +3474,6 @@ function initInternalQuincenaCron() {
     }
   }, 60000); // Chequeo cada 1 minuto
 }
-
 
 app.get("/health", (req, res) => {
   return res.json({ status: "ok" });
@@ -3295,7 +3484,9 @@ if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
   runSchema().then(() => {
     initInternalQuincenaCron();
     app.listen(port, "0.0.0.0", () => {
-      console.log(`Tiendita backend running on port ${port} (Quincena Cron active)`);
+      console.log(
+        `Tiendita backend running on port ${port} (Quincena Cron active)`,
+      );
     });
   });
 }
