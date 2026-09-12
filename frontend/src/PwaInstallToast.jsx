@@ -68,7 +68,7 @@ export default function PwaInstallToast() {
     return () => {
       window.removeEventListener(
         "beforeinstallprompt",
-        handleBeforeInstallPrompt
+        handleBeforeInstallPrompt,
       );
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
@@ -99,56 +99,67 @@ export default function PwaInstallToast() {
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: 100, opacity: 0, scale: 0.95 }}
           transition={{ type: "spring", damping: 22, stiffness: 260 }}
-          className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md overflow-hidden rounded-3xl border border-amber-200/80 bg-white/90 p-4 shadow-2xl backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90"
+          className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md overflow-hidden rounded-2xl border border-[#E5E2DA] bg-white/95 p-4 shadow-2xl backdrop-blur-md dark:border-[#282C32] dark:bg-[#181B1E]/95"
         >
           <div className="flex items-start gap-3">
             <img
               src={brandLogo}
               alt="Tiendita"
-              className="h-12 w-12 shrink-0 rounded-2xl border border-amber-200 object-cover shadow-sm dark:border-slate-700"
+              className="h-11 w-11 shrink-0 rounded-xl border border-[#E5E2DA] object-cover dark:border-[#282C32]"
             />
             <div className="flex-1 pr-2">
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              <h3 className="text-sm font-bold text-[#1C1917] dark:text-[#F3F4F6]">
                 Instalar Tiendita
               </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                Agrega la app a tu pantalla de inicio para un acceso rápido y sin conexión.
+              <p className="text-xs text-[#78716C] dark:text-[#9CA3AF] mt-0.5">
+                Acceso rápido desde tu pantalla de inicio y funcionamiento sin
+                conexión.
               </p>
             </div>
             <button
               onClick={handleDismiss}
               aria-label="Cerrar"
-              className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition"
+              className="rounded-lg p-1 text-[#A8A29E] hover:bg-[#FAF7F0] hover:text-[#1C1917] dark:hover:bg-[#202428] dark:hover:text-[#F3F4F6] transition"
             >
-              <Icon path={mdiClose} size={0.8} />
+              <Icon path={mdiClose} size={0.75} />
             </button>
           </div>
 
           <div className="mt-3.5 flex flex-col gap-2">
             {isIOS ? (
-              <div className="rounded-2xl bg-amber-50 p-2.5 text-xs text-amber-900 dark:bg-slate-800/80 dark:text-amber-200">
-                <div className="flex items-center gap-1.5 font-semibold mb-1">
+              <div className="rounded-xl border border-[#E5E2DA] bg-[#FAF7F0] p-3 text-xs text-[#57534E] dark:border-[#282C32] dark:bg-[#121417] dark:text-[#D1D5DB]">
+                <div className="flex items-center gap-1.5 font-bold mb-1.5 text-[#1C1917] dark:text-[#F3F4F6]">
                   Instrucciones para iOS (Safari):
                 </div>
-                <ol className="list-inside list-decimal space-y-1 text-slate-700 dark:text-slate-300">
+                <ol className="list-inside list-decimal space-y-1 text-[#78716C] dark:text-[#9CA3AF]">
                   <li className="flex items-center gap-1">
                     Toca el botón compartir{" "}
-                    <Icon path={mdiShareVariant} size={0.65} className="inline text-amber-600 dark:text-amber-400" />
+                    <Icon
+                      path={mdiShareVariant}
+                      size={0.65}
+                      className="inline text-[#D97706] dark:text-[#F59E0B]"
+                    />
                   </li>
                   <li className="flex items-center gap-1">
                     Selecciona{" "}
-                    <span className="font-medium">"Agregar a inicio"</span>{" "}
-                    <Icon path={mdiPlusBox} size={0.65} className="inline text-amber-600 dark:text-amber-400" />
+                    <span className="font-semibold text-[#1C1917] dark:text-[#F3F4F6]">
+                      "Agregar a inicio"
+                    </span>{" "}
+                    <Icon
+                      path={mdiPlusBox}
+                      size={0.65}
+                      className="inline text-[#D97706] dark:text-[#F59E0B]"
+                    />
                   </li>
                 </ol>
               </div>
             ) : (
               <button
                 onClick={handleInstallClick}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:from-amber-600 hover:to-amber-700 active:scale-[0.98]"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#D97706] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#B45309] transition active:scale-[0.99]"
               >
-                <Icon path={mdiDownload} size={0.8} />
-                Instalar Aplicación
+                <Icon path={mdiDownload} size={0.75} />
+                Instalar Aplicación en Dispositivo
               </button>
             )}
           </div>

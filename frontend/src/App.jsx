@@ -921,7 +921,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-amber-100 text-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-100">
+    <div className="min-h-screen bg-[#F7F6F2] text-[#1C1917] dark:bg-[#111315] dark:text-[#F3F2EE] flex flex-col transition-colors">
       <Navbar
         token={token}
         theme={theme}
@@ -934,10 +934,10 @@ export default function App() {
           }
           return false;
         }}
-        systemVersion="1.5.1"
+        systemVersion="1.6.0"
       />
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-6 sm:px-6">
         <Routes>
           <Route
             path="/login"
@@ -1095,10 +1095,10 @@ export default function App() {
                     }}
                   />
                 ) : (
-                  <div className="flex flex-col items-center justify-center rounded-3xl border border-amber-200 bg-white/80 p-12 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-                    <div className="rounded-2xl bg-amber-100 p-4 text-amber-600 dark:bg-slate-800 dark:text-amber-400 mb-4">
+                  <div className="mx-auto max-w-md flex flex-col items-center justify-center rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-8 sm:p-10 text-center shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-50 text-amber-700 dark:border-amber-400/20 dark:bg-amber-950/40 dark:text-amber-400 mb-4 shadow-xs">
                       <svg
-                        className="w-10 h-10"
+                        className="w-7 h-7"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1111,16 +1111,16 @@ export default function App() {
                         />
                       </svg>
                     </div>
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">
+                    <h2 className="text-lg font-bold text-[#1C1917] dark:text-[#F3F2EE] mb-1.5">
                       Configuración Bloqueada
                     </h2>
-                    <p className="text-xs text-slate-500 max-w-sm mb-6">
-                      Esta sección contiene parámetros sensibles del sistema y
-                      requiere confirmación de contraseña.
+                    <p className="text-xs text-[#78716C] dark:text-[#9CA3AF] max-w-xs mb-6 leading-relaxed">
+                      Esta sección contiene parámetros sensibles del negocio y
+                      requiere verificación de contraseña de administrador.
                     </p>
                     <button
                       onClick={handleRequestConfigAccess}
-                      className="rounded-2xl bg-amber-500 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-600 transition"
+                      className="w-full sm:w-auto inline-flex items-center justify-center rounded-xl bg-amber-600 px-6 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
                     >
                       Ingresar Contraseña
                     </button>

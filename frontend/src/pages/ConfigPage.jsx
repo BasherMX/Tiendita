@@ -96,20 +96,19 @@ export default function ConfigPage({
   const isConnected = whatsappStatus?.status === "CONNECTED";
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-5 max-w-4xl mx-auto">
       {/* Header con botón de bloqueo */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-amber-100 p-3 text-amber-600 dark:bg-slate-800 dark:text-amber-400">
-            <Icon path={mdiCog} size={1.2} />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300">
+            <Icon path={mdiCog} size={1} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">
-              Panel de Configuración
+            <h1 className="text-lg font-black text-[#1C1917] dark:text-[#F3F2EE] leading-tight">
+              Parámetros del Sistema
             </h1>
-            <p className="text-xs text-slate-500">
-              Administra datos del negocio, WhatsApp, programa de puntos y
-              seguridad.
+            <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+              Ajustes de tienda, cobros, WhatsApp, puntos y claves de acceso
             </p>
           </div>
         </div>
@@ -117,88 +116,90 @@ export default function ConfigPage({
         {onLockConfig && (
           <button
             onClick={onLockConfig}
-            className="flex items-center gap-1.5 rounded-2xl border border-slate-200 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition"
+            className="flex items-center gap-1.5 rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] px-3.5 py-2 text-xs font-bold text-[#78716C] hover:bg-[#F7F6F2] hover:text-[#1C1917] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#9CA3AF] dark:hover:bg-[#282C32] dark:hover:text-[#F3F2EE] transition"
             title="Bloquear panel de configuración"
           >
-            <Icon path={mdiLock} size={0.7} />
-            Bloquear Panel
+            <Icon path={mdiLock} size={0.65} />
+            <span>Bloquear Panel</span>
           </button>
         )}
       </div>
 
       {/* Selector de Sub-secciones */}
-      <div className="flex flex-wrap gap-2 rounded-2xl bg-amber-50/70 p-1.5 dark:bg-slate-800/60 text-xs font-bold">
+      <div className="flex flex-wrap gap-1.5 rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-1.5 text-xs font-bold dark:border-[#282C32] dark:bg-[#181B1E]">
         <button
           type="button"
           onClick={() => setActiveTab("general")}
-          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 transition ${
+          className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition ${
             activeTab === "general"
-              ? "bg-white text-amber-900 shadow-sm dark:bg-slate-700 dark:text-amber-300"
-              : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+              ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200"
+              : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
           }`}
         >
-          <Icon path={mdiBank} size={0.75} />
-          Negocio y Banco
+          <Icon path={mdiBank} size={0.65} />
+          <span>Negocio y Banco</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("whatsapp")}
-          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 transition ${
+          className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition ${
             activeTab === "whatsapp"
-              ? "bg-white text-amber-900 shadow-sm dark:bg-slate-700 dark:text-amber-300"
-              : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+              ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200"
+              : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
           }`}
         >
-          <Icon path={mdiWhatsapp} size={0.75} />
-          WhatsApp API
+          <Icon path={mdiWhatsapp} size={0.65} />
+          <span>WhatsApp API</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("rewards")}
-          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 transition ${
+          className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition ${
             activeTab === "rewards"
-              ? "bg-white text-amber-900 shadow-sm dark:bg-slate-700 dark:text-amber-300"
-              : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+              ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200"
+              : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
           }`}
         >
-          <Icon path={mdiStarOutline} size={0.75} />
-          Programa de Puntos
+          <Icon path={mdiStarOutline} size={0.65} />
+          <span>Programa de Puntos</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("security")}
-          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 transition ${
+          className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 transition ${
             activeTab === "security"
-              ? "bg-white text-amber-900 shadow-sm dark:bg-slate-700 dark:text-amber-300"
-              : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+              ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200"
+              : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
           }`}
         >
-          <Icon path={mdiLockOutline} size={0.75} />
-          Seguridad y Contraseña
+          <Icon path={mdiShieldCheckOutline} size={0.65} />
+          <span>Seguridad</span>
         </button>
       </div>
 
       {/* Contenido según sub-sección */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* 1. NEGOCIO Y BANCO */}
         {activeTab === "general" && (
-          <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 space-y-4">
-            <div className="flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100">
-              <Icon path={mdiBank} size={0.9} className="text-amber-500" />
-              Datos del Negocio y Transferencias
+          <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E] space-y-4">
+            <div className="border-b border-[#E5E2DA] pb-3 dark:border-[#282C32]">
+              <div className="flex items-center gap-2 text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                <Icon path={mdiBank} size={0.75} className="text-amber-600" />
+                <span>Datos del Negocio y Transferencias</span>
+              </div>
+              <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF] mt-0.5">
+                Información mostrada a los clientes para recibir transferencias
+                bancarias directas
+              </p>
             </div>
-            <p className="text-xs text-slate-500">
-              Información que se muestra a los clientes al compartirles su
-              estado de cuenta y para recepción de pagos.
-            </p>
 
-            <div className="grid gap-4 sm:grid-cols-2 pt-2">
+            <div className="grid gap-4 sm:grid-cols-2 pt-1">
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-                  Cuenta CLABE (para que tus clientes transfieran)
+                <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                  Cuenta CLABE (para transferencias SPEI)
                 </label>
                 <input
-                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-sm outline-none dark:border-slate-700 dark:text-slate-100 font-mono font-bold"
+                  className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono font-bold"
                   placeholder="646990403801118437"
                   value={form.bank_clabe}
                   onChange={(e) =>
@@ -208,11 +209,11 @@ export default function ConfigPage({
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-                  Teléfono de Atención WhatsApp (Negocio)
+                <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                  Teléfono de Atención WhatsApp (con lada, ej. 5233...)
                 </label>
                 <input
-                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-sm outline-none dark:border-slate-700 dark:text-slate-100 font-mono"
+                  className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
                   placeholder="523346502871"
                   value={form.business_phone}
                   onChange={(e) =>
@@ -222,10 +223,10 @@ export default function ConfigPage({
               </div>
             </div>
 
-            <div className="flex justify-end pt-3">
+            <div className="flex justify-end pt-3 border-t border-[#E5E2DA] dark:border-[#282C32]">
               <button
                 type="submit"
-                className="rounded-2xl bg-amber-500 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-600 transition"
+                className="rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
               >
                 Guardar Datos de Negocio
               </button>
@@ -235,53 +236,54 @@ export default function ConfigPage({
 
         {/* 2. WHATSAPP */}
         {activeTab === "whatsapp" && (
-          <div className="space-y-6">
-            <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-5 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-                    <Icon path={mdiWhatsapp} size={1.2} />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-600/20">
+                    <Icon path={mdiWhatsapp} size={0.8} />
                   </div>
                   <div>
-                    <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                      Estado del Servicio WhatsApp
+                    <h2 className="text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                      Estado de Conexión WhatsApp
                     </h2>
-                    <p className="text-xs text-slate-500">
-                      Envío automático de tickets y estados de cuenta a tus
-                      clientes.
+                    <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                      Envío directo de estados de cuenta vía WhatsApp Cloud API
                     </p>
                   </div>
                 </div>
 
                 <div
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold ${
                     isConnected
-                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                      : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300"
+                      : "bg-amber-50 text-amber-900 border border-amber-500/20 dark:bg-amber-950/60 dark:text-amber-300"
                   }`}
                 >
                   <Icon
                     path={isConnected ? mdiCheckCircle : mdiCloseCircle}
                     size={0.6}
                   />
-                  {isConnected ? "Conectado" : "Configurado"}
+                  <span>{isConnected ? "Conectado" : "Configurado"}</span>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 space-y-4">
-              <div className="text-base font-bold text-slate-800 dark:text-slate-100">
-                Credenciales de WhatsApp (Meta Cloud API Oficial)
+            <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E] space-y-4">
+              <div className="border-b border-[#E5E2DA] pb-3 dark:border-[#282C32]">
+                <h3 className="text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                  Credenciales de WhatsApp (Meta Cloud API Oficial)
+                </h3>
               </div>
 
               <div className="space-y-3">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
                     Meta Phone Number ID
                   </label>
                   <input
-                    className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-sm outline-none dark:border-slate-700 dark:text-slate-100 font-mono"
-                    placeholder="ID numérico del número de teléfono en Meta Developer"
+                    className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
+                    placeholder="ID numérico en Meta Developer"
                     value={form.meta_phone_number_id}
                     onChange={(e) =>
                       setForm({ ...form, meta_phone_number_id: e.target.value })
@@ -290,12 +292,12 @@ export default function ConfigPage({
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
                     Meta WhatsApp Token (Permanente)
                   </label>
                   <input
                     type="password"
-                    className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-sm outline-none dark:border-slate-700 dark:text-slate-100 font-mono"
+                    className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE] font-mono"
                     placeholder="EAA..."
                     value={form.meta_whatsapp_token}
                     onChange={(e) =>
@@ -305,10 +307,10 @@ export default function ConfigPage({
                 </div>
               </div>
 
-              <div className="flex justify-end pt-3">
+              <div className="flex justify-end pt-3 border-t border-[#E5E2DA] dark:border-[#282C32]">
                 <button
                   type="submit"
-                  className="rounded-2xl bg-amber-500 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-600 transition"
+                  className="rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
                 >
                   Guardar Credenciales WhatsApp
                 </button>
@@ -319,32 +321,33 @@ export default function ConfigPage({
 
         {/* 3. RECOMPENSAS */}
         {activeTab === "rewards" && (
-          <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 space-y-4">
-            <div className="flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100">
-              <Icon
-                path={mdiStarOutline}
-                size={0.9}
-                className="text-amber-500"
-              />
-              Configuración del Programa de Puntos
+          <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E] space-y-4">
+            <div className="border-b border-[#E5E2DA] pb-3 dark:border-[#282C32]">
+              <div className="flex items-center gap-2 text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                <Icon
+                  path={mdiStarOutline}
+                  size={0.75}
+                  className="text-amber-600"
+                />
+                <span>Configuración de Puntos de Lealtad</span>
+              </div>
+              <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF] mt-0.5">
+                Porcentaje de compras y abonos convertido en puntos para
+                clientes
+              </p>
             </div>
-            <p className="text-xs text-slate-500">
-              Define el porcentaje de compras y pagos que se convierte en puntos
-              para tus clientes.
-            </p>
 
-            <div className="grid gap-4 sm:grid-cols-2 pt-2">
+            <div className="grid gap-4 sm:grid-cols-2 pt-1">
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-                  Factor de Puntos (ej. 0.10 = 10% de lo comprado se vuelve
-                  puntos)
+                <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                  Factor de Puntos (ej. 0.10 = 10% del importe en puntos)
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   max="1"
-                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-sm outline-none dark:border-slate-700 dark:text-slate-100 font-mono"
+                  className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs font-tabular outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
                   value={form.reward_factor}
                   onChange={(e) =>
                     setForm({ ...form, reward_factor: e.target.value })
@@ -352,25 +355,27 @@ export default function ConfigPage({
                 />
               </div>
 
-              <div className="flex items-center pt-5">
-                <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+              <div className="flex items-center pt-4">
+                <label className="flex items-center gap-2.5 text-xs font-semibold text-[#1C1917] dark:text-[#F3F2EE] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.rewards_enabled}
                     onChange={(e) =>
                       setForm({ ...form, rewards_enabled: e.target.checked })
                     }
-                    className="h-4 w-4 rounded text-amber-500 focus:ring-amber-400"
+                    className="h-4 w-4 rounded text-amber-600 focus:ring-amber-400"
                   />
-                  Activar acumulación de puntos en compras y abonos
+                  <span>
+                    Habilitar acumulación de puntos en compras y pagos
+                  </span>
                 </label>
               </div>
             </div>
 
-            <div className="flex justify-end pt-3">
+            <div className="flex justify-end pt-3 border-t border-[#E5E2DA] dark:border-[#282C32]">
               <button
                 type="submit"
-                className="rounded-2xl bg-amber-500 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-600 transition"
+                className="rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
               >
                 Guardar Configuración de Puntos
               </button>
@@ -378,31 +383,32 @@ export default function ConfigPage({
           </div>
         )}
 
-        {/* 4. SEGURIDAD Y CONTRASEÑA */}
+        {/* 4. SEGURIDAD */}
         {activeTab === "security" && (
-          <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 space-y-4">
-            <div className="flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100">
-              <Icon
-                path={mdiShieldCheckOutline}
-                size={0.9}
-                className="text-amber-500"
-              />
-              Seguridad: Cambiar Contraseña de Administrador
+          <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E] space-y-4">
+            <div className="border-b border-[#E5E2DA] pb-3 dark:border-[#282C32]">
+              <div className="flex items-center gap-2 text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                <Icon
+                  path={mdiShieldCheckOutline}
+                  size={0.75}
+                  className="text-amber-600"
+                />
+                <span>Cambiar Contraseña de Administrador</span>
+              </div>
+              <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF] mt-0.5">
+                Utilizada para ingresar al sistema y desbloquear configuraciones
+                protegidas
+              </p>
             </div>
-            <p className="text-xs text-slate-500">
-              Esta contraseña es la que utilizas para ingresar al sistema,
-              entrar a este panel de configuración y autorizar la cancelación de
-              movimientos.
-            </p>
 
-            <div className="grid gap-3 sm:grid-cols-3 pt-2">
+            <div className="grid gap-3 sm:grid-cols-3 pt-1">
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
                   Contraseña Actual
                 </label>
                 <input
                   type="password"
-                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-sm outline-none dark:border-slate-700 dark:text-slate-100"
+                  className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
                   placeholder="••••••••"
                   value={passForm.currentPassword}
                   onChange={(e) =>
@@ -414,12 +420,12 @@ export default function ConfigPage({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
                   Nueva Contraseña
                 </label>
                 <input
                   type="password"
-                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-sm outline-none dark:border-slate-700 dark:text-slate-100"
+                  className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
                   placeholder="Mínimo 4 caracteres"
                   value={passForm.newPassword}
                   onChange={(e) =>
@@ -428,12 +434,12 @@ export default function ConfigPage({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
                   Confirmar Contraseña
                 </label>
                 <input
                   type="password"
-                  className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-sm outline-none dark:border-slate-700 dark:text-slate-100"
+                  className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
                   placeholder="Repite la contraseña"
                   value={passForm.confirmPassword}
                   onChange={(e) =>
@@ -446,11 +452,11 @@ export default function ConfigPage({
               </div>
             </div>
 
-            <div className="flex justify-end pt-3">
+            <div className="flex justify-end pt-3 border-t border-[#E5E2DA] dark:border-[#282C32]">
               <button
                 type="button"
                 onClick={handlePasswordSubmit}
-                className="rounded-2xl border border-amber-300 bg-amber-50 px-6 py-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200 transition"
+                className="rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
               >
                 Actualizar Contraseña
               </button>

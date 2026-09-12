@@ -2,8 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: "Archivo", "Segoe UI", sans-serif;
+@layer base {
+  body {
+    font-family:
+      "Plus Jakarta Sans",
+      system-ui,
+      -apple-system,
+      sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* Números tabulares para importes monetarios y tablas */
+  .font-tabular {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 :root {
@@ -29,13 +41,38 @@ textarea {
   touch-action: manipulation;
 }
 
+/* ── Focus states ── */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #d97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
+
 /* ── Dark mode: inputs, selects, textareas ── */
 .dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 .dark select,
 .dark textarea {
-  background-color: rgb(30 41 59 / 0.85);
-  color: rgb(226 232 240);
+  background-color: #181b1e;
+  color: #f3f2ee;
   color-scheme: dark;
+}
+
+.dark
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
 }
 
 .dark input[type="date"] {
@@ -43,39 +80,53 @@ textarea {
 }
 
 .dark select option {
-  background-color: rgb(30 41 59);
-  color: rgb(226 232 240);
+  background-color: #181b1e;
+  color: #f3f2ee;
 }
 
-/* ── Dark mode: scrollbars (webkit) ── */
-.dark ::-webkit-scrollbar {
+/* ── Scrollbars ── */
+::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
+::-webkit-scrollbar-track {
+  background: #f1efe9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d6d1c4;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b8b1a0;
+}
+
 .dark ::-webkit-scrollbar-track {
-  background: rgb(15 23 42);
-  border-radius: 3px;
+  background: #111315;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: rgb(51 65 85);
-  border-radius: 3px;
+  background: #282c32;
+  border-radius: 9999px;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgb(71 85 105);
+  background: #393e47;
 }
 
 /* SweetAlert2 in dark mode */
 .dark .swal2-popup {
-  background: rgb(15 23 42);
-  color: rgb(226 232 240);
+  background: #181b1e;
+  color: #f3f2ee;
+  border: 1px solid #282c32;
+  border-radius: 1.25rem;
 }
 
 .dark .swal2-title,
 .dark .swal2-html-container {
-  color: rgb(226 232 240);
+  color: #f3f2ee;
 }
 
 .dark .swal2-icon.swal2-success .swal2-success-ring {

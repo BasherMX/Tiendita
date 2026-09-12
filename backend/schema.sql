@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
 -- Migraciones automáticas idempotentes para bases de datos existentes
 ALTER TABLE settings ALTER COLUMN value TYPE TEXT;
+ALTER TABLE sweets ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS credit_limit DECIMAL(10,2) NOT NULL DEFAULT 0;
 ALTER TABLE movements ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30) NOT NULL DEFAULT 'cash';
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30) NOT NULL DEFAULT 'cash';

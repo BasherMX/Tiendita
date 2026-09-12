@@ -36,17 +36,17 @@ export default function PaymentMethodSelector({
             key={method.id}
             type="button"
             onClick={() => onChange(method.id)}
-            className={`flex flex-col items-center justify-center gap-1 rounded-2xl border p-2.5 text-xs font-semibold transition-all ${
+            className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border p-2.5 text-xs font-semibold transition-all ${
               selected
-                ? "border-amber-500 bg-amber-50 text-amber-900 shadow-sm ring-2 ring-amber-500/20 dark:border-amber-500 dark:bg-amber-950/40 dark:text-amber-200"
-                : "border-slate-200 bg-white/70 text-slate-600 hover:border-amber-200 hover:bg-amber-50/50 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:bg-slate-800/60"
+                ? "border-[#D97706] bg-[#FEF3C7]/40 text-[#92400E] shadow-sm ring-1 ring-[#D97706] dark:border-[#D97706] dark:bg-[#78350F]/20 dark:text-[#FDE68A]"
+                : "border-[#E5E2DA] bg-white text-[#57534E] hover:border-[#D97706]/50 hover:bg-[#FAF7F0] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#9CA3AF] dark:hover:bg-[#202428]"
             }`}
           >
             <Icon
               path={method.icon}
               size={0.85}
               className={
-                selected ? "text-amber-600 dark:text-amber-400" : method.color
+                selected ? "text-[#D97706] dark:text-[#F59E0B]" : method.color
               }
             />
             <span>{method.label}</span>

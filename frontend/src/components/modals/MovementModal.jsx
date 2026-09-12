@@ -94,48 +94,67 @@ export default function MovementModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1C1917]/60 p-4 backdrop-blur-sm">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-lg rounded-3xl border border-amber-100/70 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 max-h-[90vh] flex flex-col"
+        exit={{ opacity: 0, scale: 0.96 }}
+        className="w-full max-w-lg rounded-2xl border border-[#E5E2DA] bg-white p-6 shadow-2xl dark:border-[#282C32] dark:bg-[#181B1E] max-h-[90vh] flex flex-col"
       >
         {/* Header */}
         <div className="mb-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 text-lg font-bold text-slate-800 dark:text-slate-100">
-            <Icon
-              path={movementKind === "purchase" ? mdiCashMinus : mdiCashPlus}
-              size={1}
-              className={
+          <div className="flex items-center gap-2 text-base font-bold text-[#1C1917] dark:text-[#F3F4F6]">
+            <div
+              className={`flex h-8 w-8 items-center justify-center rounded-lg ${
                 movementKind === "purchase"
-                  ? "text-amber-500"
-                  : "text-emerald-500"
-              }
-            />
-            {movementKind === "purchase"
-              ? `Nueva Compra: ${selectedClient.name}`
-              : `Registrar Abono: ${selectedClient.name}`}
+                  ? "bg-[#FEF3C7] text-[#D97706] dark:bg-[#78350F]/30 dark:text-[#F59E0B]"
+                  : "bg-[#D1FAE5] text-[#059669] dark:bg-[#064E3B]/30 dark:text-[#10B981]"
+              }`}
+            >
+              <Icon
+                path={movementKind === "purchase" ? mdiCashMinus : mdiCashPlus}
+                size={0.8}
+              />
+            </div>
+            <div>
+              <h3>
+                {movementKind === "purchase"
+                  ? "Nueva Compra"
+                  : "Registrar Abono"}
+              </h3>
+              <p className="text-xs font-normal text-[#78716C] dark:text-[#9CA3AF]">
+                {selectedClient.name}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="rounded-lg p-1.5 text-[#A8A29E] hover:bg-[#FAF7F0] hover:text-[#1C1917] dark:hover:bg-[#202428] dark:hover:text-[#F3F4F6] transition"
           >
-            <Icon path={mdiClose} size={0.8} />
+            <Icon path={mdiClose} size={0.75} />
           </button>
         </div>
 
         {/* Client summary badge */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-amber-50/70 px-4 py-2.5 text-xs text-amber-950 dark:bg-slate-800/80 dark:text-amber-200 shrink-0">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#E5E2DA] bg-[#FAF7F0] px-3.5 py-2 text-xs text-[#57534E] dark:border-[#282C32] dark:bg-[#121417] dark:text-[#9CA3AF] shrink-0">
           <span>
-            Deuda actual: <strong>${clientDebt.toFixed(2)}</strong>
+            Deuda:{" "}
+            <strong className="font-tabular text-[#1C1917] dark:text-[#F3F4F6]">
+              ${clientDebt.toFixed(2)}
+            </strong>
           </span>
           <span>
-            Puntos: <strong>{clientPoints.toFixed(1)} pts</strong>
+            Puntos:{" "}
+            <strong className="font-tabular text-[#D97706] dark:text-[#F59E0B]">
+              {clientPoints.toFixed(1)} pts
+            </strong>
           </span>
           {creditLimit > 0 && (
             <span>
-              Límite de crédito: <strong>${creditLimit.toFixed(2)}</strong>
+              Límite:{" "}
+              <strong className="font-tabular text-[#1C1917] dark:text-[#F3F4F6]">
+                ${creditLimit.toFixed(2)}
+              </strong>
             </span>
           )}
         </div>
@@ -146,14 +165,14 @@ export default function MovementModal({
         >
           {/* Purchase: Mode Selector (Items vs Manual) */}
           {movementKind === "purchase" && (
-            <div className="flex rounded-2xl bg-slate-100 p-1 dark:bg-slate-800">
+            <div className="flex rounded-xl border border-[#E5E2DA] bg-[#F5F2EB] p-1 dark:border-[#282C32] dark:bg-[#121417]">
               <button
                 type="button"
                 onClick={() => setMode("items")}
-                className={`flex-1 rounded-xl py-1.5 text-xs font-semibold transition ${
+                className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${
                   mode === "items"
-                    ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100"
-                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400"
+                    ? "bg-white text-[#1C1917] shadow-sm dark:bg-[#202428] dark:text-[#F3F4F6]"
+                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F4F6]"
                 }`}
               >
                 Por Dulces / Productos
@@ -161,10 +180,10 @@ export default function MovementModal({
               <button
                 type="button"
                 onClick={() => setMode("manual")}
-                className={`flex-1 rounded-xl py-1.5 text-xs font-semibold transition ${
+                className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${
                   mode === "manual"
-                    ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100"
-                    : "text-slate-500 hover:text-slate-900 dark:text-slate-400"
+                    ? "bg-white text-[#1C1917] shadow-sm dark:bg-[#202428] dark:text-[#F3F4F6]"
+                    : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F4F6]"
                 }`}
               >
                 Monto Manual ($)
@@ -175,11 +194,11 @@ export default function MovementModal({
           {/* Items Section */}
           {movementKind === "purchase" && mode === "items" && (
             <div className="space-y-2.5">
-              <div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-500">
-                <span>Productos</span>
-                <span>Subtotal</span>
+              <div className="flex items-center justify-between text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                <span>PRODUCTOS</span>
+                <span>SUBTOTAL</span>
               </div>
-              {items.map((item, idx) => {
+              {items.map((item) => {
                 const sweet = sweetById.get(String(item.sweetId));
                 const sub = sweet
                   ? Number(sweet.sale_price) * (Number(item.quantity) || 0)
@@ -196,20 +215,20 @@ export default function MovementModal({
                     <input
                       type="number"
                       min="1"
-                      className="w-16 rounded-2xl border border-amber-100/70 bg-transparent px-2 py-2 text-center text-sm outline-none dark:border-slate-700 dark:text-slate-100"
+                      className="w-16 rounded-xl border border-[#E5E2DA] bg-white px-2 py-2 text-center text-sm font-tabular outline-none focus:border-[#D97706] focus:ring-1 focus:ring-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
                       value={item.quantity}
                       onChange={(e) =>
                         updateItem(item.id, "quantity", e.target.value)
                       }
                     />
-                    <div className="w-16 text-right text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <div className="w-16 text-right text-xs font-bold font-tabular text-[#1C1917] dark:text-[#F3F4F6]">
                       ${sub.toFixed(2)}
                     </div>
                     {items.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeItem(item.id)}
-                        className="rounded-full p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950"
+                        className="rounded-lg p-1.5 text-[#DC2626] hover:bg-[#FEF2F2] dark:hover:bg-[#450A0A]/40 transition"
                       >
                         <Icon path={mdiDelete} size={0.75} />
                       </button>
@@ -220,7 +239,7 @@ export default function MovementModal({
               <button
                 type="button"
                 onClick={addItem}
-                className="flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-[#D97706] hover:bg-[#FEF3C7]/40 dark:text-[#F59E0B] dark:hover:bg-[#78350F]/20 transition"
               >
                 <Icon path={mdiPlus} size={0.7} />
                 Agregar otro producto
@@ -231,17 +250,17 @@ export default function MovementModal({
           {/* Manual Amount input */}
           {(movementKind === "pay" || mode === "manual") && (
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+              <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
                 {movementKind === "pay"
-                  ? "Monto a Abonar / Pagar ($)"
-                  : "Monto de la Compra ($)"}
+                  ? "MONTO A ABONAR / PAGAR ($)"
+                  : "MONTO DE LA COMPRA ($)"}
               </label>
               <input
                 required
                 type="number"
                 step="0.01"
                 min="0.01"
-                className="w-full rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-base font-bold outline-none dark:border-slate-700 dark:text-slate-100"
+                className="w-full rounded-xl border border-[#E5E2DA] bg-white px-4 py-2.5 text-xl font-extrabold font-tabular text-[#1C1917] outline-none focus:border-[#D97706] focus:ring-1 focus:ring-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
                 placeholder="0.00"
                 value={manualAmount}
                 onChange={(e) => setManualAmount(e.target.value)}
@@ -253,8 +272,8 @@ export default function MovementModal({
           {movementKind === "purchase" &&
             clientPoints > 0 &&
             computedTotal > 0 && (
-              <div className="rounded-2xl border border-amber-100/70 p-3 dark:border-slate-800 space-y-2">
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+              <div className="rounded-xl border border-[#E5E2DA] bg-[#FAF7F0] p-3.5 dark:border-[#282C32] dark:bg-[#121417] space-y-2">
+                <label className="flex items-center gap-2 text-xs font-semibold text-[#1C1917] dark:text-[#F3F4F6] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={usePoints}
@@ -266,7 +285,7 @@ export default function MovementModal({
                         );
                       }
                     }}
-                    className="rounded text-amber-500 focus:ring-amber-400"
+                    className="h-4 w-4 rounded border-[#E5E2DA] text-[#D97706] focus:ring-[#D97706]"
                   />
                   Pagar parte o total con Puntos ({clientPoints.toFixed(1)} pts
                   disponibles)
@@ -278,13 +297,13 @@ export default function MovementModal({
                       step="0.1"
                       min="0"
                       max={Math.min(clientPoints, computedTotal)}
-                      className="w-32 rounded-xl border border-amber-200 px-3 py-1.5 text-xs outline-none dark:border-slate-700 dark:bg-slate-800"
+                      className="w-32 rounded-lg border border-[#E5E2DA] bg-white px-3 py-1.5 text-xs font-tabular outline-none focus:border-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
                       placeholder="Puntos a usar"
                       value={pointsToUse}
                       onChange={(e) => setPointsToUse(e.target.value)}
                     />
-                    <span className="text-xs text-slate-500">
-                      Equivalente a: -${Number(pointsToUse || 0).toFixed(2)}
+                    <span className="text-xs font-medium text-[#78716C] dark:text-[#9CA3AF]">
+                      Descuento: -${Number(pointsToUse || 0).toFixed(2)}
                     </span>
                   </div>
                 )}
@@ -294,8 +313,8 @@ export default function MovementModal({
           {/* Payment Method Selector (for payments and instant purchases) */}
           {(movementKind === "pay" || payImmediately) && (
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase text-slate-500">
-                Método de Pago
+              <label className="mb-1.5 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                MÉTODO DE PAGO
               </label>
               <PaymentMethodSelector
                 value={paymentMethod}
@@ -306,21 +325,21 @@ export default function MovementModal({
 
           {/* Instant Payment toggle for purchases */}
           {movementKind === "purchase" && (
-            <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-800">
+            <div className="rounded-xl border border-[#E5E2DA] bg-[#FAF7F0]/60 p-3 dark:border-[#282C32] dark:bg-[#121417]/60">
               <label className="flex items-center justify-between gap-2 cursor-pointer">
                 <div>
-                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                  <div className="text-xs font-semibold text-[#1C1917] dark:text-[#F3F4F6]">
                     ¿Se paga al instante en mostrador?
                   </div>
-                  <div className="text-[11px] text-slate-500">
-                    Si se activa, no queda como deuda pendiente.
+                  <div className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                    Si se activa, no queda como deuda pendiente en su libreta.
                   </div>
                 </div>
                 <input
                   type="checkbox"
                   checked={payImmediately}
                   onChange={(e) => setPayImmediately(e.target.checked)}
-                  className="h-4 w-4 rounded text-amber-500 focus:ring-amber-400"
+                  className="h-4 w-4 rounded border-[#E5E2DA] text-[#D97706] focus:ring-[#D97706]"
                 />
               </label>
             </div>
@@ -328,27 +347,33 @@ export default function MovementModal({
 
           {/* Credit Limit Alert Warning */}
           {isOverCreditLimit && (
-            <div className="flex items-center gap-2 rounded-2xl bg-rose-50 p-3 text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+            <div className="flex items-center gap-2.5 rounded-xl border border-[#FCA5A5]/60 bg-[#FEF2F2] p-3 text-xs text-[#991B1B] dark:border-[#7F1D1D] dark:bg-[#450A0A]/30 dark:text-[#FCA5A5]">
               <Icon
                 path={mdiAlertCircleOutline}
-                size={1}
-                className="shrink-0 text-rose-500"
+                size={0.9}
+                className="shrink-0 text-[#DC2626]"
               />
               <span>
-                <strong>Atención:</strong> Esta compra a crédito dejará la deuda
-                en <strong>${resultingDebt.toFixed(2)}</strong>, superando el
-                límite de <strong>${creditLimit.toFixed(2)}</strong>.
+                <strong>Atención:</strong> Esta compra dejará la deuda en{" "}
+                <strong className="font-tabular">
+                  ${resultingDebt.toFixed(2)}
+                </strong>
+                , superando el límite de{" "}
+                <strong className="font-tabular">
+                  ${creditLimit.toFixed(2)}
+                </strong>
+                .
               </span>
             </div>
           )}
 
           {/* Total & Submit Button */}
-          <div className="shrink-0 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <div className="shrink-0 border-t border-[#E5E2DA] pt-4 dark:border-[#282C32]">
             <div className="mb-4 flex items-center justify-between">
-              <span className="text-xs uppercase text-slate-500 font-semibold">
-                {movementKind === "purchase" ? "Total a cobrar" : "Total abono"}
+              <span className="text-xs font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                {movementKind === "purchase" ? "TOTAL A COBRAR" : "TOTAL ABONO"}
               </span>
-              <span className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
+              <span className="text-2xl font-extrabold font-tabular text-[#1C1917] dark:text-[#F3F4F6]">
                 ${computedTotal.toFixed(2)}
               </span>
             </div>
@@ -357,19 +382,19 @@ export default function MovementModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="rounded-xl border border-[#E5E2DA] px-4 py-2 text-xs font-semibold text-[#57534E] hover:bg-[#FAF7F0] dark:border-[#282C32] dark:text-[#9CA3AF] dark:hover:bg-[#202428] transition"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={computedTotal <= 0}
-                className={`rounded-2xl px-6 py-2 text-sm font-semibold text-white shadow-sm transition ${
+                className={`rounded-xl px-5 py-2 text-xs font-bold text-white shadow-sm transition ${
                   computedTotal > 0
                     ? movementKind === "purchase"
-                      ? "bg-amber-500 hover:bg-amber-600"
-                      : "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-slate-300 dark:bg-slate-700 cursor-not-allowed"
+                      ? "bg-[#D97706] hover:bg-[#B45309]"
+                      : "bg-[#059669] hover:bg-[#047857]"
+                    : "bg-[#D6D3CD] text-[#78716C] dark:bg-[#282C32] dark:text-[#6B7280] cursor-not-allowed"
                 }`}
               >
                 {movementKind === "purchase"

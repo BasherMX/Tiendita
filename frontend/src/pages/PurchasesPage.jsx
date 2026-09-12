@@ -70,61 +70,64 @@ export default function PurchasesPage({
   );
 
   return (
-    <div className="space-y-6">
-      {/* Formulario de Ticket de Reestock */}
-      <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="mb-2 flex items-center gap-2 text-lg font-bold text-slate-800 dark:text-slate-100">
-          <Icon
-            path={mdiPackageVariantClosed}
-            size={1}
-            className="text-amber-500"
-          />
-          Registrar Ticket de Reestock (Compras)
+    <div className="space-y-5">
+      {/* Formulario de Entrada de Mercancía / Reestock */}
+      <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+        <div className="mb-4 border-b border-[#E5E2DA] pb-3 dark:border-[#282C32]">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300">
+              <Icon path={mdiPackageVariantClosed} size={0.75} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-[#1C1917] dark:text-[#F3F2EE] leading-tight">
+                Registrar Entrada de Mercancía
+              </h2>
+              <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                Las piezas ingresadas se sumarán automáticamente a las
+                existencias del inventario
+              </p>
+            </div>
+          </div>
         </div>
-        <p className="mb-4 text-xs text-slate-500">
-          Agrega varios productos al mismo ticket. La cantidad de piezas se
-          sumará automáticamente al inventario.
-        </p>
 
         <form onSubmit={handleTicketSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-              Lugar / Proveedor de Compra
+          <div className="max-w-xs">
+            <label className="mb-1.5 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+              Proveedor o Lugar de Compra
             </label>
             <select
               required
-              className="w-full sm:w-80 rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2.5 text-sm outline-none dark:border-slate-700 dark:text-slate-100"
+              className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-2 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
               value={ticketPlaceId}
               onChange={(e) => setTicketPlaceId(e.target.value)}
             >
-              <option value="" className="dark:bg-slate-900">
-                Seleccionar lugar...
+              <option value="" className="dark:bg-[#181B1E]">
+                Seleccionar proveedor...
               </option>
               {purchasePlaces.map((pl) => (
-                <option key={pl.id} value={pl.id} className="dark:bg-slate-900">
+                <option key={pl.id} value={pl.id} className="dark:bg-[#181B1E]">
                   {pl.name}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-500">
-              <span>Líneas de Compra</span>
-              <span>Costo Paquete ($)</span>
+          <div className="space-y-2.5">
+            <div className="text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+              Renglones de Compra
             </div>
 
             {ticketItems.map((item, idx) => (
               <div
                 key={item.id}
-                className="grid gap-3 rounded-2xl border border-amber-100/70 p-3.5 dark:border-slate-800 sm:grid-cols-[minmax(0,1.5fr)_minmax(100px,0.4fr)_minmax(120px,0.5fr)_auto]"
+                className="grid gap-3 rounded-xl border border-[#E5E2DA] bg-[#F7F6F2]/40 p-3 dark:border-[#282C32] dark:bg-[#111315]/40 sm:grid-cols-[minmax(0,1.5fr)_minmax(100px,0.4fr)_minmax(120px,0.5fr)_auto]"
               >
                 <div>
-                  <label className="mb-1 block text-[10px] font-semibold uppercase text-slate-400">
+                  <label className="mb-1 block text-[10px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
                     Producto #{idx + 1}
                   </label>
                   <select
-                    className="w-full rounded-xl border border-amber-100/70 bg-transparent px-3 py-2 text-sm outline-none dark:border-slate-700 dark:text-slate-100"
+                    className="w-full rounded-lg border border-[#E5E2DA] bg-[#FFFFFF] px-2.5 py-1.5 text-xs outline-none dark:border-[#282C32] dark:bg-[#181B1E] text-[#1C1917] dark:text-[#F3F2EE]"
                     value={item.sweetId}
                     onChange={(e) => {
                       updateItem(item.id, "sweetId", e.target.value);
@@ -132,14 +135,14 @@ export default function PurchasesPage({
                         updateItem(item.id, "productName", "");
                     }}
                   >
-                    <option value="" className="dark:bg-slate-900">
-                      Producto nuevo / manual
+                    <option value="" className="dark:bg-[#181B1E]">
+                      Producto nuevo / escribir nombre
                     </option>
                     {sweets.map((s) => (
                       <option
                         key={s.id}
                         value={s.id}
-                        className="dark:bg-slate-900"
+                        className="dark:bg-[#181B1E]"
                       >
                         {s.name}
                       </option>
@@ -149,8 +152,8 @@ export default function PurchasesPage({
                   {!item.sweetId && (
                     <input
                       required
-                      className="mt-2 w-full rounded-xl border border-amber-100/70 bg-transparent px-3 py-2 text-xs outline-none dark:border-slate-700 dark:text-slate-100"
-                      placeholder="Nombre del producto nuevo..."
+                      className="mt-1.5 w-full rounded-lg border border-[#E5E2DA] bg-[#FFFFFF] px-2.5 py-1.5 text-xs outline-none dark:border-[#282C32] dark:bg-[#181B1E] text-[#1C1917] dark:text-[#F3F2EE]"
+                      placeholder="Nombre del nuevo producto..."
                       value={item.productName}
                       onChange={(e) =>
                         updateItem(item.id, "productName", e.target.value)
@@ -160,14 +163,14 @@ export default function PurchasesPage({
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[10px] font-semibold uppercase text-slate-400">
-                    Piezas a Sumar
+                  <label className="mb-1 block text-[10px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                    Piezas Nuevas
                   </label>
                   <input
                     required
                     type="number"
                     min="1"
-                    className="w-full rounded-xl border border-amber-100/70 bg-transparent px-3 py-2 text-sm outline-none dark:border-slate-700 dark:text-slate-100"
+                    className="w-full rounded-lg border border-[#E5E2DA] bg-[#FFFFFF] px-2.5 py-1.5 text-xs font-tabular outline-none dark:border-[#282C32] dark:bg-[#181B1E] text-[#1C1917] dark:text-[#F3F2EE]"
                     value={item.quantity}
                     onChange={(e) =>
                       updateItem(item.id, "quantity", e.target.value)
@@ -176,7 +179,7 @@ export default function PurchasesPage({
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[10px] font-semibold uppercase text-slate-400">
+                  <label className="mb-1 block text-[10px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
                     Costo Total ($)
                   </label>
                   <input
@@ -184,7 +187,7 @@ export default function PurchasesPage({
                     type="number"
                     step="0.01"
                     min="0"
-                    className="w-full rounded-xl border border-amber-100/70 bg-transparent px-3 py-2 text-sm outline-none dark:border-slate-700 dark:text-slate-100"
+                    className="w-full rounded-lg border border-[#E5E2DA] bg-[#FFFFFF] px-2.5 py-1.5 text-xs font-tabular outline-none dark:border-[#282C32] dark:bg-[#181B1E] text-[#1C1917] dark:text-[#F3F2EE]"
                     placeholder="0.00"
                     value={item.packageCost}
                     onChange={(e) =>
@@ -197,7 +200,7 @@ export default function PurchasesPage({
                   <button
                     type="button"
                     onClick={() => removeItem(item.id)}
-                    className="w-full rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:border-rose-900/50 dark:hover:bg-rose-950/40"
+                    className="w-full sm:w-auto rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-950/40 transition"
                   >
                     Quitar
                   </button>
@@ -206,94 +209,112 @@ export default function PurchasesPage({
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E5E2DA] pt-4 dark:border-[#282C32]">
             <button
               type="button"
               onClick={addItem}
-              className="flex items-center gap-1 rounded-xl border border-amber-200 px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-50 dark:border-slate-700 dark:text-amber-300"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] px-3.5 py-2 text-xs font-bold text-[#1C1917] hover:bg-[#F7F6F2] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F2EE] dark:hover:bg-[#282C32] transition"
             >
-              <Icon path={mdiPlus} size={0.7} />+ Agregar otro producto
+              <Icon path={mdiPlus} size={0.65} />
+              <span>Agregar renglón</span>
             </button>
 
             <div className="flex items-center gap-4">
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                Total Ticket: ${totalTicketCost.toFixed(2)}
+              <span className="text-xs font-bold font-tabular text-[#1C1917] dark:text-[#F3F2EE]">
+                Total de Remisión:{" "}
+                <strong className="text-base text-amber-700 dark:text-amber-400 font-black ml-1">
+                  ${totalTicketCost.toFixed(2)}
+                </strong>
               </span>
               <button
                 type="submit"
-                className="rounded-2xl bg-amber-500 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-600 transition"
+                className="rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
               >
-                Guardar Ticket
+                Guardar Remisión
               </button>
             </div>
           </div>
         </form>
       </div>
 
-      {/* Lugares de Compra / Proveedores */}
-      <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="mb-4 flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100">
-          <Icon path={mdiStore} size={0.9} className="text-amber-500" />
-          Proveedores y Lugares de Surtido
+      {/* Proveedores de Surtido */}
+      <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+        <div className="mb-3 flex items-center gap-2 border-b border-[#E5E2DA] pb-3 dark:border-[#282C32]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E2DA] bg-[#F7F6F2] text-[#57534E] dark:border-[#282C32] dark:bg-[#111315] dark:text-[#9CA3AF]">
+            <Icon path={mdiStore} size={0.7} />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE] leading-tight">
+              Proveedores y Dulcerías
+            </h2>
+            <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+              Lugares habituales donde se compran los dulces
+            </p>
+          </div>
         </div>
 
-        <form onSubmit={handlePlaceSubmit} className="mb-4 flex max-w-md gap-2">
+        <form
+          onSubmit={handlePlaceSubmit}
+          className="mb-3.5 flex max-w-md gap-2"
+        >
           <input
             required
-            className="flex-1 rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700 dark:text-slate-100"
+            className="flex-1 rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-1.5 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
             placeholder="Ej. Dulcería El Trébol"
             value={newPlaceName}
             onChange={(e) => setNewPlaceName(e.target.value)}
           />
           <button
             type="submit"
-            className="flex items-center gap-1 rounded-2xl bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-600"
+            className="flex items-center gap-1 rounded-xl bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
           >
-            <Icon path={mdiMapMarkerPlus} size={0.7} />
-            Agregar
+            <Icon path={mdiMapMarkerPlus} size={0.65} />
+            <span>Agregar</span>
           </button>
         </form>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {purchasePlaces.map((p) => (
             <span
               key={p.id}
-              className="rounded-full bg-amber-100 px-3.5 py-1 text-xs font-semibold text-amber-900 dark:bg-slate-800 dark:text-amber-200"
+              className="rounded-lg border border-amber-500/20 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900 dark:border-amber-400/20 dark:bg-amber-950/40 dark:text-amber-300"
             >
               {p.name}
             </span>
           ))}
           {purchasePlaces.length === 0 && (
-            <span className="text-xs text-slate-400">
-              Sin lugares registrados
+            <span className="text-xs text-[#78716C] dark:text-[#9CA3AF]">
+              No hay proveedores registrados aún
             </span>
           )}
         </div>
       </div>
 
       {/* Historial de Compras */}
-      <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="mb-4 text-base font-bold text-slate-800 dark:text-slate-100">
-          Historial de Reestock
+      <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+        <div className="mb-3 text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+          Historial de Reestock Registrado
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto rounded-2xl border border-amber-100/70 dark:border-slate-800">
+        <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-[#E5E2DA] dark:border-[#282C32]">
           <table className="min-w-full text-left text-xs">
-            <thead className="sticky top-0 bg-amber-50 text-amber-950 dark:bg-slate-800 dark:text-amber-200">
+            <thead className="sticky top-0 bg-[#F7F6F2] text-[#57534E] border-b border-[#E5E2DA] dark:bg-[#111315] dark:text-[#9CA3AF] dark:border-[#282C32] z-10">
               <tr>
-                <th className="px-4 py-2.5">Fecha</th>
-                <th className="px-4 py-2.5">Producto</th>
-                <th className="px-4 py-2.5">Lugar</th>
-                <th className="px-4 py-2.5 text-right">Costo Paquete</th>
+                <th className="px-3.5 py-2 font-semibold">Fecha</th>
+                <th className="px-3.5 py-2 font-semibold">Producto</th>
+                <th className="px-3.5 py-2 font-semibold">Proveedor</th>
+                <th className="px-3.5 py-2 text-right font-semibold">
+                  Costo Paquete
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-amber-100/70 dark:divide-slate-800">
+            <tbody className="divide-y divide-[#E5E2DA] dark:divide-[#282C32] font-tabular">
               {packagePurchases.map((item) => (
                 <tr
                   key={item.id}
-                  className="hover:bg-amber-50/40 dark:hover:bg-slate-800/40"
+                  className="hover:bg-[#F7F6F2]/60 dark:hover:bg-[#202428]/50 transition-colors"
                 >
-                  <td className="px-4 py-2 text-slate-500">
+                  <td className="px-3.5 py-2 text-[#78716C] dark:text-[#9CA3AF] whitespace-nowrap">
                     {new Date(item.created_at).toLocaleString("es-MX", {
                       day: "2-digit",
                       month: "short",
@@ -302,13 +323,13 @@ export default function PurchasesPage({
                       minute: "2-digit",
                     })}
                   </td>
-                  <td className="px-4 py-2 font-medium text-slate-800 dark:text-slate-200">
+                  <td className="px-3.5 py-2 font-bold text-[#1C1917] dark:text-[#F3F2EE]">
                     {item.product_name}
                   </td>
-                  <td className="px-4 py-2 text-slate-600 dark:text-slate-400">
+                  <td className="px-3.5 py-2 text-[#78716C] dark:text-[#9CA3AF]">
                     {item.place_name || "—"}
                   </td>
-                  <td className="px-4 py-2 text-right font-bold text-slate-800 dark:text-slate-100">
+                  <td className="px-3.5 py-2 text-right font-black text-[#1C1917] dark:text-[#F3F2EE]">
                     ${Number(item.package_cost).toFixed(2)}
                   </td>
                 </tr>
@@ -318,7 +339,7 @@ export default function PurchasesPage({
                 <tr>
                   <td
                     colSpan={4}
-                    className="px-4 py-6 text-center text-slate-500"
+                    className="px-4 py-8 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]"
                   >
                     Sin compras registradas aún
                   </td>

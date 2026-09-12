@@ -61,17 +61,44 @@ export async function query(text, params) {
   return await dbPool.query(text, params);
 }
 
-// Inicialización de Esquema
+// Inicialización de Esquema y Migraciones Idempotentes
+let schemaEnsured = false;
+async function ensureMigrations() {
+  if (schemaEnsured) return;
+  try {
+    await query(`
+      ALTER TABLE settings ALTER COLUMN value TYPE TEXT;
+      ALTER TABLE sweets ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS credit_limit DECIMAL(10,2) NOT NULL DEFAULT 0;
+      ALTER TABLE movements ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30) NOT NULL DEFAULT 'cash';
+      ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30) NOT NULL DEFAULT 'cash';
+    `);
+    schemaEnsured = true;
+  } catch (error) {
+    console.error("Error executing migrations:", error.message);
+  }
+}
+
+app.use(async (req, res, next) => {
+  await ensureMigrations();
+  next();
+});
+
 async function runSchema() {
   try {
-    const schemaPath = path.join(process.cwd(), "schema.sql");
-    if (fs.existsSync(schemaPath)) {
+    const localSchema = path.join(process.cwd(), "schema.sql");
+    const backendSchema = path.join(process.cwd(), "backend", "schema.sql");
+    const schemaPath = fs.existsSync(localSchema)
+      ? localSchema
+      : fs.existsSync(backendSchema)
+        ? backendSchema
+        : null;
+
+    if (schemaPath) {
       const schema = fs.readFileSync(schemaPath, "utf-8");
       await query(schema);
     }
-    await query(
-      "ALTER TABLE sweets ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;",
-    );
+    await ensureMigrations();
     console.log("PostgreSQL schema execution completed");
   } catch (error) {
     console.error("Error executing schema:", error.message);

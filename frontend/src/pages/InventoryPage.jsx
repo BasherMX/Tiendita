@@ -2,11 +2,10 @@ import { useState } from "react";
 import Icon from "@mdi/react";
 import {
   mdiCandycane,
-  mdiPlusCircle,
+  mdiPlus,
   mdiPencil,
   mdiDelete,
-  mdiAlertCircle,
-  mdiCurrencyUsd,
+  mdiMagnify,
 } from "@mdi/js";
 
 export default function InventoryPage({
@@ -41,104 +40,124 @@ export default function InventoryPage({
   const totalPotentialProfit = totalPotentialSale - totalInvestment;
 
   return (
-    <div className="space-y-6">
-      {/* Resumen de Métricas de Inventario */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-        <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-          <span className="text-[10px] font-semibold uppercase text-slate-500">
-            Total de Productos
-          </span>
-          <div className="mt-1 text-2xl font-black text-slate-800 dark:text-slate-100">
-            {sweets.length}{" "}
-            <span className="text-xs font-normal text-slate-500">
-              artículos
+    <div className="space-y-5">
+      {/* Cinta de Métricas de Almacén */}
+      <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-5 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:divide-x sm:divide-[#E5E2DA] sm:dark:divide-[#282C32]">
+          <div className="sm:pr-4">
+            <span className="block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+              Total de Productos
             </span>
+            <div className="mt-1 text-2xl font-black font-tabular text-[#1C1917] dark:text-[#F3F2EE]">
+              {sweets.length}{" "}
+              <span className="text-xs font-medium text-[#78716C] dark:text-[#9CA3AF]">
+                artículos
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-          <span className="text-[10px] font-semibold uppercase text-slate-500">
-            Piezas en Stock
-          </span>
-          <div className="mt-1 text-2xl font-black text-amber-600 dark:text-amber-400">
-            {totalStock}{" "}
-            <span className="text-xs font-normal text-slate-500">piezas</span>
+          <div className="sm:px-4">
+            <span className="block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+              Piezas en Almacén
+            </span>
+            <div className="mt-1 text-2xl font-black font-tabular text-amber-700 dark:text-amber-400">
+              {totalStock}{" "}
+              <span className="text-xs font-medium text-amber-800/60 dark:text-amber-400/70">
+                pzas
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-          <span className="text-[10px] font-semibold uppercase text-slate-500">
-            Inversión en Stock
-          </span>
-          <div className="mt-1 text-2xl font-black text-slate-700 dark:text-slate-300">
-            ${totalInvestment.toFixed(2)}
+          <div className="sm:px-4">
+            <span className="block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+              Inversión en Mercancía
+            </span>
+            <div className="mt-1 text-2xl font-black font-tabular text-[#1C1917] dark:text-[#F3F2EE]">
+              ${totalInvestment.toFixed(2)}
+            </div>
           </div>
-        </div>
 
-        <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-          <span className="text-[10px] font-semibold uppercase text-slate-500">
-            Ganancia Estimada
-          </span>
-          <div className="mt-1 text-2xl font-black text-emerald-600 dark:text-emerald-400">
-            ${totalPotentialProfit.toFixed(2)}
+          <div className="sm:pl-4">
+            <span className="block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+              Ganancia Proyectada
+            </span>
+            <div className="mt-1 text-2xl font-black font-tabular text-emerald-700 dark:text-emerald-400">
+              ${totalPotentialProfit.toFixed(2)}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Tabla y Control de Inventario */}
-      <div className="rounded-3xl border border-amber-100/70 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-lg font-bold text-slate-800 dark:text-slate-100">
-            <Icon path={mdiCandycane} size={1} className="text-amber-500" />
-            Catálogo de Dulces y Productos
+      {/* Catálogo de Productos y Almacén */}
+      <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E2DA] pb-3 dark:border-[#282C32]">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300">
+              <Icon path={mdiCandycane} size={0.75} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-[#1C1917] dark:text-[#F3F2EE] leading-tight">
+                Catálogo de Productos
+              </h2>
+              <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                Control de existencias y precios de venta
+              </p>
+            </div>
           </div>
 
           <button
             onClick={onNewSweet}
-            className="flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-600 transition"
+            className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
           >
-            <Icon path={mdiPlusCircle} size={0.8} />
-            Nuevo Dulce
+            <Icon path={mdiPlus} size={0.65} />
+            <span>Nuevo Producto</span>
           </button>
         </div>
 
-        {/* Buscador y Filtros */}
+        {/* Buscador y Filtros Rápidos */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <input
-            type="search"
-            className="w-full sm:w-72 rounded-2xl border border-amber-100/70 bg-transparent px-4 py-2 text-sm outline-none dark:border-slate-700 dark:text-slate-100"
-            placeholder="Buscar por nombre..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <div className="relative w-full sm:w-72">
+            <Icon
+              path={mdiMagnify}
+              size={0.7}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#78716C] dark:text-[#9CA3AF]"
+            />
+            <input
+              type="search"
+              className="w-full rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] py-2 pl-9 pr-3 text-xs outline-none transition focus:bg-[#FFFFFF] dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
+              placeholder="Buscar producto por nombre..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
 
-          <div className="flex rounded-2xl bg-slate-100 p-1 dark:bg-slate-800 text-xs font-semibold">
+          <div className="flex rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-1 text-[11px] font-semibold dark:border-[#282C32] dark:bg-[#181B1E]">
             <button
               onClick={() => setFilterStock("all")}
-              className={`rounded-xl px-3 py-1.5 transition ${
+              className={`rounded-lg px-2.5 py-1 transition ${
                 filterStock === "all"
-                  ? "bg-white shadow-sm text-slate-900 dark:bg-slate-700 dark:text-slate-100"
-                  : "text-slate-500"
+                  ? "bg-amber-500/15 text-amber-950 dark:bg-amber-400/20 dark:text-amber-200 font-bold"
+                  : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF]"
               }`}
             >
               Todos ({sweets.length})
             </button>
             <button
               onClick={() => setFilterStock("low")}
-              className={`rounded-xl px-3 py-1.5 transition ${
+              className={`rounded-lg px-2.5 py-1 transition ${
                 filterStock === "low"
-                  ? "bg-white shadow-sm text-amber-700 dark:bg-slate-700 dark:text-amber-300"
-                  : "text-slate-500"
+                  ? "bg-amber-500/20 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold"
+                  : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF]"
               }`}
             >
               Stock Bajo (≤5)
             </button>
             <button
               onClick={() => setFilterStock("out")}
-              className={`rounded-xl px-3 py-1.5 transition ${
+              className={`rounded-lg px-2.5 py-1 transition ${
                 filterStock === "out"
-                  ? "bg-white shadow-sm text-rose-600 dark:bg-slate-700 dark:text-rose-400"
-                  : "text-slate-500"
+                  ? "bg-red-500/15 text-red-700 dark:bg-red-950/60 dark:text-red-300 font-bold"
+                  : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF]"
               }`}
             >
               Agotados
@@ -146,21 +165,31 @@ export default function InventoryPage({
           </div>
         </div>
 
-        {/* Tabla */}
-        <div className="max-h-[60vh] overflow-y-auto rounded-2xl border border-amber-100/70 dark:border-slate-800">
-          <table className="min-w-full text-left text-sm">
-            <thead className="sticky top-0 bg-amber-50 text-amber-950 dark:bg-slate-800 dark:text-amber-200">
+        {/* Tabla de Catálogo */}
+        <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-[#E5E2DA] dark:border-[#282C32]">
+          <table className="min-w-full text-left text-xs">
+            <thead className="sticky top-0 bg-[#F7F6F2] text-[#57534E] border-b border-[#E5E2DA] dark:bg-[#111315] dark:text-[#9CA3AF] dark:border-[#282C32] z-10">
               <tr>
-                <th className="px-4 py-3">Nombre</th>
-                <th className="px-4 py-3 text-right">P. Compra</th>
-                <th className="px-4 py-3 text-right">P. Venta</th>
-                <th className="px-4 py-3 text-right">Margen</th>
-                <th className="px-4 py-3 text-center">Stock</th>
-                <th className="px-4 py-3 text-center">Vendidos</th>
-                <th className="px-4 py-3 text-center">Acciones</th>
+                <th className="px-3.5 py-2.5 font-semibold">Producto</th>
+                <th className="px-3.5 py-2.5 text-right font-semibold">
+                  P. Compra
+                </th>
+                <th className="px-3.5 py-2.5 text-right font-semibold">
+                  P. Venta
+                </th>
+                <th className="px-3.5 py-2.5 text-right font-semibold">
+                  Ganancia
+                </th>
+                <th className="px-3.5 py-2.5 text-center font-semibold">
+                  Existencias
+                </th>
+                <th className="px-3.5 py-2.5 text-center font-semibold">
+                  Vendidos
+                </th>
+                <th className="px-3 py-2.5 text-center font-semibold"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-amber-100/70 dark:divide-slate-800">
+            <tbody className="divide-y divide-[#E5E2DA] dark:divide-[#282C32] font-tabular">
               {filteredSweets.map((s) => {
                 const pComp = Number(s.purchase_price || 0);
                 const pVent = Number(s.sale_price || 0);
@@ -172,54 +201,56 @@ export default function InventoryPage({
                 return (
                   <tr
                     key={s.id}
-                    className="hover:bg-amber-50/50 dark:hover:bg-slate-800/40"
+                    className="hover:bg-[#F7F6F2]/60 dark:hover:bg-[#202428]/50 transition-colors"
                   >
-                    <td className="px-4 py-2.5 font-semibold text-slate-800 dark:text-slate-100">
+                    <td className="px-3.5 py-2.5 font-bold text-[#1C1917] dark:text-[#F3F2EE]">
                       {s.name}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-slate-600 dark:text-slate-300">
+                    <td className="px-3.5 py-2.5 text-right text-[#78716C] dark:text-[#9CA3AF]">
                       ${pComp.toFixed(2)}
                     </td>
-                    <td className="px-4 py-2.5 text-right font-bold text-amber-700 dark:text-amber-400">
+                    <td className="px-3.5 py-2.5 text-right font-bold text-amber-700 dark:text-amber-400">
                       ${pVent.toFixed(2)}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-xs">
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    <td className="px-3.5 py-2.5 text-right">
+                      <span className="font-bold text-emerald-700 dark:text-emerald-400">
                         +${margin.toFixed(2)}
                       </span>{" "}
-                      <span className="text-slate-400">({marginPct}%)</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span
-                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                          stock === 0
-                            ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                            : stock <= 5
-                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                        }`}
-                      >
-                        {stock} pzas
+                      <span className="text-[10px] text-[#78716C] dark:text-[#9CA3AF]">
+                        ({marginPct}%)
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-center text-xs text-slate-500">
+                    <td className="px-3.5 py-2.5 text-center">
+                      <span
+                        className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                          stock === 0
+                            ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+                            : stock <= 5
+                              ? "bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+                              : "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                        }`}
+                      >
+                        {stock === 0 ? "Agotado" : `${stock} pzas`}
+                      </span>
+                    </td>
+                    <td className="px-3.5 py-2.5 text-center text-[#78716C] dark:text-[#9CA3AF]">
                       {s.sold_count || 0}
                     </td>
-                    <td className="px-4 py-2.5 text-center">
+                    <td className="px-3 py-2.5 text-center">
                       <div className="flex justify-center gap-1">
                         <button
                           onClick={() => onEditSweet(s)}
-                          className="rounded-xl p-1.5 text-slate-500 hover:bg-amber-100 hover:text-amber-800 dark:hover:bg-slate-700"
-                          title="Editar"
+                          className="rounded-lg p-1 text-[#78716C] hover:bg-amber-100 hover:text-amber-900 dark:text-[#9CA3AF] dark:hover:bg-[#282C32] dark:hover:text-amber-300 transition"
+                          title="Editar producto"
                         >
-                          <Icon path={mdiPencil} size={0.75} />
+                          <Icon path={mdiPencil} size={0.65} />
                         </button>
                         <button
                           onClick={() => onDeleteSweet(s)}
-                          className="rounded-xl p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950"
-                          title="Eliminar"
+                          className="rounded-lg p-1 text-[#78716C] hover:bg-red-50 hover:text-red-600 dark:text-[#9CA3AF] dark:hover:bg-red-950/40 dark:hover:text-red-400 transition"
+                          title="Dar de baja producto"
                         >
-                          <Icon path={mdiDelete} size={0.75} />
+                          <Icon path={mdiDelete} size={0.65} />
                         </button>
                       </div>
                     </td>
@@ -231,9 +262,9 @@ export default function InventoryPage({
                 <tr>
                   <td
                     colSpan={7}
-                    className="px-4 py-8 text-center text-slate-500"
+                    className="px-4 py-10 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]"
                   >
-                    No se encontraron productos
+                    No se encontraron productos en el catálogo
                   </td>
                 </tr>
               )}
