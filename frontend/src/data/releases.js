@@ -7,7 +7,7 @@ export const releases = [
     highlights: [
       "Corrección crítica en registro de compras: Eliminación de error en backend al registrar compras a crédito o de contado que impedía guardar transacciones.",
       "Soporte de decimales/centavos en puntos de recompensa: Se amplió el selector numérico a dos decimales (step='0.01'), permitiendo capturar y editar saldos fraccionarios de puntos (ej. 8.55 pts) sin bloqueos del navegador.",
-      "Depuración de consultas contables: Saneamiento de bloques duplicados en estadísticas de flujo de caja y ventas.",
+      "Corrección de agregación SQL en estadísticas: Resolución de error 500 en GET /api/stats (agrupación GROUP BY de paid_amount) y eliminación de cláusulas duplicadas.",
     ],
     sections: [
       {
@@ -20,7 +20,8 @@ export const releases = [
       {
         title: "📊 Estabilidad Contable",
         items: [
-          "Limpieza de cláusulas SQL redundantes en flujo de caja y horas de venta.",
+          "Corrección de agregación SUM en paid_amount para la consulta diaria de /api/stats.",
+          "Limpieza de cláusulas SQL redundantes en flujo de caja y ventas por día.",
         ],
       },
     ],

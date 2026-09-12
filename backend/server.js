@@ -433,7 +433,7 @@ app.get("/api/stats", authGuard, async (req, res) => {
           GROUP BY (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date
           UNION ALL
           SELECT (m2.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date AS day,
-                 COALESCE(m2.paid_amount, 0) AS total,
+                 SUM(COALESCE(m2.paid_amount, 0)) AS total,
                  0 AS profit
           FROM movements m2
           LEFT JOIN movement_items mi2 ON mi2.movement_id = m2.id
@@ -1323,7 +1323,6 @@ app.get("/api/stats/day/:day", authGuard, async (req, res) => {
        FROM sales sa
        JOIN sale_items si ON si.sale_id = sa.id
        JOIN sweets s ON s.id = si.sweet_id
-       WHERE sa.created_at::date = $1::date
        WHERE (sa.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City')::date = $1::date
        GROUP BY sa.id, sa.created_at`,
       [day],
