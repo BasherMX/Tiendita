@@ -1136,15 +1136,11 @@ export default function App() {
           <Route
             path="/precios"
             element={
-              token ? (
-                <PricesPage
-                  prices={prices}
-                  pricesQuery={pricesQuery}
-                  setPricesQuery={setPricesQuery}
-                />
-              ) : (
-                <Navigate to="/login" replace />
-              )
+              <PricesPage
+                prices={prices}
+                pricesQuery={pricesQuery}
+                setPricesQuery={setPricesQuery}
+              />
             }
           />
 

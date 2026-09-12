@@ -56,35 +56,57 @@ export default function Navbar({
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-2.5">
         {/* Brand & Version Badge */}
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigateTo(token ? "/clientes" : "/login")}
-            className="group flex items-center gap-2.5 text-left focus:outline-none"
-            title="Ir a Clientes"
-          >
-            <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-amber-500/30 bg-amber-50 shadow-xs dark:border-amber-400/20 dark:bg-amber-950/40">
-              <img
-                src={brandLogo}
-                alt="Logo Tiendita"
-                className="h-8 w-8 object-cover transition-transform group-hover:scale-105"
-              />
+          {token ? (
+            <button
+              onClick={() => navigateTo("/clientes")}
+              className="group flex items-center gap-2.5 text-left focus:outline-none"
+              title="Ir a Clientes"
+            >
+              <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-amber-500/30 bg-amber-50 shadow-xs dark:border-amber-400/20 dark:bg-amber-950/40">
+                <img
+                  src={brandLogo}
+                  alt="Logo Tiendita"
+                  className="h-8 w-8 object-cover transition-transform group-hover:scale-105"
+                />
+              </div>
+              <div>
+                <span className="block text-base font-extrabold tracking-tight text-[#1C1917] dark:text-[#F3F2EE] leading-none">
+                  Tiendita
+                </span>
+                <span className="block text-[11px] font-medium text-[#78716C] dark:text-[#9CA3AF] leading-none mt-0.5">
+                  Mostrador
+                </span>
+              </div>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2.5 text-left select-none">
+              <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-amber-500/30 bg-amber-50 shadow-xs dark:border-amber-400/20 dark:bg-amber-950/40">
+                <img
+                  src={brandLogo}
+                  alt="Logo Tiendita"
+                  className="h-8 w-8 object-cover"
+                />
+              </div>
+              <div>
+                <span className="block text-base font-extrabold tracking-tight text-[#1C1917] dark:text-[#F3F2EE] leading-none">
+                  Tiendita
+                </span>
+                <span className="block text-[11px] font-medium text-[#78716C] dark:text-[#9CA3AF] leading-none mt-0.5">
+                  Mostrador
+                </span>
+              </div>
             </div>
-            <div>
-              <span className="block text-base font-extrabold tracking-tight text-[#1C1917] dark:text-[#F3F2EE] leading-none">
-                Tiendita
-              </span>
-              <span className="block text-[11px] font-medium text-[#78716C] dark:text-[#9CA3AF] leading-none mt-0.5">
-                Mostrador
-              </span>
-            </div>
-          </button>
+          )}
 
-          <button
-            onClick={() => navigateTo("/releases")}
-            title="Ver registro de versiones (Releases)"
-            className="flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-900 transition hover:border-amber-500/40 hover:bg-amber-100 dark:border-amber-400/20 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
-          >
-            v{systemVersion}
-          </button>
+          {token && (
+            <button
+              onClick={() => navigateTo("/releases")}
+              title="Ver registro de versiones (Releases)"
+              className="flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-900 transition hover:border-amber-500/40 hover:bg-amber-100 dark:border-amber-400/20 dark:bg-amber-950/50 dark:text-amber-300 dark:hover:bg-amber-900/60"
+            >
+              v{systemVersion}
+            </button>
+          )}
         </div>
 
         {/* Desktop Nav Links */}
@@ -129,7 +151,7 @@ export default function Navbar({
             />
           </button>
 
-          {token ? (
+          {token && (
             <button
               className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-900/40"
               onClick={onLogout}
@@ -137,14 +159,6 @@ export default function Navbar({
             >
               <Icon path={mdiLogout} size={0.65} />
               <span className="hidden sm:inline">Cerrar Sesión</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => navigateTo("/login")}
-              className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-950/50 dark:text-amber-300"
-            >
-              <Icon path={mdiLogin} size={0.65} />
-              <span>Entrar</span>
             </button>
           )}
 
