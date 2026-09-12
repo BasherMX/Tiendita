@@ -2888,14 +2888,6 @@ async function sendWhatsAppTicketAutomatically(
       `⭐ *Puntos Disponibles:* ${Number(client.points || 0).toFixed(1)} pts`,
     );
 
-    if (debtValue > 0) {
-      const breakdown = await getClientDebtBreakdown(client.id, debtValue);
-      if (breakdown.length > 0) {
-        lines.push(``);
-        lines.push(formatDebtBreakdownText(breakdown));
-      }
-    }
-
     const ticketCode = encodeClientId(client.id);
     const envBaseUrl =
       process.env.APP_URL ||
@@ -2903,7 +2895,7 @@ async function sendWhatsAppTicketAutomatically(
         ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
         : null) ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
-    const baseUrl = settings.app_url || envBaseUrl || "http://localhost:1416";
+    let baseUrl = (settings.app_url || envBaseUrl || "http://localhost:1416").replace(/\/+$/, "");
     if (ticketCode) {
       lines.push(``);
       lines.push(`🔗 *Consulta tu estado de cuenta completo aquí:*`);
@@ -3014,7 +3006,7 @@ app.post("/api/clients/:id/whatsapp-statement", authGuard, async (req, res) => {
         ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
         : null) ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
-    const baseUrl = settings.app_url || envBaseUrl || "http://localhost:1416";
+    const baseUrl = (settings.app_url || envBaseUrl || "http://localhost:1416").replace(/\/+$/, "");
     const stmtCode = encodeClientId(client.id);
     let linkStr = "";
     if (stmtCode) {
@@ -3132,7 +3124,7 @@ export async function sendBulkStatements(tagPrefix = "MANUAL", triggerSource = "
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : null) ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
-  const baseUrl = settings.app_url || envBaseUrl || "http://localhost:1416";
+  const baseUrl = (settings.app_url || envBaseUrl || "http://localhost:1416").replace(/\/+$/, "");
 
   const clientsWithDebtRes = await query(
     "SELECT id, name, total_debt, points, phone FROM clients WHERE total_debt > 0 ORDER BY name ASC",
