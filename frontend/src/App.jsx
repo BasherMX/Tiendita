@@ -710,7 +710,11 @@ export default function App() {
         if (res.ok) {
           loadSweets();
           loadPublicPrices();
-          Swal.fire("Dado de baja", "El producto ha sido retirado del catálogo", "success");
+          Swal.fire(
+            "Dado de baja",
+            "El producto ha sido retirado del catálogo",
+            "success",
+          );
         }
       } catch (err) {
         Swal.fire("Error", "No se pudo dar de baja", "error");
