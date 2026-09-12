@@ -637,6 +637,89 @@ export default function App() {
     }
   }
 
+  async function handleSendBulkStatements() {
+    const clientsWithDebt = (clients || []).filter(
+      (c) => Number(c.total_debt || 0) > 0,
+    );
+
+    if (clientsWithDebt.length === 0) {
+      Swal.fire({
+        icon: "info",
+        title: "Sin adeudos pendientes",
+        text: "No hay clientes con saldo deudor mayor a $0.00 en este momento.",
+        confirmButtonColor: "#d97706",
+      });
+      return;
+    }
+
+    const { value: password } = await Swal.fire({
+      title: "📤 Enviar Cuentas por WhatsApp",
+      html: `
+        <div class="text-left text-xs space-y-2">
+          <p>Se enviará el estado de cuenta con desglose y enlace público a <strong>${clientsWithDebt.length} clientes</strong> con adeudo pendiente.</p>
+          <div class="rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-200 text-[11px]">
+            ℹ️ Al terminar se enviará un mensaje de confirmación al número máster de Uli.
+          </div>
+          <p class="font-semibold pt-1">Ingresa tu contraseña de administrador para autorizar:</p>
+        </div>
+      `,
+      input: "password",
+      inputPlaceholder: "Contraseña de administrador",
+      showCancelButton: true,
+      confirmButtonColor: "#0284c7",
+      confirmButtonText: "Confirmar y Enviar",
+      cancelButtonText: "Cancelar",
+      showLoaderOnConfirm: true,
+      preConfirm: async (adminPass) => {
+        if (!adminPass) {
+          Swal.showValidationMessage("Debes ingresar la contraseña de admin");
+          return false;
+        }
+        try {
+          const res = await authFetch(
+            `${apiBase}/api/clients/send-bulk-statements`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ password: adminPass }),
+            },
+            handleAuthFail,
+          );
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(
+              data.message || "Error al procesar el envío masivo",
+            );
+          }
+          return data;
+        } catch (error) {
+          Swal.showValidationMessage(`Error: ${error.message}`);
+          return false;
+        }
+      },
+      allowOutsideClick: () => !Swal.isLoading(),
+    });
+
+    if (password) {
+      const resData = password;
+      Swal.fire({
+        icon: "success",
+        title: "¡Cuentas Despachadas!",
+        html: `
+          <div class="text-left text-xs space-y-1.5">
+            <p class="text-emerald-700 dark:text-emerald-400 font-bold">✓ Envío masivo programado con éxito.</p>
+            <p>• Clientes con deuda: <strong>${resData.result?.totalClients || 0}</strong></p>
+            <p>• Mensajes encolados: <strong>${resData.result?.enqueuedCount || 0}</strong></p>
+            <p>• Ya enviados previamente: <strong>${resData.result?.skippedCount || 0}</strong></p>
+            <p>• Sin teléfono registrado: <strong>${resData.result?.noPhoneCount || 0}</strong></p>
+            <p class="text-sky-600 dark:text-sky-400 text-[11px] pt-1">📱 Se envió la notificación de confirmación al máster.</p>
+          </div>
+        `,
+        confirmButtonColor: "#d97706",
+      });
+    }
+  }
+
   async function handleViewDebtBreakdown() {
     if (!selectedClient) return;
     try {
@@ -973,7 +1056,7 @@ export default function App() {
           }
           return false;
         }}
-        systemVersion="1.8.5"
+        systemVersion="1.8.6"
       />
 
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-6 min-w-0">
@@ -1029,6 +1112,7 @@ export default function App() {
                   onSendWhatsappStatement={handleSendWhatsappStatement}
                   onDeleteMovement={handleDeleteMovement}
                   onViewDebtBreakdown={handleViewDebtBreakdown}
+                  onSendBulkStatements={handleSendBulkStatements}
                 />
               ) : (
                 <Navigate to="/login" replace />

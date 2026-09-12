@@ -20,6 +20,7 @@ import {
   mdiReceiptTextOutline,
   mdiClose,
   mdiCashRegister,
+  mdiSendCheckOutline,
 } from "@mdi/js";
 
 export default function ClientsPage({
@@ -39,6 +40,7 @@ export default function ClientsPage({
   onShareLink,
   onSendWhatsappStatement,
   onDeleteMovement,
+  onSendBulkStatements,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDebt, setFilterDebt] = useState("all"); // "all" | "debt" | "clean"
@@ -87,7 +89,7 @@ export default function ClientsPage({
         }`}
       >
         {/* Acciones superiores del directorio */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={onNewClient}
@@ -104,6 +106,15 @@ export default function ClientsPage({
           >
             <Icon path={mdiCashRegister} size={0.7} />
             <span>Venta Rápida</span>
+          </button>
+          <button
+            type="button"
+            onClick={onSendBulkStatements}
+            className="flex items-center gap-1.5 rounded-xl border border-sky-600/30 bg-sky-500/10 px-3 sm:px-3.5 py-2 text-xs font-bold text-sky-800 shadow-xs hover:bg-sky-600 hover:text-white dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-600 dark:hover:text-white active:scale-[0.98] transition"
+            title="Enviar estado de cuenta por WhatsApp a todos los clientes con adeudo pendiente"
+          >
+            <Icon path={mdiSendCheckOutline} size={0.7} />
+            <span>Enviar cuentas</span>
           </button>
         </div>
 

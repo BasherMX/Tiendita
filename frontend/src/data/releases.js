@@ -1,5 +1,28 @@
 export const releases = [
   {
+    version: "1.8.6",
+    date: "12 de Septiembre, 2026",
+    tagline:
+      "Envío masivo de estados de cuenta y automatización quincenal inteligente",
+    highlights: [
+      "Botón 'Enviar cuentas' en Directorio: Permite enviar estados de cuenta por WhatsApp a todos los clientes con saldo deudor mayor a $0.00 con desglose y enlace público, protegido por contraseña de administrador.",
+      "Automatización Quincenal Inteligente (8:30 AM): Notificación automática programada en días 15 y fin de mes (28/30/31). Si la fecha coincide con sábado, domingo o día feriado oficial en México, se despacha automáticamente el día hábil inmediato anterior.",
+      "Confirmación al Máster: Notificación automática con reporte consolidado de entrega al usuario máster (Uli) al número 5214492777186.",
+      "Protección contra duplicados: Mecanismo de etiquetado único ('unique_tag') por ciclo para garantizar que cada cliente reciba el mensaje una sola vez por periodo.",
+    ],
+    sections: [
+      {
+        title: "📲 Mensajería y Cobranza Automática",
+        items: [
+          "Nuevo botón interactivo 'Enviar cuentas' con confirmación mediante contraseña de admin.",
+          "Cálculo automático de días hábiles de quincena en zona horaria America/Mexico_City.",
+          "Endpoint cron '/api/cron/check-quincena' programado a las 8:30 AM y cron interno continuo.",
+          "Reporte final de auditoría enviado al teléfono del usuario máster.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.5",
     date: "12 de Septiembre, 2026",
     tagline:

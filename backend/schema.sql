@@ -124,9 +124,11 @@ CREATE TABLE IF NOT EXISTS whatsapp_queue (
   status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- 'PENDING', 'SENT', 'FAILED'
   message_id VARCHAR(120),
   error_message TEXT,
+  unique_tag VARCHAR(100) UNIQUE NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_status ON whatsapp_queue(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_unique_tag ON whatsapp_queue(unique_tag);
 

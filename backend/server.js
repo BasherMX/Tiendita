@@ -90,10 +90,13 @@ async function ensureMigrations() {
         status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
         message_id VARCHAR(120),
         error_message TEXT,
+        unique_tag VARCHAR(100) UNIQUE NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE whatsapp_queue ADD COLUMN IF NOT EXISTS unique_tag VARCHAR(100) UNIQUE NULL;
       CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_status ON whatsapp_queue(status, created_at);
+      CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_unique_tag ON whatsapp_queue(unique_tag);
     `);
     schemaEnsured = true;
   } catch (error) {
@@ -2718,21 +2721,29 @@ async function sendWhatsAppMessage(phone, text) {
 }
 
 // Helper reutilizable para encolar mensajes en whatsapp_queue (Patrón Outbox)
-export async function enqueueWhatsAppNotification(phone, message) {
+export async function enqueueWhatsAppNotification(phone, message, uniqueTag = null) {
   if (!phone || !message) return null;
   const cleanPhone = formatWhatsAppNumber(phone);
   if (!cleanPhone) return null;
   try {
     const result = await query(
-      `INSERT INTO whatsapp_queue (phone, message, status, created_at, updated_at) 
-       VALUES ($1, $2, 'PENDING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+      `INSERT INTO whatsapp_queue (phone, message, status, unique_tag, created_at, updated_at) 
+       VALUES ($1, $2, 'PENDING', $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+       ON CONFLICT (unique_tag) DO NOTHING
        RETURNING *`,
-      [cleanPhone, message],
+      [cleanPhone, message, uniqueTag || null],
     );
-    console.log(
-      `[WhatsApp Queue] Enqueued message #${result.rows[0].id} for ${cleanPhone}`,
-    );
-    return result.rows[0];
+    if (result.rows.length) {
+      console.log(
+        `[WhatsApp Queue] Enqueued message #${result.rows[0].id} for ${cleanPhone}`,
+      );
+      return result.rows[0];
+    } else {
+      console.log(
+        `[WhatsApp Queue] Message for ${cleanPhone} with tag '${uniqueTag}' already exists. Skipped duplicate.`,
+      );
+      return null;
+    }
   } catch (error) {
     console.error("[WhatsApp Queue] Error enqueuing message:", error.message);
     return null;
@@ -3042,11 +3053,246 @@ app.post("/api/clients/:id/whatsapp-statement", authGuard, async (req, res) => {
         warning: sendError.message,
         waUrl: manualWaUrl,
       });
+// Días feriados oficiales en México (d-m)
+const MEXICAN_HOLIDAYS = [
+  "1-1", // Año nuevo
+  "5-2", // Día de la Constitución (o primer lunes)
+  "21-3", // Natalicio Benito Juárez
+  "1-5", // Día del Trabajo
+  "16-9", // Día de la Independencia
+  "20-11", // Revolución Mexicana
+  "25-12", // Navidad
+  "1-10", // Transmisión del Poder Ejecutivo Federal
+];
+
+function isMexicanHoliday(date) {
+  const d = date.getDate();
+  const m = date.getMonth() + 1;
+  return MEXICAN_HOLIDAYS.includes(`${d}-${m}`);
+}
+
+function isBusinessDay(date) {
+  const day = date.getDay(); // 0 = Domingo, 6 = Sábado
+  if (day === 0 || day === 6) return false;
+  if (isMexicanHoliday(date)) return false;
+  return true;
+}
+
+// Calcula el día hábil efectivo de la quincena (15 o fin de mes)
+function getEffectiveQuincenaDate(year, month, quincenaType) {
+  // quincenaType: 1 para día 15, 2 para fin de mes
+  let targetDate;
+  if (quincenaType === 1) {
+    targetDate = new Date(year, month - 1, 15, 12, 0, 0);
+  } else {
+    // Último día del mes (28, 29, 30 o 31)
+    const lastDay = new Date(year, month, 0).getDate();
+    targetDate = new Date(year, month - 1, lastDay, 12, 0, 0);
+  }
+
+  // Retroceder hasta encontrar un día hábil (lunes a viernes no festivo)
+  while (!isBusinessDay(targetDate)) {
+    targetDate.setDate(targetDate.getDate() - 1);
+  }
+  return targetDate;
+}
+
+// Verifica si la fecha dada (en horario México) corresponde al envío de quincena
+function isQuincenaTriggerDay(nowDate = new Date()) {
+  const localStr = nowDate.toLocaleDateString("en-CA", {
+    timeZone: "America/Mexico_City",
+  });
+  const [yearStr, monthStr, dayStr] = localStr.split("-");
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+
+  const q1Date = getEffectiveQuincenaDate(year, month, 1);
+  const q2Date = getEffectiveQuincenaDate(year, month, 2);
+
+  const q1Tag = `Q1_${year}_${String(month).padStart(2, "0")}`;
+  const q2Tag = `Q2_${year}_${String(month).padStart(2, "0")}`;
+
+  if (q1Date.getDate() === day) {
+    return { isTriggerDay: true, quincenaTag: q1Tag, label: `1ra Quincena (${dayStr}/${monthStr}/${yearStr})` };
+  }
+  if (q2Date.getDate() === day) {
+    return { isTriggerDay: true, quincenaTag: q2Tag, label: `2da Quincena (${dayStr}/${monthStr}/${yearStr})` };
+  }
+  return { isTriggerDay: false, quincenaTag: null, label: null };
+}
+
+// Función central para enviar estados de cuenta a todos los clientes con deuda > 0
+export async function sendBulkStatements(tagPrefix = "MANUAL", triggerSource = "Manual Admin") {
+  const masterPhone = "5214492777186";
+  const settings = await getSettings();
+  const envBaseUrl =
+    process.env.APP_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : null) ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+  const baseUrl = settings.app_url || envBaseUrl || "http://localhost:1416";
+
+  const clientsWithDebtRes = await query(
+    "SELECT id, name, total_debt, points, phone FROM clients WHERE total_debt > 0 ORDER BY name ASC",
+  );
+
+  const clientsList = clientsWithDebtRes.rows;
+  let enqueuedCount = 0;
+  let skippedCount = 0;
+  let noPhoneCount = 0;
+
+  for (const client of clientsList) {
+    if (!client.phone) {
+      noPhoneCount++;
+      continue;
     }
+
+    const stmtCode = encodeClientId(client.id);
+    let linkStr = "";
+    if (stmtCode) {
+      linkStr = `\n\n🔗 *Consulta tu estado de cuenta completo aquí:*\n${baseUrl}/c/${stmtCode}`;
+    }
+
+    let breakdownStr = "";
+    const breakdown = await getClientDebtBreakdown(client.id, client.total_debt);
+    if (breakdown.length > 0) {
+      breakdownStr = `\n\n${formatDebtBreakdownText(breakdown)}`;
+    }
+
+    const message = `Hola *${client.name}*, te recordamos que tu saldo total en Tiendita es de *$${Number(client.total_debt).toFixed(2)}* y cuentas con *${Number(client.points || 0).toFixed(1)}* pts.${breakdownStr}${linkStr}\n\n¡Gracias por tu preferencia! 🙌`;
+    const uniqueTag = `${tagPrefix}_CLI_${client.id}`;
+
+    const enqueued = await enqueueWhatsAppNotification(client.phone, message, uniqueTag);
+    if (enqueued) {
+      enqueuedCount++;
+    } else {
+      skippedCount++;
+    }
+  }
+
+  // Notificar al usuario Master (Uli)
+  const masterTag = `${tagPrefix}_MASTER_CONFIRM`;
+  const dateStr = new Date().toLocaleString("es-MX", {
+    timeZone: "America/Mexico_City",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  const masterMessage = `🔔 *Reporte de Envío Masivo de Cuentas - Tiendita*\n📅 _Fecha: ${dateStr}_\n📌 *Origen:* ${triggerSource}\n\n📊 *Resumen:*
+• Total clientes con adeudo: *${clientsList.length}*
+• Mensajes encolados/enviados: *${enqueuedCount}*
+• Omitidos (ya enviados previamente): *${skippedCount}*
+• Sin teléfono registrado: *${noPhoneCount}*\n\n✅ Todos los mensajes fueron procesados y programados en la cola de WhatsApp.`;
+
+  await enqueueWhatsAppNotification(masterPhone, masterMessage, masterTag);
+  console.log(`[WhatsApp Bulk] Processed bulk statements for ${clientsList.length} clients.`);
+
+  return {
+    totalClients: clientsList.length,
+    enqueuedCount,
+    skippedCount,
+    noPhoneCount,
+    masterNotified: true,
+  };
+}
+
+// Endpoint para envío masivo manual de estados de cuenta protegido con contraseña admin
+app.post("/api/clients/send-bulk-statements", authGuard, async (req, res) => {
+  const { password } = req.body || {};
+  const effectivePass = await getEffectiveAdminPass();
+
+  if (!password || password !== effectivePass) {
+    return res.status(401).json({ message: "Contraseña de administrador incorrecta" });
+  }
+
+  try {
+    const todayTag = new Date().toISOString().slice(0, 10);
+    const result = await sendBulkStatements(`MANUAL_${todayTag}`, "Manual desde Panel");
+    return res.json({
+      success: true,
+      message: `Envío masivo iniciado: ${result.enqueuedCount} mensajes encolados. Se notificó al número máster.`,
+      result,
+    });
   } catch (error) {
+    console.error("Error in bulk statements:", error.message);
     return res.status(500).json({ message: error.message });
   }
 });
+
+// Endpoint para el Cron de Quincena (Llamado a las 8:30am o periódicamente por cron job)
+app.all("/api/cron/check-quincena", async (req, res) => {
+  // Validación de seguridad de cron (opcional con token o header)
+  const cronSecret = process.env.CRON_SECRET || process.env.WHATSAPP_QUEUE_API_KEY || "tiendita_secret_wa_token_2026";
+  const authHeader = req.headers.authorization || req.headers["x-api-key"] || req.query.key || "";
+  const provided = authHeader.replace("Bearer ", "").trim();
+
+  // Permitir si coincide con key o si se invoca internamente
+  if (provided && provided !== cronSecret) {
+    return res.status(401).json({ message: "Unauthorized cron request" });
+  }
+
+  const now = new Date();
+  const triggerCheck = isQuincenaTriggerDay(now);
+
+  if (!triggerCheck.isTriggerDay) {
+    return res.json({
+      triggered: false,
+      message: "Hoy no es día hábil de cobro de quincena.",
+      serverTime: now.toISOString(),
+    });
+  }
+
+  try {
+    const result = await sendBulkStatements(triggerCheck.quincenaTag, `Automático Quincena (${triggerCheck.label})`);
+    return res.json({
+      triggered: true,
+      quincena: triggerCheck.label,
+      quincenaTag: triggerCheck.quincenaTag,
+      result,
+    });
+  } catch (error) {
+    console.error("Error running quincena cron:", error.message);
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+// Cron interno si se ejecuta en Node.js 24/7 (Localhost / Docker)
+let lastCheckedQuincenaHour = -1;
+function initInternalQuincenaCron() {
+  setInterval(async () => {
+    const now = new Date();
+    const mexicoTimeStr = now.toLocaleTimeString("en-US", {
+      timeZone: "America/Mexico_City",
+      hour12: false,
+    });
+    const [hStr, mStr] = mexicoTimeStr.split(":");
+    const hour = parseInt(hStr, 10);
+    const minute = parseInt(mStr, 10);
+
+    // Revisar a las 08:30 AM en zona horaria America/Mexico_City
+    if (hour === 8 && minute >= 30 && minute <= 35 && lastCheckedQuincenaHour !== hour) {
+      lastCheckedQuincenaHour = hour;
+      const triggerCheck = isQuincenaTriggerDay(now);
+      if (triggerCheck.isTriggerDay) {
+        console.log(`[Internal Cron] Running quincena auto statements for ${triggerCheck.label}`);
+        try {
+          await sendBulkStatements(triggerCheck.quincenaTag, `Automático Quincena 8:30am (${triggerCheck.label})`);
+        } catch (e) {
+          console.error("[Internal Cron] Error executing bulk statements:", e.message);
+        }
+      }
+    } else if (hour !== 8) {
+      lastCheckedQuincenaHour = -1;
+    }
+  }, 60000); // Chequeo cada 1 minuto
+}
+
 
 app.get("/health", (req, res) => {
   return res.json({ status: "ok" });
@@ -3055,8 +3301,9 @@ app.get("/health", (req, res) => {
 // Inicio en desarrollo local (no interfiere con Vercel Serverless)
 if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
   runSchema().then(() => {
+    initInternalQuincenaCron();
     app.listen(port, "0.0.0.0", () => {
-      console.log(`Tiendita backend running on port ${port}`);
+      console.log(`Tiendita backend running on port ${port} (Quincena Cron active)`);
     });
   });
 }
