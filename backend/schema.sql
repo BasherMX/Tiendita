@@ -117,12 +117,16 @@ CREATE INDEX IF NOT EXISTS idx_package_purchases_place ON package_purchases(plac
 -- Valores por defecto en Settings
 INSERT INTO settings (key, value) VALUES ('reward_factor', '0.10') ON CONFLICT (key) DO NOTHING;
 INSERT INTO settings (key, value) VALUES ('rewards_enabled', 'true') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('whatsapp_enabled', 'true') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('whatsapp_provider', 'meta') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('whatsapp_gateway_url', 'http://openwa:2785') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('whatsapp_api_key', '') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('whatsapp_session_id', 'tiendita') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('whatsapp_default_country', '52') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('meta_whatsapp_token', '') ON CONFLICT (key) DO NOTHING;
-INSERT INTO settings (key, value) VALUES ('meta_phone_number_id', '') ON CONFLICT (key) DO NOTHING;
+CREATE TABLE IF NOT EXISTS whatsapp_queue (
+  id SERIAL PRIMARY KEY,
+  phone VARCHAR(30) NOT NULL,
+  message TEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- 'PENDING', 'SENT', 'FAILED'
+  message_id VARCHAR(120),
+  error_message TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_status ON whatsapp_queue(status, created_at);
 

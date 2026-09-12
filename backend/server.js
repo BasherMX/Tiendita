@@ -77,11 +77,17 @@ async function ensureMigrations() {
       CREATE INDEX IF NOT EXISTS idx_movements_created ON movements(created_at);
       CREATE INDEX IF NOT EXISTS idx_movement_items_mov ON movement_items(movement_id);
       CREATE INDEX IF NOT EXISTS idx_movement_items_sweet ON movement_items(sweet_id);
-      CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
-      CREATE INDEX IF NOT EXISTS idx_sale_items_sweet ON sale_items(sweet_id);
-      CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);
-      CREATE INDEX IF NOT EXISTS idx_sweets_stock ON sweets(stock);
-      CREATE INDEX IF NOT EXISTS idx_sweets_active_stock ON sweets(is_active, stock);
+      CREATE TABLE IF NOT EXISTS whatsapp_queue (
+        id SERIAL PRIMARY KEY,
+        phone VARCHAR(30) NOT NULL,
+        message TEXT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+        message_id VARCHAR(120),
+        error_message TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_status ON whatsapp_queue(status, created_at);
     `);
     schemaEnsured = true;
   } catch (error) {
@@ -2705,6 +2711,106 @@ async function sendWhatsAppMessage(phone, text) {
   }
 }
 
+// Helper reutilizable para encolar mensajes en whatsapp_queue (Patrón Outbox)
+export async function enqueueWhatsAppNotification(phone, message) {
+  if (!phone || !message) return null;
+  const cleanPhone = formatWhatsAppNumber(phone);
+  if (!cleanPhone) return null;
+  try {
+    const result = await query(
+      `INSERT INTO whatsapp_queue (phone, message, status, created_at, updated_at) 
+       VALUES ($1, $2, 'PENDING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+       RETURNING *`,
+      [cleanPhone, message],
+    );
+    console.log(
+      `[WhatsApp Queue] Enqueued message #${result.rows[0].id} for ${cleanPhone}`,
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error("[WhatsApp Queue] Error enqueuing message:", error.message);
+    return null;
+  }
+}
+
+// Middleware de seguridad para la cola de WhatsApp (Worker)
+function whatsappQueueAuthGuard(req, res, next) {
+  const expectedKey =
+    process.env.WHATSAPP_QUEUE_API_KEY || "tiendita_secret_wa_token_2026";
+  const apiKeyHeader = req.headers["x-api-key"];
+  const authHeader = req.headers.authorization || "";
+  const bearerToken = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : "";
+
+  const providedKey = apiKeyHeader || bearerToken;
+  if (!providedKey || providedKey !== expectedKey) {
+    return res
+      .status(401)
+      .json({ message: "Unauthorized - Invalid WhatsApp Queue API Key" });
+  }
+  next();
+}
+
+// Endpoints de la API REST para el Worker de WhatsApp
+app.get(
+  "/api/whatsapp/queue/pending",
+  whatsappQueueAuthGuard,
+  async (req, res) => {
+    try {
+      const result = await query(
+        `SELECT id, phone, message 
+       FROM whatsapp_queue 
+       WHERE status = 'PENDING' 
+       ORDER BY created_at ASC 
+       LIMIT 10`,
+      );
+      return res.json(result.rows);
+    } catch (error) {
+      console.error("[WhatsApp Queue] Error fetching pending:", error.message);
+      return res.status(500).json({ message: error.message });
+    }
+  },
+);
+
+app.post(
+  "/api/whatsapp/queue/status",
+  whatsappQueueAuthGuard,
+  async (req, res) => {
+    const { id, status, messageId, error } = req.body || {};
+    if (!id || !status) {
+      return res.status(400).json({ message: "Missing id or status" });
+    }
+
+    try {
+      const result = await query(
+        `UPDATE whatsapp_queue 
+       SET status = $1, 
+           message_id = $2, 
+           error_message = $3, 
+           updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $4 
+       RETURNING id, status`,
+        [
+          String(status).toUpperCase(),
+          messageId || null,
+          error || null,
+          Number(id),
+        ],
+      );
+
+      if (!result.rows.length) {
+        return res.status(404).json({ message: "Message in queue not found" });
+      }
+
+      return res.json({ success: true, updated: result.rows[0] });
+    } catch (error) {
+      console.error("[WhatsApp Queue] Error updating status:", error.message);
+      return res.status(500).json({ message: error.message });
+    }
+  },
+);
+
 async function sendWhatsAppTicketAutomatically(
   client,
   concept,
@@ -2783,8 +2889,17 @@ async function sendWhatsAppTicketAutomatically(
     lines.push(``);
     lines.push(`¡Gracias por tu preferencia! 🙌`);
 
-    await sendWhatsAppMessage(client.phone, lines.join("\n"));
-    console.log(`WhatsApp ticket sent to ${client.name}`);
+    const fullMessage = lines.join("\n");
+    // Encolar mensaje automáticamente en whatsapp_queue (Worker Outbox)
+    await enqueueWhatsAppNotification(client.phone, fullMessage);
+
+    // Intentar también envío directo si hay provider configurado
+    try {
+      await sendWhatsAppMessage(client.phone, fullMessage);
+    } catch (e) {
+      // Si falla o no está disponible el webhook/provider directo, queda respaldado en la cola para el worker
+    }
+    console.log(`WhatsApp ticket processed for ${client.name}`);
   } catch (error) {
     console.error("Error sending WhatsApp ticket:", error.message);
   }
