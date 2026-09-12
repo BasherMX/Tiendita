@@ -25,10 +25,11 @@ import PwaInstallToast from "./PwaInstallToast.jsx";
 import SweetModal from "./components/modals/SweetModal.jsx";
 import ClientModal from "./components/modals/ClientModal.jsx";
 import MovementModal from "./components/modals/MovementModal.jsx";
+import QuickSaleModal from "./components/modals/QuickSaleModal.jsx";
 
 // Páginas (con Code-Splitting para páginas pesadas)
 import LoginPage from "./pages/LoginPage.jsx";
-import PosPage from "./pages/PosPage.jsx";
+import PricesPage from "./pages/PricesPage.jsx";
 import ClientsPage from "./pages/ClientsPage.jsx";
 import InventoryPage from "./pages/InventoryPage.jsx";
 import ConfigPage from "./pages/ConfigPage.jsx";
@@ -92,6 +93,7 @@ export default function App() {
 
   const [movementModalOpen, setMovementModalOpen] = useState(false);
   const [movementKind, setMovementKind] = useState("purchase"); // "purchase" | "pay"
+  const [quickSaleModalOpen, setQuickSaleModalOpen] = useState(false);
 
   const [rewardModalOpen, setRewardModalOpen] = useState(false);
   const [editingReward, setEditingReward] = useState(null);
@@ -971,7 +973,7 @@ export default function App() {
           }
           return false;
         }}
-        systemVersion="1.8.1"
+        systemVersion="1.8.2"
       />
 
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-6 min-w-0">
@@ -1022,6 +1024,7 @@ export default function App() {
                     setMovementKind("pay");
                     setMovementModalOpen(true);
                   }}
+                  onOpenQuickSale={() => setQuickSaleModalOpen(true)}
                   onShareLink={handleShareClientLink}
                   onSendWhatsappStatement={handleSendWhatsappStatement}
                   onDeleteMovement={handleDeleteMovement}
@@ -1037,12 +1040,10 @@ export default function App() {
             path="/precios"
             element={
               token ? (
-                <PosPage
-                  sweets={sweets}
+                <PricesPage
                   prices={prices}
                   pricesQuery={pricesQuery}
                   setPricesQuery={setPricesQuery}
-                  onRegisterSale={handleRegisterSale}
                 />
               ) : (
                 <Navigate to="/login" replace />
@@ -1213,6 +1214,13 @@ export default function App() {
         sweets={sweets}
         settings={settings}
         onSubmit={handleMovementSubmit}
+      />
+
+      <QuickSaleModal
+        isOpen={quickSaleModalOpen}
+        onClose={() => setQuickSaleModalOpen(false)}
+        sweets={sweets}
+        onRegisterSale={handleRegisterSale}
       />
 
       <PwaInstallToast />

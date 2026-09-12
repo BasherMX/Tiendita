@@ -19,6 +19,7 @@ import {
   mdiEyeOutline,
   mdiReceiptTextOutline,
   mdiClose,
+  mdiCashRegister,
 } from "@mdi/js";
 
 export default function ClientsPage({
@@ -34,6 +35,7 @@ export default function ClientsPage({
   onDeleteClient,
   onOpenPurchaseModal,
   onOpenPayModal,
+  onOpenQuickSale,
   onShareLink,
   onSendWhatsappStatement,
   onDeleteMovement,
@@ -86,14 +88,25 @@ export default function ClientsPage({
       >
         {/* Acciones superiores del directorio */}
         <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={onNewClient}
-            className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
-          >
-            <Icon path={mdiPlus} size={0.7} />
-            Nuevo Cliente
-          </button>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              type="button"
+              onClick={onNewClient}
+              className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 sm:px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
+            >
+              <Icon path={mdiPlus} size={0.7} />
+              <span>Nuevo Cliente</span>
+            </button>
+            <button
+              type="button"
+              onClick={onOpenQuickSale}
+              className="flex items-center gap-1.5 rounded-xl border border-emerald-600/30 bg-emerald-500/10 px-3 sm:px-3.5 py-2 text-xs font-bold text-emerald-800 shadow-xs hover:bg-emerald-600 hover:text-white dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300 dark:hover:bg-emerald-600 dark:hover:text-white active:scale-[0.98] transition"
+              title="Registrar venta rápida de mostrador a público general"
+            >
+              <Icon path={mdiCashRegister} size={0.7} />
+              <span>Venta Rápida</span>
+            </button>
+          </div>
 
           {/* Filtros rápidos por estado de cuenta */}
           <div className="flex overflow-x-auto rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-1 text-[11px] font-semibold dark:border-[#282C32] dark:bg-[#181B1E]">

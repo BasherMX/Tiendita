@@ -1,5 +1,31 @@
 export const releases = [
   {
+    version: "1.8.2",
+    date: "12 de Septiembre, 2026",
+    tagline:
+      "Venta Rápida integrada en Clientes y pestaña dedicada de Lista de Precios",
+    highlights: [
+      "Venta Rápida de Mostrador en Clientes: Nuevo botón de acceso directo en el directorio de clientes para registrar ventas al contado a público general en un modal optimizado sin salir del mostrador.",
+      "Pestaña 'Precios' simplificada: La pestaña anterior 'Punto de Venta' ahora se llama 'Precios' y se enfoca exclusivamente en la consulta rápida de precios de productos con buscador instantáneo y diseño limpio.",
+    ],
+    sections: [
+      {
+        title: "⚡ Flujo de Mostrador & Clientes",
+        items: [
+          "Modal flotante de Venta Rápida con selección de productos por SweetCombobox, selector de cantidades, desglose y métodos de pago.",
+          "Botonera superior de Clientes actualizada con botones '+ Nuevo Cliente' y 'Venta Rápida'.",
+        ],
+      },
+      {
+        title: "🏷️ Catálogo & Precios",
+        items: [
+          "Vista dedicada de Lista de Precios (/precios) con tabla limpia de productos y precios unitarios.",
+          "Navegación de barra superior renombrada a 'Precios'.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.1",
     date: "12 de Septiembre, 2026",
     tagline:

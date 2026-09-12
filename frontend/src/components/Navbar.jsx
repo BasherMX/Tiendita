@@ -24,7 +24,7 @@ export default function Navbar({
   setTheme,
   onLogout,
   onNavigate,
-  systemVersion = "1.8.1",
+  systemVersion = "1.8.2",
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -32,7 +32,7 @@ export default function Navbar({
 
   const navLinks = [
     { path: "/clientes", icon: mdiAccountGroup, label: "Clientes" },
-    { path: "/precios", icon: mdiClipboardList, label: "Punto de Venta" },
+    { path: "/precios", icon: mdiClipboardList, label: "Precios" },
     { path: "/inventario", icon: mdiCandycane, label: "Inventario" },
     { path: "/compras", icon: mdiStore, label: "Compras" },
     { path: "/estadisticas", icon: mdiChartBar, label: "Estadísticas" },
