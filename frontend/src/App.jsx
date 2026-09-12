@@ -691,12 +691,12 @@ export default function App() {
 
   async function handleDeleteSweet(sweet) {
     const confirm = await Swal.fire({
-      title: `¿Eliminar ${sweet.name}?`,
-      text: "Esta acción no se puede deshacer.",
+      title: `¿Dar de baja ${sweet.name}?`,
+      text: "El producto se retirará del catálogo pero se conservará su historial de ventas y movimientos.",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#ef4444",
-      confirmButtonText: "Eliminar",
+      confirmButtonText: "Sí, dar de baja",
       cancelButtonText: "Cancelar",
     });
 
@@ -710,10 +710,10 @@ export default function App() {
         if (res.ok) {
           loadSweets();
           loadPublicPrices();
-          Swal.fire("Eliminado", "Dulce eliminado del catálogo", "success");
+          Swal.fire("Dado de baja", "El producto ha sido retirado del catálogo", "success");
         }
       } catch (err) {
-        Swal.fire("Error", "No se pudo eliminar", "error");
+        Swal.fire("Error", "No se pudo dar de baja", "error");
       }
     }
   }
@@ -930,7 +930,7 @@ export default function App() {
           }
           return false;
         }}
-        systemVersion="1.5.0"
+        systemVersion="1.5.1"
       />
 
       <main className="mx-auto max-w-6xl px-4 py-8">

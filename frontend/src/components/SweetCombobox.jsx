@@ -1,15 +1,19 @@
 import { useState } from "react";
 
-export default function SweetCombobox({ value, onChange, sweets }) {
+export default function SweetCombobox({ value, onChange, sweets = [] }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const selected = sweets.find((s) => String(s.id) === String(value));
+
+  const sortedSweets = [...sweets].sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "", "es", { sensitivity: "base" }),
+  );
+  const selected = sortedSweets.find((s) => String(s.id) === String(value));
   const filtered = query.trim()
-    ? sweets.filter((s) =>
-        s.name.toLowerCase().includes(query.trim().toLowerCase()),
+    ? sortedSweets.filter((s) =>
+        (s.name || "").toLowerCase().includes(query.trim().toLowerCase()),
       )
-    : sweets;
+    : sortedSweets;
 
   function commitSelection(sweet) {
     if (!sweet) return;

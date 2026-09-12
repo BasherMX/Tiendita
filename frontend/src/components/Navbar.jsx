@@ -24,8 +24,7 @@ export default function Navbar({
   setTheme,
   onLogout,
   onNavigate,
-  systemVersion = "1.4.1",
-  systemVersion = "1.5.0",
+  systemVersion = "1.5.1",
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -35,7 +34,6 @@ export default function Navbar({
     { path: "/clientes", icon: mdiAccountGroup, label: "Clientes" },
     { path: "/precios", icon: mdiClipboardList, label: "Precios" },
     { path: "/inventario", icon: mdiCandycane, label: "Inventario" },
-    { path: "/clientes", icon: mdiAccountGroup, label: "Clientes" },
     { path: "/recompensas", icon: mdiGift, label: "Recompensas" },
     { path: "/compras", icon: mdiStore, label: "Compras" },
     { path: "/estadisticas", icon: mdiChartBar, label: "Estadísticas" },
@@ -57,20 +55,6 @@ export default function Navbar({
   return (
     <nav className="sticky top-0 z-30 border-b border-amber-100/70 bg-white/80 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-        {/* Brand */}
-        <button
-          onClick={() => navigateTo(token ? "/precios" : "/login")}
-          className="flex items-center gap-2.5 text-left transition hover:opacity-85"
-        >
-          <img
-            src={brandLogo}
-            alt="Logo Tiendita"
-            className="h-10 w-10 rounded-2xl border border-amber-200 object-cover shadow-sm dark:border-slate-700"
-          />
-          <span className="flex items-center gap-1.5 text-lg font-bold tracking-tight text-amber-950 dark:text-amber-100">
-            Tiendita
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 dark:bg-slate-800 dark:text-amber-300">
-              v{systemVersion}
         {/* Brand & Version Badge */}
         <div className="flex items-center gap-2.5">
           <button
@@ -86,8 +70,6 @@ export default function Navbar({
             <span className="text-lg font-bold tracking-tight text-amber-950 dark:text-amber-100">
               Tiendita
             </span>
-          </span>
-        </button>
           </button>
 
           <button
@@ -105,7 +87,6 @@ export default function Navbar({
             {navLinks.map(({ path, icon, label }) => {
               const active =
                 location.pathname === path ||
-                (path === "/precios" && location.pathname === "/");
                 (path === "/clientes" && location.pathname === "/");
               return (
                 <button
@@ -184,7 +165,6 @@ export default function Navbar({
               {navLinks.map(({ path, icon, label }) => {
                 const active =
                   location.pathname === path ||
-                  (path === "/precios" && location.pathname === "/");
                   (path === "/clientes" && location.pathname === "/");
                 return (
                   <button

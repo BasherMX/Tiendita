@@ -69,6 +69,9 @@ async function runSchema() {
       const schema = fs.readFileSync(schemaPath, "utf-8");
       await query(schema);
     }
+    await query(
+      "ALTER TABLE sweets ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;",
+    );
     console.log("PostgreSQL schema execution completed");
   } catch (error) {
     console.error("Error executing schema:", error.message);
@@ -230,7 +233,7 @@ app.post("/api/auth/verify-password", authGuard, async (req, res) => {
 app.get("/api/prices", async (req, res) => {
   try {
     const result = await query(
-      "SELECT name, sale_price AS price FROM sweets ORDER BY name",
+      "SELECT name, sale_price AS price FROM sweets WHERE is_active IS NOT FALSE ORDER BY name ASC",
     );
     return res.json(result.rows);
   } catch (error) {
@@ -242,7 +245,7 @@ app.get("/api/prices", async (req, res) => {
 app.get("/api/sweets", authGuard, async (req, res) => {
   try {
     const result = await query(
-      "SELECT id, name, purchase_price, sale_price, stock, sold_count FROM sweets ORDER BY created_at DESC",
+      "SELECT id, name, purchase_price, sale_price, stock, sold_count, is_active FROM sweets WHERE is_active IS NOT FALSE ORDER BY name ASC",
     );
     return res.json(result.rows);
   } catch (error) {
@@ -257,7 +260,7 @@ app.post("/api/sweets", authGuard, async (req, res) => {
   }
   try {
     const result = await query(
-      "INSERT INTO sweets (name, purchase_price, sale_price, stock) VALUES ($1, $2, $3, $4) RETURNING *",
+      "INSERT INTO sweets (name, purchase_price, sale_price, stock, is_active) VALUES ($1, $2, $3, $4, true) RETURNING *",
       [name, purchasePrice, salePrice, Number(stock) || 0],
     );
     return res.json(result.rows[0]);
@@ -285,8 +288,8 @@ app.put("/api/sweets/:id", authGuard, async (req, res) => {
 app.delete("/api/sweets/:id", authGuard, async (req, res) => {
   const { id } = req.params;
   try {
-    await query("DELETE FROM sweets WHERE id = $1", [id]);
-    return res.json({ message: "Sweet deleted successfully" });
+    await query("UPDATE sweets SET is_active = false WHERE id = $1", [id]);
+    return res.json({ message: "Sweet disabled successfully (baja lógica)" });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
