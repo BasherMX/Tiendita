@@ -38,6 +38,7 @@ import PublicClientView from "./pages/PublicClientView.jsx";
 
 const PurchasesPage = lazy(() => import("./pages/PurchasesPage.jsx"));
 const StatsPage = lazy(() => import("./pages/StatsPage.jsx"));
+const LogsPage = lazy(() => import("./pages/LogsPage.jsx"));
 
 export default function App() {
   const navigate = useNavigate();
@@ -1206,6 +1207,25 @@ export default function App() {
                     authFetch={authFetch}
                     handleAuthFail={handleAuthFail}
                   />
+                </Suspense>
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/logs"
+            element={
+              token ? (
+                <Suspense
+                  fallback={
+                    <div className="flex h-64 items-center justify-center">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-600 border-t-transparent"></div>
+                    </div>
+                  }
+                >
+                  <LogsPage handleAuthFail={handleAuthFail} />
                 </Suspense>
               ) : (
                 <Navigate to="/login" replace />

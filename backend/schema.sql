@@ -132,3 +132,28 @@ CREATE TABLE IF NOT EXISTS whatsapp_queue (
 CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_status ON whatsapp_queue(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_unique_tag ON whatsapp_queue(unique_tag);
 
+-- Tabla de Auditoría e Interacciones del Sistema
+CREATE TABLE IF NOT EXISTS system_logs (
+  id BIGSERIAL PRIMARY KEY,
+  timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  category VARCHAR(40) NOT NULL,       -- 'SALES', 'CLIENTS', 'INVENTORY', 'PURCHASES', 'REWARDS', 'CONFIG', 'AUTH', 'WHATSAPP', 'SYSTEM'
+  action_type VARCHAR(60) NOT NULL,    -- 'SALE_CREATE', 'PAYMENT_ABONO', 'CLIENT_UPDATE', etc.
+  severity VARCHAR(20) NOT NULL DEFAULT 'INFO', -- 'INFO', 'WARN', 'ERROR', 'CRITICAL'
+  actor_type VARCHAR(30) NOT NULL DEFAULT 'ADMIN', -- 'ADMIN', 'CLIENT_PUBLIC', 'SYSTEM', 'ANONYMOUS'
+  actor_id VARCHAR(100) NULL,
+  ip_address VARCHAR(45) NULL,
+  user_agent TEXT NULL,
+  entity_type VARCHAR(50) NULL,
+  entity_id VARCHAR(50) NULL,
+  description TEXT NOT NULL,
+  details JSONB NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'SUCCESS', -- 'SUCCESS', 'FAILED'
+  latency_ms INT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON system_logs(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_system_logs_category ON system_logs(category, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_system_logs_severity ON system_logs(severity, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_system_logs_entity ON system_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_system_logs_action ON system_logs(action_type);
+

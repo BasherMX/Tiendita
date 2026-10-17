@@ -15,6 +15,7 @@ import {
   mdiChartBar,
   mdiStore,
   mdiCog,
+  mdiHistory,
 } from "@mdi/js";
 import brandLogo from "../assets/logo.png";
 
@@ -36,6 +37,7 @@ export default function Navbar({
     { path: "/inventario", icon: mdiCandycane, label: "Inventario" },
     { path: "/compras", icon: mdiStore, label: "Compras" },
     { path: "/estadisticas", icon: mdiChartBar, label: "Estadísticas" },
+    { path: "/logs", icon: mdiHistory, label: "Auditoría" },
     { path: "/configuracion", icon: mdiCog, label: "Configuración" },
   ];
 

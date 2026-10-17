@@ -25,6 +25,7 @@ frontend/.env.local
 # Backups and local data
 backups/
 *.bak
+azure-postgres/credentials.local.txt
 
 # Logs
 *.log

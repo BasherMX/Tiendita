@@ -5,6 +5,8 @@ import cors from "cors";
 import jwt from "jsonwebtoken";
 import pg from "pg";
 import dotenv from "dotenv";
+import { auditMiddleware } from "./middleware/auditMiddleware.js";
+import { logActivity } from "./services/auditLogger.js";
 
 dotenv.config();
 if (fs.existsSync(path.join(process.cwd(), "backend", ".env"))) {
@@ -20,11 +22,37 @@ const port = Number(process.env.PORT || 4000);
 app.use(cors());
 app.use(express.json());
 
+// Extracción opcional temprana de usuario para enriquecer logs de auditoría
+app.use((req, res, next) => {
+  const header = req.headers.authorization || "";
+  const token = header.replace("Bearer ", "");
+  if (token) {
+    try {
+      req.user = jwt.verify(
+        token,
+        process.env.JWT_SECRET || "default_jwt_secret",
+      );
+    } catch (_) {
+      // Ignorar errores aquí; authGuard manejará autenticación estricta en rutas protegidas
+    }
+  }
+  next();
+});
+
+app.use(auditMiddleware);
+
 // Singleton pool para PostgreSQL (Serverless Reusable Pool)
 let pool;
 
 export function getPool() {
   if (!pool) {
+    const poolOptions = {
+      max: Number(process.env.PG_POOL_MAX || 2),
+      idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 10000),
+      connectionTimeoutMillis: Number(
+        process.env.PG_CONNECTION_TIMEOUT_MS || 5000,
+      ),
+    };
     const connectionString =
       process.env.POSTGRES_URL ||
       process.env.DATABASE_URL ||
@@ -34,6 +62,7 @@ export function getPool() {
 
     if (connectionString) {
       pool = new pg.Pool({
+        ...poolOptions,
         connectionString,
         options: "-c timezone=America/Mexico_City",
         ssl:
@@ -45,6 +74,7 @@ export function getPool() {
       });
     } else {
       pool = new pg.Pool({
+        ...poolOptions,
         user: process.env.DB_USER || "postgres",
         password: process.env.DB_PASSWORD || "postgres",
         host: process.env.DB_HOST || "localhost",
@@ -97,6 +127,29 @@ async function ensureMigrations() {
       ALTER TABLE whatsapp_queue ADD COLUMN IF NOT EXISTS unique_tag VARCHAR(100) UNIQUE NULL;
       CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_status ON whatsapp_queue(status, created_at);
       CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_unique_tag ON whatsapp_queue(unique_tag);
+
+      CREATE TABLE IF NOT EXISTS system_logs (
+        id BIGSERIAL PRIMARY KEY,
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        category VARCHAR(40) NOT NULL,
+        action_type VARCHAR(60) NOT NULL,
+        severity VARCHAR(20) NOT NULL DEFAULT 'INFO',
+        actor_type VARCHAR(30) NOT NULL DEFAULT 'ADMIN',
+        actor_id VARCHAR(100) NULL,
+        ip_address VARCHAR(45) NULL,
+        user_agent TEXT NULL,
+        entity_type VARCHAR(50) NULL,
+        entity_id VARCHAR(50) NULL,
+        description TEXT NOT NULL,
+        details JSONB NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'SUCCESS',
+        latency_ms INT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON system_logs(timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_system_logs_category ON system_logs(category, timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_system_logs_severity ON system_logs(severity, timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_system_logs_entity ON system_logs(entity_type, entity_id);
+      CREATE INDEX IF NOT EXISTS idx_system_logs_action ON system_logs(action_type);
     `);
     schemaEnsured = true;
   } catch (error) {
@@ -244,6 +297,18 @@ app.post("/api/login", async (req, res) => {
   const adminPass = await getEffectiveAdminPass();
 
   if (username !== adminUser || password !== adminPass) {
+    req.skipAuditLog = true;
+    await logActivity({
+      req,
+      category: "AUTH",
+      action_type: "LOGIN_FAILED",
+      severity: "WARN",
+      actor_type: "ANONYMOUS",
+      actor_id: username || "desconocido",
+      description: `Intento fallido de inicio de sesión para el usuario '${username || "desconocido"}'`,
+      details: { username },
+      status: "FAILED",
+    });
     return res.status(401).json({ message: "Credenciales incorrectas" });
   }
 
@@ -254,6 +319,19 @@ app.post("/api/login", async (req, res) => {
       expiresIn: "365d",
     },
   );
+
+  req.skipAuditLog = true;
+  await logActivity({
+    req,
+    category: "AUTH",
+    action_type: "LOGIN_SUCCESS",
+    severity: "INFO",
+    actor_type: "ADMIN",
+    actor_id: username,
+    description: `Inicio de sesión exitoso para el usuario '${username}'`,
+    status: "SUCCESS",
+  });
+
   return res.json({ token });
 });
 
@@ -284,6 +362,16 @@ app.post("/api/auth/change-password", authGuard, async (req, res) => {
       "INSERT INTO settings (key, value) VALUES ('admin_password', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
       [String(newPassword)],
     );
+
+    req.skipAuditLog = true;
+    await logActivity({
+      req,
+      category: "AUTH",
+      action_type: "PASSWORD_CHANGED",
+      severity: "WARN",
+      description: "Contraseña de administrador actualizada exitosamente",
+      status: "SUCCESS",
+    });
 
     return res.json({ message: "Contraseña actualizada exitosamente" });
   } catch (error) {
@@ -2132,7 +2220,7 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
 
     await clientConn.query("COMMIT");
 
-    const clientFinal = await query(
+    const clientFinal = await clientConn.query(
       "SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1",
       [clientId],
     );
@@ -2897,6 +2985,14 @@ app.get("/api/whatsapp/bot/context", async (req, res) => {
         `${p.name} ($${Number(p.sale_price).toFixed(2)}${Number(p.stock) <= 0 ? " - Agotado" : ""})`,
     );
 
+    // Seleccionar 5 productos aleatorios con stock disponible para destacados / menú rápido
+    const inStockList = productsRes.rows
+      .filter((p) => Number(p.stock) > 0)
+      .map((p) => `${p.name} ($${Number(p.sale_price).toFixed(2)})`);
+
+    const pool = inStockList.length > 0 ? inStockList : allProducts;
+    const randomTop5 = [...pool].sort(() => 0.5 - Math.random()).slice(0, 5);
+
     return res.json({
       client: client
         ? {
@@ -2914,12 +3010,14 @@ app.get("/api/whatsapp/bot/context", async (req, res) => {
         name: "Tiendita",
         catalog: allProducts,
         top_products:
-          allProducts.length > 0
-            ? allProducts
+          randomTop5.length > 0
+            ? randomTop5
             : [
                 "Aciduladitos ($1.00)",
-                "Chocolates ($5.00)",
-                "Botanas y Refrescos",
+                "Mazapan de la Rosa ($5.00)",
+                "Picafresas ($1.00)",
+                "Chicle Trident ($4.00)",
+                "Gansito ($8.00)",
               ],
         payment_methods: ["Efectivo", "Transferencia SPEI (STP)"],
       },
@@ -3552,6 +3650,250 @@ function initInternalQuincenaCron() {
     }
   }, 60000); // Chequeo cada 1 minuto
 }
+
+// ==========================================
+// MÓDULO DE LOGS Y AUDITORÍA
+// ==========================================
+
+// Obtener logs con filtros y paginación
+app.get("/api/logs", authGuard, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page || "1", 10));
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || "50", 10)));
+    const offset = (page - 1) * limit;
+
+    const { category, severity, action_type, search, startDate, endDate } = req.query;
+
+    const conditions = [];
+    const params = [];
+    let paramIdx = 1;
+
+    if (category && category !== "ALL") {
+      conditions.push(`category = $${paramIdx++}`);
+      params.push(category);
+    }
+
+    if (severity && severity !== "ALL") {
+      conditions.push(`severity = $${paramIdx++}`);
+      params.push(severity);
+    }
+
+    if (action_type) {
+      conditions.push(`action_type = $${paramIdx++}`);
+      params.push(action_type);
+    }
+
+    if (search && search.trim()) {
+      conditions.push(`(description ILIKE $${paramIdx} OR actor_id ILIKE $${paramIdx} OR entity_id ILIKE $${paramIdx})`);
+      params.push(`%${search.trim()}%`);
+      paramIdx++;
+    }
+
+    if (startDate) {
+      conditions.push(`timestamp >= $${paramIdx++}`);
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      conditions.push(`timestamp <= $${paramIdx++}`);
+      params.push(endDate);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    // Total count
+    const countResult = await query(`SELECT COUNT(*) as total FROM system_logs ${whereClause}`, params);
+    const total = parseInt(countResult.rows[0]?.total || "0", 10);
+
+    // Rows
+    const dataQuery = `
+      SELECT id, timestamp, category, action_type, severity, actor_type, actor_id, ip_address, user_agent, entity_type, entity_id, description, details, status, latency_ms
+      FROM system_logs
+      ${whereClause}
+      ORDER BY timestamp DESC
+      LIMIT $${paramIdx++} OFFSET $${paramIdx++}
+    `;
+    const rowsResult = await query(dataQuery, [...params, limit, offset]);
+
+    return res.json({
+      logs: rowsResult.rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (error) {
+    console.error("Error fetching logs:", error);
+    return res.status(500).json({ message: "Error al obtener logs del sistema" });
+  }
+});
+
+// Estadísticas para KPIs del módulo de auditoría
+app.get("/api/logs/stats", authGuard, async (req, res) => {
+  try {
+    // Hoy (desde las 00:00 hora servidor/local)
+    const todayRes = await query(`
+      SELECT 
+        COUNT(*) as total_today,
+        COUNT(*) FILTER (WHERE status = 'FAILED' OR severity IN ('ERROR', 'CRITICAL')) as errors_today
+      FROM system_logs
+      WHERE timestamp >= CURRENT_DATE
+    `);
+
+    // Conteo por categoría (últimos 30 días)
+    const catRes = await query(`
+      SELECT category, COUNT(*) as count
+      FROM system_logs
+      WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY category
+      ORDER BY count DESC
+    `);
+
+    // Conteo por severidad (últimos 30 días)
+    const sevRes = await query(`
+      SELECT severity, COUNT(*) as count
+      FROM system_logs
+      WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY severity
+    `);
+
+    return res.json({
+      totalToday: parseInt(todayRes.rows[0]?.total_today || "0", 10),
+      errorsToday: parseInt(todayRes.rows[0]?.errors_today || "0", 10),
+      byCategory: catRes.rows,
+      bySeverity: sevRes.rows,
+    });
+  } catch (error) {
+    console.error("Error fetching log stats:", error);
+    return res.status(500).json({ message: "Error al obtener estadísticas de logs" });
+  }
+});
+
+// Exportar logs a CSV o JSON
+app.get("/api/logs/export", authGuard, async (req, res) => {
+  try {
+    const { format = "csv", category, severity, startDate, endDate } = req.query;
+
+    const conditions = [];
+    const params = [];
+    let paramIdx = 1;
+
+    if (category && category !== "ALL") {
+      conditions.push(`category = $${paramIdx++}`);
+      params.push(category);
+    }
+    if (severity && severity !== "ALL") {
+      conditions.push(`severity = $${paramIdx++}`);
+      params.push(severity);
+    }
+    if (startDate) {
+      conditions.push(`timestamp >= $${paramIdx++}`);
+      params.push(startDate);
+    }
+    if (endDate) {
+      conditions.push(`timestamp <= $${paramIdx++}`);
+      params.push(endDate);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const dataRes = await query(
+      `SELECT id, timestamp, category, action_type, severity, actor_type, actor_id, ip_address, entity_type, entity_id, description, status, latency_ms
+       FROM system_logs
+       ${whereClause}
+       ORDER BY timestamp DESC
+       LIMIT 5000`,
+      params
+    );
+
+    if (format === "json") {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="tiendita_logs_${new Date().toISOString().slice(0, 10)}.json"`);
+      return res.send(JSON.stringify(dataRes.rows, null, 2));
+    }
+
+    // Formato CSV
+    const headers = [
+      "ID",
+      "Fecha",
+      "Categoria",
+      "Accion",
+      "Severidad",
+      "Actor Tipo",
+      "Actor ID",
+      "IP",
+      "Entidad Tipo",
+      "Entidad ID",
+      "Descripcion",
+      "Estado",
+      "Latencia (ms)"
+    ];
+
+    const escapeCsv = (val) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const csvLines = [
+      headers.join(","),
+      ...dataRes.rows.map((row) =>
+        [
+          row.id,
+          new Date(row.timestamp).toISOString(),
+          escapeCsv(row.category),
+          escapeCsv(row.action_type),
+          escapeCsv(row.severity),
+          escapeCsv(row.actor_type),
+          escapeCsv(row.actor_id),
+          escapeCsv(row.ip_address),
+          escapeCsv(row.entity_type),
+          escapeCsv(row.entity_id),
+          escapeCsv(row.description),
+          escapeCsv(row.status),
+          row.latency_ms ?? "",
+        ].join(",")
+      ),
+    ];
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="tiendita_logs_${new Date().toISOString().slice(0, 10)}.csv"`);
+    return res.send("\uFEFF" + csvLines.join("\r\n"));
+  } catch (error) {
+    console.error("Error exporting logs:", error);
+    return res.status(500).json({ message: "Error al exportar logs" });
+  }
+});
+
+// Limpieza o purga de logs antiguos
+app.delete("/api/logs/cleanup", authGuard, async (req, res) => {
+  try {
+    const days = Math.max(7, parseInt(req.body?.olderThanDays || "90", 10));
+    const result = await query(
+      `DELETE FROM system_logs WHERE timestamp < CURRENT_DATE - ($1 || ' days')::INTERVAL`,
+      [days]
+    );
+
+    const deletedCount = result.rowCount || 0;
+
+    await logActivity({
+      req,
+      category: "SYSTEM",
+      action_type: "LOGS_CLEANUP",
+      severity: "WARN",
+      description: `Se purgaron ${deletedCount} registros de logs con antigüedad mayor a ${days} días`,
+      details: { olderThanDays: days, deletedCount },
+      status: "SUCCESS"
+    });
+
+    return res.json({
+      message: `Se eliminaron ${deletedCount} registros antiguos exitosamente`,
+      deletedCount,
+    });
+  } catch (error) {
+    console.error("Error cleaning up logs:", error);
+    return res.status(500).json({ message: "Error al depurar logs antiguos" });
+  }
+});
 
 app.get("/health", (req, res) => {
   return res.json({ status: "ok" });
