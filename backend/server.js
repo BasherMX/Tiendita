@@ -1489,6 +1489,127 @@ app.get("/api/stats/day/:day", authGuard, async (req, res) => {
   }
 });
 
+// Listado de compras realizadas filtrable por día, semana, mes o periodo específico
+app.get("/api/stats/purchases", authGuard, async (req, res) => {
+  const { period = "dia", startDate, endDate } = req.query;
+  try {
+    let range = null;
+    if (period === "dia") {
+      const todayStr = new Date().toLocaleDateString("en-CA", {
+        timeZone: "America/Mexico_City",
+      });
+      range = {
+        start: `${todayStr} 00:00:00`,
+        end: `${todayStr} 23:59:59`,
+      };
+    } else if (period === "custom") {
+      if (
+        !startDate ||
+        !endDate ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(endDate)
+      ) {
+        return res.status(400).json({
+          message: "Formato de fecha inválido. Usa YYYY-MM-DD.",
+        });
+      }
+      range = {
+        start: `${startDate} 00:00:00`,
+        end: `${endDate} 23:59:59`,
+      };
+    } else if (period === "semana" || period === "mes") {
+      range = getPeriodDateRange(period);
+    }
+
+    const params = range ? [range.start, range.end] : [];
+    const movDateFilter = range
+      ? "AND (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') BETWEEN $1::timestamp AND $2::timestamp"
+      : "";
+    const saleDateFilter = range
+      ? "WHERE (sa.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') BETWEEN $1::timestamp AND $2::timestamp"
+      : "";
+
+    const [movementPurchases, cashSales] = await Promise.all([
+      query(
+        `SELECT m.id,
+                'cliente' AS source,
+                m.created_at,
+                c.name AS buyer,
+                m.concept,
+                COALESCE(m.payment_method, 'credit') AS payment_method,
+                COALESCE(STRING_AGG(CONCAT(s.name, ' x', mi.quantity), ', '), m.concept, 'Compra manual') AS items,
+                CASE
+                  WHEN m.amount > 0 THEN m.amount
+                  WHEN COALESCE(m.paid_amount, 0) > 0 THEN m.paid_amount
+                  ELSE COALESCE(SUM(mi.quantity * mi.unit_price), 0)
+                END AS total
+         FROM movements m
+         JOIN clients c ON c.id = m.client_id
+         LEFT JOIN movement_items mi ON mi.movement_id = m.id
+         LEFT JOIN sweets s ON s.id = mi.sweet_id
+         WHERE (
+           m.amount > 0
+           OR (COALESCE(m.paid_amount, 0) > 0)
+           OR (m.amount = 0 AND (m.concept ILIKE '%contado%' OR mi.sweet_id IS NOT NULL))
+         )
+           AND m.concept NOT ILIKE '%pago%'
+           AND m.concept NOT ILIKE '%abono%'
+           ${movDateFilter}
+         GROUP BY m.id, m.created_at, c.name, m.concept, m.payment_method, m.amount, m.paid_amount`,
+        params,
+      ),
+      query(
+        `SELECT sa.id,
+                'mostrador' AS source,
+                sa.created_at,
+                'Público General' AS buyer,
+                'Venta en mostrador' AS concept,
+                COALESCE(sa.payment_method, 'cash') AS payment_method,
+                COALESCE(STRING_AGG(CONCAT(s.name, ' x', si.quantity), ', '), 'Venta rápida') AS items,
+                COALESCE(sa.total_amount, SUM(si.quantity * si.unit_price), 0) AS total
+         FROM sales sa
+         LEFT JOIN sale_items si ON si.sale_id = sa.id
+         LEFT JOIN sweets s ON s.id = si.sweet_id
+         ${saleDateFilter}
+         GROUP BY sa.id, sa.created_at, sa.payment_method, sa.total_amount`,
+        params,
+      ),
+    ]);
+
+    const purchases = [...movementPurchases.rows, ...cashSales.rows]
+      .map((r) => ({
+        id: `${r.source}-${r.id}`,
+        rawId: r.id,
+        source: r.source,
+        created_at: r.created_at,
+        buyer: r.buyer,
+        concept: r.concept,
+        payment_method: r.payment_method,
+        items: r.items,
+        total: Number(Number(r.total || 0).toFixed(2)),
+      }))
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+
+    const totalAmount = Number(
+      purchases.reduce((sum, p) => sum + p.total, 0).toFixed(2),
+    );
+
+    return res.json({
+      period,
+      range,
+      totalCount: purchases.length,
+      totalAmount,
+      purchases,
+    });
+  } catch (error) {
+    console.error("Error generating purchases list:", error);
+    return res.status(500).json({ message: error.message });
+  }
+});
+
 const ALPHABET =
   "9A1b2C3d4E5f6G7h8I0jKlMnOpQrStUvWxYzaBcDeFgHiJkLmNoPqRsTuVwXyZ";
 const N_BIG = 916132832n; // 62^5
@@ -2030,8 +2151,14 @@ app.delete(
 
 app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
   const clientId = Number(req.params.id);
-  const { amount, concept, items, payImmediately, paymentMethod } =
-    req.body || {};
+  const {
+    amount,
+    concept,
+    items,
+    payImmediately,
+    paymentMethod,
+    secondaryPaymentMethod,
+  } = req.body || {};
   const pointsUsed = Number(req.body.pointsUsed) || 0;
 
   if (pointsUsed < 0)
@@ -2148,14 +2275,28 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
 
     if (shouldPay) {
       // Compra al instante (al contado): UN SOLO movimiento con impacto neto en deuda $0.00 y paid_amount guardado
+      const effectivePaymentMethod =
+        paymentMethod === "points"
+          ? remainingAmount <= 0
+            ? "points"
+            : secondaryPaymentMethod || "cash"
+          : paymentMethod || "cash";
+      const baseConcept = concept
+        ? `${concept} (al contado)`
+        : "Compra al contado";
+      const finalConcept =
+        pointsUsed > 0 && remainingAmount > 0
+          ? `${baseConcept} (${pointsUsed.toFixed(2)} pts)`
+          : baseConcept;
+
       const movRes = await clientConn.query(
         "INSERT INTO movements (client_id, concept, amount, points, payment_method, paid_amount) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
         [
           clientId,
-          concept ? `${concept} (al contado)` : "Compra al contado",
+          finalConcept,
           0,
           pointsEarned,
-          paymentMethod || "cash",
+          effectivePaymentMethod,
           totalAmount,
         ],
       );
@@ -2256,16 +2397,25 @@ app.post("/api/clients/:id/purchase", authGuard, async (req, res) => {
 
 app.post("/api/clients/:id/pay", authGuard, async (req, res) => {
   const clientId = Number(req.params.id);
-  const { amount, concept, paymentMethod } = req.body || {};
+  const {
+    amount,
+    concept,
+    paymentMethod,
+    pointsUsed = 0,
+    secondaryPaymentMethod,
+  } = req.body || {};
   const parsedAmount = Number(amount);
+  const parsedPoints = Number(pointsUsed) || 0;
 
   if (
     !Number.isInteger(clientId) ||
     clientId <= 0 ||
     !Number.isFinite(parsedAmount) ||
-    parsedAmount <= 0
+    parsedAmount <= 0 ||
+    parsedPoints < 0 ||
+    parsedPoints > parsedAmount
   ) {
-    return res.status(400).json({ message: "Invalid client or amount" });
+    return res.status(400).json({ message: "Invalid client, amount or points" });
   }
 
   const dbPool = getPool();
@@ -2275,7 +2425,7 @@ app.post("/api/clients/:id/pay", authGuard, async (req, res) => {
     await clientConn.query("BEGIN");
 
     const clientRes = await clientConn.query(
-      "SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1",
+      "SELECT id, name, total_debt, points, phone, COALESCE(credit_limit, 0) AS credit_limit FROM clients WHERE id = $1",
       [clientId],
     );
     if (!clientRes.rows.length) {
@@ -2283,41 +2433,66 @@ app.post("/api/clients/:id/pay", authGuard, async (req, res) => {
       return res.status(404).json({ message: "Client not found" });
     }
 
+    const clientData = clientRes.rows[0];
+    const currentPoints = Number(clientData.points || 0);
+    if (parsedPoints > 0 && currentPoints < parsedPoints) {
+      await clientConn.query("ROLLBACK");
+      return res.status(400).json({
+        message: `Puntos insuficientes. El cliente tiene ${currentPoints.toFixed(2)} pts.`,
+      });
+    }
+
     const settings = await getSettings();
     const rewardFactor = parseFloat(settings.reward_factor || "0.10");
     const normalized = Math.abs(parsedAmount) * -1;
+    const cashPortion = Number(Math.max(0, parsedAmount - parsedPoints).toFixed(2));
     const pointsEarned =
       settings.rewards_enabled === "true" || settings.rewards_enabled === true
-        ? Number((Math.abs(parsedAmount) * rewardFactor).toFixed(2))
+        ? Number((cashPortion * rewardFactor).toFixed(2))
         : 0;
+
+    const finalPaymentMethod =
+      parsedPoints >= parsedAmount
+        ? "points"
+        : parsedPoints > 0
+          ? secondaryPaymentMethod || "cash"
+          : paymentMethod || "cash";
+
+    const finalConcept =
+      parsedPoints > 0 && cashPortion > 0
+        ? `${concept || "Abono"} (${parsedPoints.toFixed(2)} pts + $${cashPortion.toFixed(2)})`
+        : parsedPoints > 0
+          ? concept || "Abono con puntos"
+          : concept || "Pago";
 
     await clientConn.query(
       "INSERT INTO movements (client_id, concept, amount, points, payment_method) VALUES ($1, $2, $3, $4, $5)",
       [
         clientId,
-        concept || "Pago",
+        finalConcept,
         normalized,
-        pointsEarned,
-        paymentMethod || "cash",
+        pointsEarned - parsedPoints,
+        finalPaymentMethod,
       ],
     );
 
     await clientConn.query(
-      "UPDATE clients SET total_debt = total_debt - $1, points = points + $2 WHERE id = $3",
-      [Math.abs(parsedAmount), pointsEarned, clientId],
+      "UPDATE clients SET total_debt = total_debt - $1, points = GREATEST(0, points - $2) + $3 WHERE id = $4",
+      [Math.abs(parsedAmount), parsedPoints, pointsEarned, clientId],
     );
 
     await clientConn.query("COMMIT");
 
     const updatedClientRes = await query(
-      "SELECT id, name, total_debt, points, phone FROM clients WHERE id = $1",
+      "SELECT id, name, total_debt, points, phone, COALESCE(credit_limit, 0) AS credit_limit FROM clients WHERE id = $1",
       [clientId],
     );
     if (updatedClientRes.rows.length) {
       sendWhatsAppTicketAutomatically(
         updatedClientRes.rows[0],
-        concept || "Pago",
+        finalConcept,
         -Math.abs(parsedAmount),
+        parsedPoints,
       );
     }
 

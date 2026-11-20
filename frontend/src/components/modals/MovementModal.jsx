@@ -30,6 +30,7 @@ export default function MovementModal({
   const [usePoints, setUsePoints] = useState(false);
   const [pointsToUse, setPointsToUse] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [secondaryPaymentMethod, setSecondaryPaymentMethod] = useState("cash");
 
   const sweetById = new Map(sweets.map((s) => [String(s.id), s]));
 
@@ -54,19 +55,38 @@ export default function MovementModal({
       ? Number(selectedClient.credit_limit)
       : defaultCreditLimit;
 
-  // Credit limit calculation for purchases
-  const ptsDeduction = usePoints
-    ? Math.min(Number(pointsToUse) || 0, computedTotal)
-    : 0;
+  // Credit limit & points calculation
+  const isPointsMethod =
+    (movementKind === "pay" || payImmediately) && paymentMethod === "points";
+  const maxUsablePoints = Math.max(0, Math.min(clientPoints, computedTotal));
+  const rawPts = isPointsMethod || usePoints ? Number(pointsToUse) || 0 : 0;
+  const ptsDeduction = Number(
+    Math.max(0, Math.min(rawPts, maxUsablePoints)).toFixed(2),
+  );
+  const remainingAfterPoints = Number(
+    Math.max(0, computedTotal - ptsDeduction).toFixed(2),
+  );
   const netAmount = Math.max(0, computedTotal - ptsDeduction);
   const resultingDebt =
     !payImmediately && movementKind === "purchase"
-      ? clientDebt + netAmount
+      ? Number((clientDebt + netAmount).toFixed(2))
       : clientDebt;
   const isOverCreditLimit =
     resultingDebt > creditLimit &&
     !payImmediately &&
     movementKind === "purchase";
+
+  function handlePrimaryMethodChange(method) {
+    setPaymentMethod(method);
+    if (method === "points") {
+      setUsePoints(true);
+      const suggested = Math.min(clientPoints, computedTotal);
+      setPointsToUse(suggested > 0 ? String(Number(suggested.toFixed(2))) : "");
+    } else {
+      setUsePoints(false);
+      setPointsToUse("");
+    }
+  }
 
   function addItem() {
     setItems((prev) => [...prev, { id: Date.now(), sweetId: "", quantity: 1 }]);
@@ -91,9 +111,13 @@ export default function MovementModal({
       amount: computedTotal,
       items: items.filter((it) => it.sweetId && it.quantity > 0),
       payImmediately,
-      usePoints,
+      usePoints: isPointsMethod || usePoints,
       pointsToUse: ptsDeduction,
       paymentMethod,
+      secondaryPaymentMethod:
+        isPointsMethod && remainingAfterPoints > 0
+          ? secondaryPaymentMethod
+          : undefined,
     });
   }
 
@@ -141,11 +165,38 @@ export default function MovementModal({
 
         {/* Client summary badge */}
         <div className="mb-3 sm:mb-4 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 rounded-xl border border-[#E5E2DA] bg-[#FAF7F0] px-3 py-2 text-[11px] sm:text-xs text-[#57534E] dark:border-[#282C32] dark:bg-[#121417] dark:text-[#9CA3AF] shrink-0">
-          <span>
-            Deuda:{" "}
-            <strong className="font-tabular text-[#1C1917] dark:text-[#F3F4F6]">
-              ${clientDebt.toFixed(2)}
-            </strong>
+          <span className="flex flex-wrap items-center gap-1.5">
+            <span>{clientDebt < 0 ? "A favor:" : "Deuda:"}</span>
+            {movementKind === "purchase" && computedTotal > 0 ? (
+              <>
+                <strong className="font-tabular line-through opacity-60 text-[#78716C] dark:text-[#9CA3AF]">
+                  ${Math.abs(clientDebt).toFixed(2)}
+                </strong>
+                <strong
+                  className={`font-tabular ${
+                    resultingDebt <= 0
+                      ? "text-[#059669] dark:text-[#10B981]"
+                      : "text-[#DC2626] dark:text-[#F87171]"
+                  }`}
+                >
+                  {resultingDebt < 0
+                    ? `A favor $${Math.abs(resultingDebt).toFixed(2)}`
+                    : resultingDebt === 0
+                      ? "$0.00"
+                      : `Deuda $${resultingDebt.toFixed(2)}`}
+                </strong>
+              </>
+            ) : (
+              <strong
+                className={`font-tabular ${
+                  clientDebt < 0
+                    ? "text-[#059669] dark:text-[#10B981]"
+                    : "text-[#1C1917] dark:text-[#F3F4F6]"
+                }`}
+              >
+                ${Math.abs(clientDebt).toFixed(2)}
+              </strong>
+            )}
           </span>
           <span>
             Puntos:{" "}
@@ -275,58 +326,87 @@ export default function MovementModal({
             </div>
           )}
 
-          {/* Points usage option for purchase */}
-          {movementKind === "purchase" &&
-            clientPoints > 0 &&
-            computedTotal > 0 && (
-              <div className="rounded-xl border border-[#E5E2DA] bg-[#FAF7F0] p-3.5 dark:border-[#282C32] dark:bg-[#121417] space-y-2">
-                <label className="flex items-center gap-2 text-xs font-semibold text-[#1C1917] dark:text-[#F3F4F6] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={usePoints}
-                    onChange={(e) => {
-                      setUsePoints(e.target.checked);
-                      if (e.target.checked) {
-                        setPointsToUse(
-                          String(Math.min(clientPoints, computedTotal)),
-                        );
-                      }
-                    }}
-                    className="h-4 w-4 rounded border-[#E5E2DA] text-[#D97706] focus:ring-[#D97706]"
-                  />
-                  Pagar parte o total con Puntos ({clientPoints.toFixed(1)} pts
-                  disponibles)
+          {/* Payment Method Selector (for payments and instant purchases) */}
+          {(movementKind === "pay" || payImmediately) && (
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                  MÉTODO DE PAGO
                 </label>
-                {usePoints && (
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                <PaymentMethodSelector
+                  value={paymentMethod}
+                  onChange={handlePrimaryMethodChange}
+                  includePoints={clientPoints > 0}
+                />
+              </div>
+
+              {paymentMethod === "points" && clientPoints > 0 && (
+                <div className="rounded-xl border border-[#E5E2DA] bg-[#FAF7F0] p-3.5 dark:border-[#282C32] dark:bg-[#121417] space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-[#1C1917] dark:text-[#F3F4F6]">
+                      Puntos a aplicar ({clientPoints.toFixed(2)} pts disp.)
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPointsToUse(
+                            String(Number(maxUsablePoints.toFixed(2))),
+                          )
+                        }
+                        className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-700 hover:bg-amber-500/20 dark:text-amber-300 transition"
+                      >
+                        Todo (${maxUsablePoints.toFixed(2)})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPointsToUse(
+                            String(
+                              Number((maxUsablePoints / 2).toFixed(2)),
+                            ),
+                          )
+                        }
+                        className="rounded-lg border border-[#E5E2DA] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#57534E] hover:bg-[#FAF7F0] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#9CA3AF] transition"
+                      >
+                        Parcial (50%)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
                     <input
                       type="number"
                       step="0.01"
                       min="0"
-                      max={Math.min(clientPoints, computedTotal)}
-                      className="w-28 sm:w-32 rounded-lg border border-[#E5E2DA] bg-white px-2.5 py-1.5 text-xs font-tabular outline-none focus:border-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
+                      max={maxUsablePoints}
+                      className="w-32 rounded-lg border border-[#E5E2DA] bg-white px-2.5 py-1.5 text-xs font-tabular outline-none focus:border-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
                       placeholder="Puntos a usar"
                       value={pointsToUse}
                       onChange={(e) => setPointsToUse(e.target.value)}
                     />
                     <span className="text-xs font-medium text-[#78716C] dark:text-[#9CA3AF]">
-                      Descuento: -${Number(pointsToUse || 0).toFixed(2)}
+                      Cubierto con puntos:{" "}
+                      <strong className="text-[#D97706] dark:text-[#F59E0B] font-tabular">
+                        ${ptsDeduction.toFixed(2)}
+                      </strong>
                     </span>
                   </div>
-                )}
-              </div>
-            )}
 
-          {/* Payment Method Selector (for payments and instant purchases) */}
-          {(movementKind === "pay" || payImmediately) && (
-            <div>
-              <label className="mb-1.5 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
-                MÉTODO DE PAGO
-              </label>
-              <PaymentMethodSelector
-                value={paymentMethod}
-                onChange={setPaymentMethod}
-              />
+                  {computedTotal > 0 && remainingAfterPoints > 0 && (
+                    <div className="pt-2 border-t border-[#E5E2DA] dark:border-[#282C32] space-y-2">
+                      <label className="block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                        MÉTODO PARA EL RESTO ($
+                        {remainingAfterPoints.toFixed(2)})
+                      </label>
+                      <PaymentMethodSelector
+                        value={secondaryPaymentMethod}
+                        onChange={setSecondaryPaymentMethod}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -345,12 +425,67 @@ export default function MovementModal({
                 <input
                   type="checkbox"
                   checked={payImmediately}
-                  onChange={(e) => setPayImmediately(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setPayImmediately(checked);
+                    if (!checked && paymentMethod === "points") {
+                      setPaymentMethod("cash");
+                    }
+                  }}
                   className="h-4 w-4 rounded border-[#E5E2DA] text-[#D97706] focus:ring-[#D97706]"
                 />
               </label>
             </div>
           )}
+
+          {/* Points usage option for credit purchases (fiado) */}
+          {movementKind === "purchase" &&
+            !payImmediately &&
+            clientPoints > 0 &&
+            computedTotal > 0 && (
+              <div className="rounded-xl border border-[#E5E2DA] bg-[#FAF7F0] p-3.5 dark:border-[#282C32] dark:bg-[#121417] space-y-2">
+                <label className="flex items-center gap-2 text-xs font-semibold text-[#1C1917] dark:text-[#F3F4F6] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={usePoints}
+                    onChange={(e) => {
+                      setUsePoints(e.target.checked);
+                      if (e.target.checked) {
+                        setPointsToUse(
+                          String(
+                            Number(
+                              Math.min(clientPoints, computedTotal).toFixed(2),
+                            ),
+                          ),
+                        );
+                      } else {
+                        setPointsToUse("");
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-[#E5E2DA] text-[#D97706] focus:ring-[#D97706]"
+                  />
+                  Descontar parte o total con Puntos ({clientPoints.toFixed(1)}{" "}
+                  pts disponibles)
+                </label>
+                {usePoints && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={Math.min(clientPoints, computedTotal)}
+                      className="w-28 sm:w-32 rounded-lg border border-[#E5E2DA] bg-white px-2.5 py-1.5 text-xs font-tabular outline-none focus:border-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
+                      placeholder="Puntos a usar"
+                      value={pointsToUse}
+                      onChange={(e) => setPointsToUse(e.target.value)}
+                    />
+                    <span className="text-xs font-medium text-[#78716C] dark:text-[#9CA3AF]">
+                      Descuento: -${ptsDeduction.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
           {/* Credit Limit Alert Warning */}
           {isOverCreditLimit && (

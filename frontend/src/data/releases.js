@@ -1,5 +1,34 @@
 export const releases = [
   {
+    version: "1.8.8",
+    date: "20 de Noviembre, 2026",
+    tagline:
+      "Pagos y abonos mixtos con Puntos, proyección de deuda en tiempo real e historial de compras",
+    highlights: [
+      "Proyección de Deuda / Saldo a Favor en Nueva Compra: Al agregar productos, el saldo actual aparece tachado junto al nuevo saldo proyectado en verde (A favor / $0.00) o rojo (Deuda).",
+      "Puntos como Método de Pago y Abono Mixto: Agregado 'Puntos' directamente en el selector de método de pago para compras al contado y abonos, permitiendo cubrir el total o una parte con puntos y el resto con otro método.",
+      "Historial de Compras en Estadísticas: Nueva pestaña 'Compras' con filtros por Día, Semana, Mes y Periodo específico (fechas personalizadas).",
+      "Directorio con Skeleton dinámico y botón actualizado: El skeleton loader ahora llena toda la altura disponible de la lista de clientes, y el botón principal ahora dice '+ Comprar Producto'.",
+    ],
+    sections: [
+      {
+        title: "🛒 Compras, Abonos & Puntos",
+        items: [
+          "Botón '+ Fiar Producto' renombrado a '+ Comprar Producto' en el panel de cliente.",
+          "Cálculo instantáneo de deuda proyectada / saldo a favor en el encabezado de Nueva Compra.",
+          "Soporte completo en frontend y backend para abonos totales o parciales con puntos (combinables con Efectivo, Transferencia o Tarjeta).",
+        ],
+      },
+      {
+        title: "📊 Estadísticas & UX",
+        items: [
+          "Nuevo endpoint GET /api/stats/purchases y pestaña 'Compras' en Estadísticas con filtro por día, semana, mes y rango de fechas.",
+          "Skeleton loader dinámico en el Directorio de Clientes calculado según la altura del contenedor.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.7",
     date: "12 de Septiembre, 2026",
     tagline:

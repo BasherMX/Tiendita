@@ -559,6 +559,7 @@ export default function App() {
             payImmediately: payload.payImmediately,
             pointsUsed: payload.pointsToUse,
             paymentMethod: payload.paymentMethod,
+            secondaryPaymentMethod: payload.secondaryPaymentMethod,
           }),
         },
         handleAuthFail,
@@ -1070,7 +1071,7 @@ export default function App() {
           }
           return false;
         }}
-        systemVersion="1.8.7"
+        systemVersion="1.8.8"
       />
 
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-6 min-w-0">

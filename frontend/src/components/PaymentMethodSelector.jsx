@@ -1,12 +1,18 @@
 import Icon from "@mdi/react";
-import { mdiCash, mdiBankTransfer, mdiCreditCardOutline } from "@mdi/js";
+import {
+  mdiCash,
+  mdiBankTransfer,
+  mdiCreditCardOutline,
+  mdiStar,
+} from "@mdi/js";
 
 export default function PaymentMethodSelector({
   value = "cash",
   onChange,
+  includePoints = false,
   className = "",
 }) {
-  const methods = [
+  const baseMethods = [
     {
       id: "cash",
       label: "Efectivo",
@@ -27,8 +33,22 @@ export default function PaymentMethodSelector({
     },
   ];
 
+  const methods = includePoints
+    ? [
+        ...baseMethods,
+        {
+          id: "points",
+          label: "Puntos",
+          icon: mdiStar,
+          color: "text-amber-500 dark:text-amber-400",
+        },
+      ]
+    : baseMethods;
+
   return (
-    <div className={`grid grid-cols-3 gap-2 ${className}`}>
+    <div
+      className={`grid ${includePoints ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"} gap-2 ${className}`}
+    >
       {methods.map((method) => {
         const selected = value === method.id;
         return (

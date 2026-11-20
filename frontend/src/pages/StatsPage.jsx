@@ -151,6 +151,14 @@ export default function StatsPage({
   const [behaviorData, setBehaviorData] = useState(null);
   const [loadingBehavior, setLoadingBehavior] = useState(false);
 
+  // Estado para la pestaña de Listado de Compras
+  const [purchasesPeriod, setPurchasesPeriod] = useState("dia"); // "dia" | "semana" | "mes" | "custom"
+  const todayLocal = new Date().toLocaleDateString("en-CA");
+  const [customStartDate, setCustomStartDate] = useState(todayLocal);
+  const [customEndDate, setCustomEndDate] = useState(todayLocal);
+  const [purchasesData, setPurchasesData] = useState(null);
+  const [loadingPurchases, setLoadingPurchases] = useState(false);
+
   const sortedClientsList = useMemo(() => {
     if (!clientsStats?.clients) return [];
     const list = [...clientsStats.clients];
@@ -205,6 +213,36 @@ export default function StatsPage({
       loadBehaviorStatsData(behaviorPeriod);
     }
   }, [activeTab, behaviorPeriod]);
+
+  useEffect(() => {
+    if (activeTab === "compras" && purchasesPeriod !== "custom") {
+      loadPurchasesData(purchasesPeriod);
+    }
+  }, [activeTab, purchasesPeriod]);
+
+  async function loadPurchasesData(period, start = customStartDate, end = customEndDate) {
+    setLoadingPurchases(true);
+    try {
+      const baseUrl = apiBase || defaultApiBase || "";
+      const fetchFn = authFetch || defaultAuthFetch;
+      const queryParams =
+        period === "custom"
+          ? `period=custom&startDate=${encodeURIComponent(start)}&endDate=${encodeURIComponent(end)}`
+          : `period=${encodeURIComponent(period)}`;
+      const res = await fetchFn(
+        `${baseUrl}/api/stats/purchases?${queryParams}`,
+        {},
+        handleAuthFail,
+      );
+      if (res && res.ok) {
+        setPurchasesData(await res.json());
+      }
+    } catch (err) {
+      console.error("Error loading purchases stats:", err);
+    } finally {
+      setLoadingPurchases(false);
+    }
+  }
 
   async function loadClientsStatsData(period) {
     setLoadingClientsStats(true);
@@ -393,6 +431,16 @@ export default function StatsPage({
             }`}
           >
             Clientes
+          </button>
+          <button
+            onClick={() => setActiveTab("compras")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
+              activeTab === "compras"
+                ? "bg-[#FFFFFF] text-amber-700 shadow-xs dark:bg-[#181B1E] dark:text-amber-400"
+                : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+            }`}
+          >
+            Compras
           </button>
         </div>
       </div>
@@ -2341,6 +2389,186 @@ export default function StatsPage({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* === VISTA: LISTADO DE COMPRAS REALIZADAS === */}
+      {activeTab === "compras" && (
+        <div className="space-y-6">
+          {/* Barra de Filtros de Periodo */}
+          <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E] space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300">
+                  <Icon path={mdiShoppingOutline} size={0.75} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                    Historial de Compras Realizadas
+                  </h3>
+                  <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                    Consulta todas las ventas de mostrador y compras de clientes por periodo
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] p-1 dark:border-[#282C32] dark:bg-[#111315] self-start sm:self-auto overflow-x-auto max-w-full">
+                {[
+                  { id: "dia", label: "Hoy (Día)" },
+                  { id: "semana", label: "Semana" },
+                  { id: "mes", label: "Mes" },
+                  { id: "custom", label: "Periodo específico" },
+                ].map((btn) => (
+                  <button
+                    key={btn.id}
+                    type="button"
+                    onClick={() => setPurchasesPeriod(btn.id)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
+                      purchasesPeriod === btn.id
+                        ? "bg-[#FFFFFF] text-amber-700 shadow-xs dark:bg-[#181B1E] dark:text-amber-400"
+                        : "text-[#78716C] hover:text-[#1C1917] dark:text-[#9CA3AF] dark:hover:text-[#F3F2EE]"
+                    }`}
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {purchasesPeriod === "custom" && (
+              <div className="flex flex-wrap items-end gap-3 pt-2 border-t border-[#E5E2DA] dark:border-[#282C32]">
+                <div>
+                  <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                    Desde
+                  </label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-1.5 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-bold text-[#78716C] dark:text-[#9CA3AF]">
+                    Hasta
+                  </label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="rounded-xl border border-[#E5E2DA] bg-[#F7F6F2] px-3 py-1.5 text-xs outline-none dark:border-[#282C32] dark:bg-[#111315] text-[#1C1917] dark:text-[#F3F2EE]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    loadPurchasesData("custom", customStartDate, customEndDate)
+                  }
+                  disabled={loadingPurchases}
+                  className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-700 transition disabled:opacity-60"
+                >
+                  Consultar Periodo
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Resumen rápido */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#78716C] dark:text-[#9CA3AF]">
+                Compras en el Periodo
+              </span>
+              <div className="mt-1 text-2xl font-black font-tabular text-[#1C1917] dark:text-[#F3F2EE]">
+                {purchasesData?.totalCount ?? 0}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#78716C] dark:text-[#9CA3AF]">
+                Monto Acumulado
+              </span>
+              <div className="mt-1 text-2xl font-black font-tabular text-emerald-700 dark:text-emerald-400">
+                ${Number(purchasesData?.totalAmount ?? 0).toFixed(2)}
+              </div>
+            </div>
+          </div>
+
+          {/* Tabla de Compras */}
+          <div className="rounded-2xl border border-[#E5E2DA] bg-[#FFFFFF] p-4 sm:p-6 shadow-xs dark:border-[#282C32] dark:bg-[#181B1E]">
+            {loadingPurchases ? (
+              <div className="space-y-2.5">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className="h-12 animate-pulse rounded-xl bg-[#F7F6F2] dark:bg-[#111315]"
+                  />
+                ))}
+              </div>
+            ) : !purchasesData?.purchases?.length ? (
+              <div className="py-10 text-center text-xs text-[#78716C] dark:text-[#9CA3AF]">
+                No hay compras registradas en este periodo.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[#E5E2DA] text-[11px] font-bold uppercase text-[#78716C] dark:border-[#282C32] dark:text-[#9CA3AF]">
+                      <th className="pb-2.5 pr-3">Fecha</th>
+                      <th className="pb-2.5 pr-3">Cliente / Origen</th>
+                      <th className="pb-2.5 pr-3">Productos</th>
+                      <th className="pb-2.5 pr-3">Método</th>
+                      <th className="pb-2.5 text-right">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E5E2DA] dark:divide-[#282C32]">
+                    {purchasesData.purchases.map((p) => {
+                      const methodLabel =
+                        {
+                          cash: "Efectivo",
+                          credit: "Crédito (Fiado)",
+                          transfer: "Transferencia",
+                          card: "Tarjeta",
+                          points: "Puntos",
+                        }[p.payment_method] || p.payment_method;
+                      return (
+                        <tr
+                          key={p.id}
+                          className="hover:bg-[#F7F6F2]/60 dark:hover:bg-[#111315]/50 transition"
+                        >
+                          <td className="py-2.5 pr-3 whitespace-nowrap text-[#78716C] dark:text-[#9CA3AF] font-tabular">
+                            {new Date(p.created_at).toLocaleString("es-MX", {
+                              timeZone: "America/Mexico_City",
+                              day: "2-digit",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </td>
+                          <td className="py-2.5 pr-3 font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                            <span>{p.buyer}</span>
+                            {p.source === "mostrador" && (
+                              <span className="ml-1.5 rounded-md bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300">
+                                Mostrador
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 pr-3 text-[#57534E] dark:text-[#D1D5DB] max-w-xs truncate">
+                            {p.items}
+                          </td>
+                          <td className="py-2.5 pr-3 whitespace-nowrap text-[#78716C] dark:text-[#9CA3AF]">
+                            {methodLabel}
+                          </td>
+                          <td className="py-2.5 text-right font-black font-tabular text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                            ${Number(p.total).toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

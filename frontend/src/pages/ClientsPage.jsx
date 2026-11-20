@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Icon from "@mdi/react";
 import {
   mdiAccountGroup,
@@ -46,6 +46,25 @@ export default function ClientsPage({
   const [filterDebt, setFilterDebt] = useState("all"); // "all" | "debt" | "clean"
   const [mobileView, setMobileView] = useState("list"); // "list" | "detail"
   const [selectedMovementDetail, setSelectedMovementDetail] = useState(null);
+  const clientsListRef = useRef(null);
+  const [skeletonCount, setSkeletonCount] = useState(6);
+
+  useEffect(() => {
+    const el = clientsListRef.current;
+    if (!el) return;
+    const updateCount = () => {
+      const h = el.clientHeight || 440;
+      setSkeletonCount(Math.max(5, Math.ceil(h / 74)));
+    };
+    updateCount();
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(updateCount);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+    window.addEventListener("resize", updateCount);
+    return () => window.removeEventListener("resize", updateCount);
+  }, []);
 
   useEffect(() => {
     if (!selectedClient && clients && clients.length > 0) {
@@ -194,10 +213,13 @@ export default function ClientsPage({
           </div>
 
           {/* Lista de clientes */}
-          <div className="flex-1 space-y-1.5 overflow-y-auto pr-0.5 max-h-[60vh] lg:max-h-none lg:min-h-0">
+          <div
+            ref={clientsListRef}
+            className="flex-1 space-y-1.5 overflow-y-auto pr-0.5 max-h-[60vh] lg:max-h-none lg:min-h-0"
+          >
             {loadingClients ? (
               <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map((i) => (
+                {Array.from({ length: skeletonCount }).map((_, i) => (
                   <div
                     key={i}
                     className="animate-pulse rounded-xl border border-[#E5E2DA] bg-[#FFFFFF] p-3 dark:border-[#282C32] dark:bg-[#181B1E]"
@@ -475,7 +497,7 @@ export default function ClientsPage({
                 className="flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3 sm:px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
               >
                 <Icon path={mdiCashMinus} size={0.7} />
-                <span>+ Fiar Producto</span>
+                <span>+ Comprar Producto</span>
               </button>
               <button
                 onClick={onOpenPayModal}
