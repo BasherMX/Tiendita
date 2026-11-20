@@ -68,9 +68,11 @@ export default function MovementModal({
   );
   const netAmount = Math.max(0, computedTotal - ptsDeduction);
   const resultingDebt =
-    !payImmediately && movementKind === "purchase"
-      ? Number((clientDebt + netAmount).toFixed(2))
-      : clientDebt;
+    movementKind === "pay"
+      ? Number((clientDebt - computedTotal).toFixed(2))
+      : !payImmediately
+        ? Number((clientDebt + netAmount).toFixed(2))
+        : clientDebt;
   const isOverCreditLimit =
     resultingDebt > creditLimit &&
     !payImmediately &&
@@ -166,8 +168,16 @@ export default function MovementModal({
         {/* Client summary badge */}
         <div className="mb-3 sm:mb-4 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 rounded-xl border border-[#E5E2DA] bg-[#FAF7F0] px-3 py-2 text-[11px] sm:text-xs text-[#57534E] dark:border-[#282C32] dark:bg-[#121417] dark:text-[#9CA3AF] shrink-0">
           <span className="flex flex-wrap items-center gap-1.5">
-            <span>{clientDebt < 0 ? "A favor:" : "Deuda:"}</span>
-            {movementKind === "purchase" && computedTotal > 0 ? (
+            <span>
+              {computedTotal > 0
+                ? resultingDebt < 0
+                  ? "A favor:"
+                  : "Deuda:"
+                : clientDebt < 0
+                  ? "A favor:"
+                  : "Deuda:"}
+            </span>
+            {computedTotal > 0 ? (
               <>
                 <strong className="font-tabular line-through opacity-60 text-[#78716C] dark:text-[#9CA3AF]">
                   ${Math.abs(clientDebt).toFixed(2)}
@@ -179,11 +189,7 @@ export default function MovementModal({
                       : "text-[#DC2626] dark:text-[#F87171]"
                   }`}
                 >
-                  {resultingDebt < 0
-                    ? `A favor $${Math.abs(resultingDebt).toFixed(2)}`
-                    : resultingDebt === 0
-                      ? "$0.00"
-                      : `Deuda $${resultingDebt.toFixed(2)}`}
+                  ${Math.abs(resultingDebt).toFixed(2)}
                 </strong>
               </>
             ) : (
@@ -437,55 +443,6 @@ export default function MovementModal({
               </label>
             </div>
           )}
-
-          {/* Points usage option for credit purchases (fiado) */}
-          {movementKind === "purchase" &&
-            !payImmediately &&
-            clientPoints > 0 &&
-            computedTotal > 0 && (
-              <div className="rounded-xl border border-[#E5E2DA] bg-[#FAF7F0] p-3.5 dark:border-[#282C32] dark:bg-[#121417] space-y-2">
-                <label className="flex items-center gap-2 text-xs font-semibold text-[#1C1917] dark:text-[#F3F4F6] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={usePoints}
-                    onChange={(e) => {
-                      setUsePoints(e.target.checked);
-                      if (e.target.checked) {
-                        setPointsToUse(
-                          String(
-                            Number(
-                              Math.min(clientPoints, computedTotal).toFixed(2),
-                            ),
-                          ),
-                        );
-                      } else {
-                        setPointsToUse("");
-                      }
-                    }}
-                    className="h-4 w-4 rounded border-[#E5E2DA] text-[#D97706] focus:ring-[#D97706]"
-                  />
-                  Descontar parte o total con Puntos ({clientPoints.toFixed(1)}{" "}
-                  pts disponibles)
-                </label>
-                {usePoints && (
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max={Math.min(clientPoints, computedTotal)}
-                      className="w-28 sm:w-32 rounded-lg border border-[#E5E2DA] bg-white px-2.5 py-1.5 text-xs font-tabular outline-none focus:border-[#D97706] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#F3F4F6]"
-                      placeholder="Puntos a usar"
-                      value={pointsToUse}
-                      onChange={(e) => setPointsToUse(e.target.value)}
-                    />
-                    <span className="text-xs font-medium text-[#78716C] dark:text-[#9CA3AF]">
-                      Descuento: -${ptsDeduction.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
 
           {/* Credit Limit Alert Warning */}
           {isOverCreditLimit && (
