@@ -1,5 +1,24 @@
 export const releases = [
   {
+    version: "1.8.9",
+    date: "20 de Noviembre, 2026",
+    tagline:
+      "Indicador visual pulsante de día de quincena en Enviar cuentas y modo test en Configuración",
+    highlights: [
+      "Indicador visual de Quincena en 'Enviar cuentas': Cuando hoy es día hábil de quincena (15 o fin de mes, o el día hábil inmediato anterior si cae en fin de semana o festivo oficial en México) y existen clientes con adeudo, el botón 'Enviar cuentas' muestra un punto pulsante y resaltado ámbar.",
+      "Modo Test en Configuración: Nuevo interruptor para previsualizar el indicador pulsante en cualquier momento sin afectar la programación real.",
+    ],
+    sections: [
+      {
+        title: "📅 Recordatorio Visual de Quincena",
+        items: [
+          "Cálculo automático en frontend de días hábiles de quincena en horario local (America/Mexico_City).",
+          "Botón de Test en Configuración para activar/desactivar la vista previa del indicador.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.8",
     date: "20 de Noviembre, 2026",
     tagline:

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { isQuincenaTriggerDay } from "../utils/dateUtils.js";
 import Icon from "@mdi/react";
 import {
   mdiAccountGroup,
@@ -97,6 +98,17 @@ export default function ClientsPage({
       : defaultLimit;
   const isOverCreditLimit = selectedDebt > selectedLimit;
   const availableCredit = Math.max(0, selectedLimit - selectedDebt);
+
+  const quincenaInfo = useMemo(() => isQuincenaTriggerDay(), []);
+  const hasDebtors = useMemo(
+    () => clients.some((c) => Number(c.total_debt || 0) > 0),
+    [clients],
+  );
+  const isQuincenaTestMode =
+    typeof window !== "undefined" &&
+    localStorage.getItem("quincena_test_mode") === "true";
+  const showPaydayPulse =
+    (quincenaInfo.isTriggerDay && hasDebtors) || isQuincenaTestMode;
   const daysWithDebt = Number(selectedClient?.days_with_debt || 0);
 
   return (
@@ -129,9 +141,23 @@ export default function ClientsPage({
           <button
             type="button"
             onClick={onSendBulkStatements}
-            className="flex items-center gap-1.5 rounded-xl border border-sky-600/30 bg-sky-500/10 px-3 sm:px-3.5 py-2 text-xs font-bold text-sky-800 shadow-xs hover:bg-sky-600 hover:text-white dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-600 dark:hover:text-white active:scale-[0.98] transition"
-            title="Enviar estado de cuenta por WhatsApp a todos los clientes con adeudo pendiente"
+            className={`relative flex items-center gap-1.5 rounded-xl border px-3 sm:px-3.5 py-2 text-xs font-bold shadow-xs hover:bg-sky-600 hover:text-white active:scale-[0.98] transition ${
+              showPaydayPulse
+                ? "border-amber-500/70 bg-amber-500/15 text-amber-800 ring-2 ring-amber-500/40 dark:border-amber-400/70 dark:bg-amber-500/20 dark:text-amber-300"
+                : "border-sky-600/30 bg-sky-500/10 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 dark:hover:bg-sky-600 dark:hover:text-white"
+            }`}
+            title={
+              showPaydayPulse
+                ? `¡Hoy es día de quincena! (${quincenaInfo.label || "Modo Test"}) — Enviar estados de cuenta`
+                : "Enviar estado de cuenta por WhatsApp a todos los clientes con adeudo pendiente"
+            }
           >
+            {showPaydayPulse && (
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500 border border-white dark:border-[#181B1E]" />
+              </span>
+            )}
             <Icon path={mdiSendCheckOutline} size={0.7} />
             <span>Enviar cuentas</span>
           </button>

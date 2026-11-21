@@ -21,6 +21,15 @@ export default function ConfigPage({
   onLockConfig,
 }) {
   const [activeTab, setActiveTab] = useState("general"); // "general" | "whatsapp" | "rewards" | "security"
+  const [quincenaTestMode, setQuincenaTestMode] = useState(
+    () => localStorage.getItem("quincena_test_mode") === "true",
+  );
+
+  function toggleQuincenaTestMode() {
+    const next = !quincenaTestMode;
+    setQuincenaTestMode(next);
+    localStorage.setItem("quincena_test_mode", String(next));
+  }
 
   const [passForm, setPassForm] = useState({
     currentPassword: "",
@@ -249,6 +258,28 @@ export default function ConfigPage({
                   puede personalizar por cliente en la libreta.
                 </p>
               </div>
+            </div>
+
+            <div className="rounded-xl border border-dashed border-[#E5E2DA] bg-[#F7F6F2]/60 p-3.5 dark:border-[#282C32] dark:bg-[#111315]/60 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                  Test: Indicador de Día de Quincena
+                </div>
+                <div className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                  Activa temporalmente el punto pulsante en el botón &quot;Enviar cuentas&quot; para previsualizarlo. No afecta la programación real.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={toggleQuincenaTestMode}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+                  quincenaTestMode
+                    ? "bg-amber-600 text-white shadow-xs hover:bg-amber-700"
+                    : "border border-[#E5E2DA] bg-white text-[#57534E] hover:bg-[#FAF7F0] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#9CA3AF]"
+                }`}
+              >
+                {quincenaTestMode ? "Test Activado ✓" : "Activar Test"}
+              </button>
             </div>
 
             <div className="flex justify-end pt-3 border-t border-[#E5E2DA] dark:border-[#282C32]">
@@ -515,7 +546,29 @@ export default function ConfigPage({
                 </div>
               )}
 
-              <div className="flex justify-end pt-3 border-t border-[#E5E2DA] dark:border-[#282C32]">
+              <div className="rounded-xl border border-dashed border-[#E5E2DA] bg-[#F7F6F2]/60 p-3.5 dark:border-[#282C32] dark:bg-[#111315]/60 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                  Test: Indicador de Día de Quincena
+                </div>
+                <div className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                  Activa temporalmente el punto pulsante en el botón &quot;Enviar cuentas&quot; para previsualizarlo. No afecta la programación real.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={toggleQuincenaTestMode}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+                  quincenaTestMode
+                    ? "bg-amber-600 text-white shadow-xs hover:bg-amber-700"
+                    : "border border-[#E5E2DA] bg-white text-[#57534E] hover:bg-[#FAF7F0] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#9CA3AF]"
+                }`}
+              >
+                {quincenaTestMode ? "Test Activado ✓" : "Activar Test"}
+              </button>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-[#E5E2DA] dark:border-[#282C32]">
                 <button
                   type="submit"
                   className="rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 active:scale-[0.98] transition"
@@ -578,6 +631,28 @@ export default function ConfigPage({
                   </span>
                 </label>
               </div>
+            </div>
+
+            <div className="rounded-xl border border-dashed border-[#E5E2DA] bg-[#F7F6F2]/60 p-3.5 dark:border-[#282C32] dark:bg-[#111315]/60 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                  Test: Indicador de Día de Quincena
+                </div>
+                <div className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                  Activa temporalmente el punto pulsante en el botón &quot;Enviar cuentas&quot; para previsualizarlo. No afecta la programación real.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={toggleQuincenaTestMode}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+                  quincenaTestMode
+                    ? "bg-amber-600 text-white shadow-xs hover:bg-amber-700"
+                    : "border border-[#E5E2DA] bg-white text-[#57534E] hover:bg-[#FAF7F0] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#9CA3AF]"
+                }`}
+              >
+                {quincenaTestMode ? "Test Activado ✓" : "Activar Test"}
+              </button>
             </div>
 
             <div className="flex justify-end pt-3 border-t border-[#E5E2DA] dark:border-[#282C32]">
@@ -658,6 +733,28 @@ export default function ConfigPage({
                   }
                 />
               </div>
+            </div>
+
+            <div className="rounded-xl border border-dashed border-[#E5E2DA] bg-[#F7F6F2]/60 p-3.5 dark:border-[#282C32] dark:bg-[#111315]/60 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-[#1C1917] dark:text-[#F3F2EE]">
+                  Test: Indicador de Día de Quincena
+                </div>
+                <div className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
+                  Activa temporalmente el punto pulsante en el botón &quot;Enviar cuentas&quot; para previsualizarlo. No afecta la programación real.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={toggleQuincenaTestMode}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+                  quincenaTestMode
+                    ? "bg-amber-600 text-white shadow-xs hover:bg-amber-700"
+                    : "border border-[#E5E2DA] bg-white text-[#57534E] hover:bg-[#FAF7F0] dark:border-[#282C32] dark:bg-[#181B1E] dark:text-[#9CA3AF]"
+                }`}
+              >
+                {quincenaTestMode ? "Test Activado ✓" : "Activar Test"}
+              </button>
             </div>
 
             <div className="flex justify-end pt-3 border-t border-[#E5E2DA] dark:border-[#282C32]">
