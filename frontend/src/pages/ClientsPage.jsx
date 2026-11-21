@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { isQuincenaTriggerDay } from "../utils/dateUtils.js";
+import {
+  isQuincenaTriggerDay,
+  formatMxShortDateTime,
+  formatMxFullDateTime,
+} from "../utils/dateUtils.js";
 import Icon from "@mdi/react";
 import {
   mdiAccountGroup,
@@ -603,15 +607,7 @@ export default function ClientsPage({
                             className="hover:bg-[#F7F6F2]/60 dark:hover:bg-[#202428]/50 transition-colors"
                           >
                             <td className="px-2.5 sm:px-3 py-2 text-[#78716C] dark:text-[#9CA3AF] whitespace-nowrap">
-                              {new Date(m.created_at).toLocaleDateString(
-                                "es-MX",
-                                {
-                                  day: "2-digit",
-                                  month: "short",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                },
-                              )}
+                              {formatMxShortDateTime(m.created_at)}
                             </td>
                             <td className="px-2.5 sm:px-3 py-2 font-medium text-[#1C1917] dark:text-[#F3F2EE]">
                               <div className="flex items-center gap-1.5">
@@ -731,16 +727,7 @@ export default function ClientsPage({
                     Detalle del Movimiento
                   </h3>
                   <p className="text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
-                    {new Date(selectedMovementDetail.created_at).toLocaleString(
-                      "es-MX",
-                      {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
-                    )}
+                    {formatMxFullDateTime(selectedMovementDetail.created_at)}
                   </p>
                 </div>
               </div>

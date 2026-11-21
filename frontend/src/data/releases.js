@@ -1,5 +1,24 @@
 export const releases = [
   {
+    version: "1.8.10",
+    date: "20 de Noviembre, 2026",
+    tagline:
+      "Unificación de zona horaria (America/Mexico_City) en historiales, compras y movimientos",
+    highlights: [
+      "Corrección de desfase horario en Historial Público y Movimientos: Se centralizó el parseo UTC y formateo explícito a America/Mexico_City para evitar horas incorrectas (como 4:00 a.m.) en enlaces públicos y tablas.",
+      "Consistencia en toda la aplicación: Aplicado en Clientes, Enlace Público, Compras de Paquetes y Logs del Sistema.",
+    ],
+    sections: [
+      {
+        title: "🕒 Fechas & Zona Horaria",
+        items: [
+          "Nuevos helpers parseUtcDate, formatMxShortDateTime y formatMxFullDateTime en dateUtils.js.",
+          "Estandarización de formato de fecha/hora en PublicClientView, ClientsPage, PurchasesPage y LogsPage.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.9",
     date: "20 de Noviembre, 2026",
     tagline:

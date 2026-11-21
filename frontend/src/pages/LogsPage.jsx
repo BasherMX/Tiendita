@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { parseUtcDate } from "../utils/dateUtils.js";
 import { motion, AnimatePresence } from "framer-motion";
 import Icon from "@mdi/react";
 import {
@@ -252,8 +253,9 @@ export default function LogsPage({ handleAuthFail }) {
 
   function formatTime(isoString) {
     if (!isoString) return "";
-    const date = new Date(isoString);
+    const date = parseUtcDate(isoString);
     return date.toLocaleTimeString("es-MX", {
+      timeZone: "America/Mexico_City",
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
@@ -262,8 +264,9 @@ export default function LogsPage({ handleAuthFail }) {
 
   function formatDate(isoString) {
     if (!isoString) return "";
-    const date = new Date(isoString);
+    const date = parseUtcDate(isoString);
     return date.toLocaleDateString("es-MX", {
+      timeZone: "America/Mexico_City",
       day: "2-digit",
       month: "short",
       year: "numeric",

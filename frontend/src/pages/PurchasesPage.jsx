@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatMxFullDateTime } from "../utils/dateUtils.js";
 import Icon from "@mdi/react";
 import {
   mdiPackageVariantClosed,
@@ -315,13 +316,7 @@ export default function PurchasesPage({
                   className="hover:bg-[#F7F6F2]/60 dark:hover:bg-[#202428]/50 transition-colors"
                 >
                   <td className="px-3.5 py-2 text-[#78716C] dark:text-[#9CA3AF] whitespace-nowrap">
-                    {new Date(item.created_at).toLocaleString("es-MX", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatMxFullDateTime(item.created_at)}
                   </td>
                   <td className="px-3.5 py-2 font-bold text-[#1C1917] dark:text-[#F3F2EE]">
                     {item.product_name}

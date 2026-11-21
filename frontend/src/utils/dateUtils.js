@@ -121,3 +121,42 @@ export function isQuincenaTriggerDay(nowDate = new Date()) {
   }
   return { isTriggerDay: false, quincenaTag: null, label: null };
 }
+
+export function parseUtcDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const str = String(value).trim();
+  // Si es formato ISO/SQL sin zona horaria (ej. "2026-11-18 14:52:00" o "2026-11-18T14:52:00"), forzar UTC
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(str)) {
+    return new Date(str.replace(" ", "T") + "Z");
+  }
+  return new Date(str);
+}
+
+export function formatMxDateTime(value, options = {}) {
+  const d = parseUtcDate(value);
+  if (!d || isNaN(d.getTime())) return "";
+  return d.toLocaleString("es-MX", {
+    timeZone: "America/Mexico_City",
+    ...options,
+  });
+}
+
+export function formatMxShortDateTime(value) {
+  return formatMxDateTime(value, {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function formatMxFullDateTime(value) {
+  return formatMxDateTime(value, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

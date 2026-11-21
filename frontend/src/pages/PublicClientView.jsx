@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatMxFullDateTime } from "../utils/dateUtils.js";
 import { useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Icon from "@mdi/react";
@@ -412,13 +413,7 @@ export default function PublicClientView() {
 
                     <div className="flex items-center justify-between text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
                       <span>
-                        {new Date(mov.created_at).toLocaleString("es-MX", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatMxFullDateTime(mov.created_at)}
                       </span>
 
                       {mov.items && mov.items.length > 0 && (
@@ -472,7 +467,7 @@ export default function PublicClientView() {
 
               <div className="mb-3 text-[11px] text-[#78716C] dark:text-[#9CA3AF]">
                 {selectedMovement.concept || "Compra"} —{" "}
-                {new Date(selectedMovement.created_at).toLocaleString("es-MX")}
+                {formatMxFullDateTime(selectedMovement.created_at)}
               </div>
 
               <div className="overflow-hidden rounded-xl border border-[#E5E2DA] dark:border-[#282C32]">
